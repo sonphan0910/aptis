@@ -1,0 +1,363 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Button,
+  Grid,
+  Chip,
+  Tab,
+  Tabs,
+  Divider,
+  Alert,
+  CircularProgress,
+  Container,
+  Breadcrumbs,
+  Link,
+} from '@mui/material';
+import {
+  Download,
+  Share,
+  Refresh,
+  ArrowBack,
+  NavigateNext,
+  Home,
+} from '@mui/icons-material';
+import NextLink from 'next/link';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchAttemptResults } from '@/store/slices/attemptSlice';
+import LoadingSpinner from '@/components/common/LoadingSpinner';
+import ResultsSummary from '@/components/results/ResultsSummary';
+import SkillScoreCard from '@/components/results/SkillScoreCard';
+import RadarChart from '@/components/results/RadarChart';
+import QuestionFeedback from '@/components/results/QuestionFeedback';
+
+function TabPanel({ children, value, index, ...other }) {
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`result-tabpanel-${index}`}
+      aria-labelledby={`result-tab-${index}`}
+      {...other}
+    >
+      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+    </div>
+  );
+}
+
+export default function ResultDetailPage() {
+  const [tabValue, setTabValue] = useState(0);
+  const { attemptId } = useParams();
+  const router = useRouter();
+  const dispatch = useDispatch();
+  
+  const { 
+    attemptResults, 
+    loading, 
+    error 
+  } = useSelector(state => state.attempts);
+  
+  const { user } = useSelector(state => state.auth);
+
+  useEffect(() => {
+    if (attemptId) {
+      dispatch(fetchAttemptResults(attemptId));
+    }
+  }, [attemptId, dispatch]);
+
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+  };
+
+  const handleRetakeExam = () => {
+    if (attemptResults?.exam) {
+      router.push(`/exams/${attemptResults.exam.id}`);
+    }
+  };
+
+  const handleGoBack = () => {
+    router.push('/results');
+  };
+
+  const handleDownloadReport = () => {
+    // Implementation for PDF download
+    console.log('Downloading report...');
+  };
+
+  const handleShare = () => {
+    // Implementation for sharing results
+    console.log('Sharing results...');
+  };
+
+  const formatResultDate = (dateString) => {
+    if (!dateString) return '-';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '-';
+      return date.toLocaleDateString('vi-VN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch (error) {
+      return '-';
+    }
+  };
+
+  if (loading) return <LoadingSpinner />;
+  if (error) {
+    return (
+      <Alert severity="error" sx={{ m: 2 }}>
+        {error}
+      </Alert>
+    );
+  }
+  if (!attemptResults) return null;
+
+  // Backend returns: { attempt, sectionScores, totalScore, status }
+  // attempt includes: exam (nested), sections
+  const { 
+    attempt, 
+    sectionScores = {}, 
+    totalScore 
+  } = attemptResults;
+
+  // Safety check - ensure attempt exists
+  if (!attempt) {
+    return (
+      <Alert severity="warning" sx={{ m: 2 }}>
+        Không tìm thấy kết quả bài thi. Vui lòng thử lại.
+      </Alert>
+    );
+  }
+
+  // Extract exam from nested structure
+  const exam = attempt.exam || {};
+  
+  // Convert sectionScores to skillScores array format
+  const skillScores = Object.values(sectionScores).map(section => {
+    const examSection = section.section;
+    return {
+      skillName: examSection?.skillType?.skill_type_name || 'Unknown',
+      score: section.score || 0,
+      maxScore: examSection?.section_max_score || 0,
+      percentage: examSection?.section_max_score 
+        ? Math.round((section.score / examSection?.section_max_score) * 100) 
+        : 0
+    };
+  });
+
+  // Calculate time spent in minutes
+  const timeSpent = attempt.end_time && attempt.start_time 
+    ? Math.round((new Date(attempt.end_time) - new Date(attempt.start_time)) / 60000)
+    : 0;
+
+  // Create questionResults array from attempt (placeholder structure)
+  // This would typically come from the backend
+  const questionResults = attemptResults.answers || [];
+
+  // Create overallStats object with safe values
+  const finalScore = totalScore || attempt.total_score || 0;
+  const finalMaxScore = exam.total_score || 100;
+  const safePercentage = finalMaxScore > 0 
+    ? Math.round((finalScore / finalMaxScore) * 100) 
+    : 0;
+
+  const overallStats = {
+    totalScore: finalScore,
+    maxScore: finalMaxScore,
+    percentage: safePercentage,
+    accuracy_percentage: safePercentage,
+    timeSpent: timeSpent
+  };
+
+  const isGradingComplete = attempt.status === 'submitted' || attempt.status === 'completed';
+  const hasTeacherReview = attempt.reviewed_at;
+
+  return (
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      {/* Breadcrumb */}
+      <Box mb={3}>
+        <Breadcrumbs
+          separator={<NavigateNext fontSize="small" />}
+          aria-label="breadcrumb"
+        >
+          <Link
+            component={NextLink}
+            href="/home"
+            underline="hover"
+            color="inherit"
+            display="flex"
+            alignItems="center"
+            gap={0.5}
+          >
+            <Home fontSize="small" />
+            Trang chủ
+          </Link>
+          <Link
+            component={NextLink}
+            href="/results"
+            underline="hover"
+            color="inherit"
+          >
+            Kết quả
+          </Link>
+          <Typography color="text.primary" sx={{ fontWeight: 500 }}>
+            {exam.title}
+          </Typography>
+        </Breadcrumbs>
+      </Box>
+
+      {/* Header */}
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Box>
+          <Button
+            startIcon={<ArrowBack />}
+            onClick={handleGoBack}
+            sx={{ mb: 1 }}
+          >
+            Quay lại danh sách
+          </Button>
+          <Typography variant="h4" component="h1">
+            Kết quả bài thi: {exam.title}
+          </Typography>
+          <Typography variant="subtitle1" color="textSecondary">
+            Ngày làm: {formatResultDate(attempt.start_time)}
+          </Typography>
+        </Box>
+        
+        <Box display="flex" gap={1}>
+          <Button
+            variant="contained"
+            startIcon={<Refresh />}
+            onClick={handleRetakeExam}
+          >
+            Làm lại
+          </Button>
+        </Box>
+      </Box>
+
+      {/* Status Alert */}
+      {!isGradingComplete && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          <Typography variant="body2">
+            Kết quả đang được xử lý. Điểm Writing và Speaking sẽ được cập nhật sau khi AI chấm điểm hoàn tất.
+          </Typography>
+        </Alert>
+      )}
+      
+      {hasTeacherReview && (
+        <Alert severity="success" sx={{ mb: 3 }}>
+          <Typography variant="body2">
+            ✓ Bài thi đã được giáo viên xem xét và cho feedback chi tiết.
+          </Typography>
+        </Alert>
+      )}
+
+      {/* Results Summary */}
+      <ResultsSummary 
+        attempt={{
+          ...attempt,
+          time_spent: attempt.time_spent || timeSpent * 60 // Use actual time_spent from backend
+        }}
+        exam={exam}
+        skillScores={skillScores}
+        overallStats={overallStats}
+      />
+
+      {/* Skills Performance */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        {skillScores.map((skill) => (
+          <Grid item xs={12} sm={6} md={4} key={skill.skillName}>
+            <SkillScoreCard skill={skill} />
+          </Grid>
+        ))}
+      </Grid>
+
+      {/* Radar Chart */}
+      {skillScores.length >= 3 && (
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Biểu đồ radar - So sánh kỹ năng
+            </Typography>
+            <RadarChart skillScores={skillScores} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Detailed Feedback Tabs */}
+      <Card>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <Tabs value={tabValue} onChange={handleTabChange}>
+            <Tab label="Tổng quan" />
+            <Tab label="Chi tiết câu hỏi" />
+            {hasTeacherReview && <Tab label="Nhận xét giáo viên" />}
+          </Tabs>
+        </Box>
+
+        <TabPanel value={tabValue} index={0}>
+          <Typography variant="h6" gutterBottom>
+            Phân tích tổng quan
+          </Typography>
+          
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle1" gutterBottom>
+                Thông tin bài thi
+              </Typography>
+              <Typography variant="body2" paragraph>
+                <strong>Loại:</strong> {attempt.attempt_type === 'full_exam' ? 'Toàn bộ bài thi' : 'Luyện tập kỹ năng'}<br/>
+                <strong>Thời gian làm bài:</strong> {Math.round((attempt.time_spent || 0) / 60)} phút<br/>
+                <strong>Số câu đã trả lời:</strong> {questionResults.length > 0 ? questionResults.filter(q => q.is_answered).length : '-'}/{questionResults.length > 0 ? questionResults.length : '-'}<br/>
+                <strong>Tỷ lệ đúng:</strong> {overallStats.accuracy_percentage ?? 0}%
+              </Typography>
+            </Grid>
+            
+            <Grid item xs={12} md={6}>
+              <Typography variant="subtitle1" gutterBottom>
+                Điểm chi tiết
+              </Typography>
+              {skillScores.map((skill) => (
+                <Typography key={skill.skillName || 'unknown'} variant="body2">
+                  <strong>{skill.skillName || 'Unknown'}:</strong> {skill.score || 0}/{skill.maxScore || skill.max_score || 0} 
+                  ({skill.percentage ?? 0}%)
+                </Typography>
+              ))}
+            </Grid>
+          </Grid>
+        </TabPanel>
+
+        <TabPanel value={tabValue} index={1}>
+          <QuestionFeedback 
+            questionResults={questionResults}
+            attemptId={attemptId}
+          />
+        </TabPanel>
+
+        {hasTeacherReview && (
+          <TabPanel value={tabValue} index={hasTeacherReview ? 2 : 1}>
+            <Typography variant="h6" gutterBottom>
+              Nhận xét từ giáo viên
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              Xem xét vào: {new Date(attempt.reviewed_at).toLocaleDateString('vi-VN')}
+            </Typography>
+            
+            {/* Teacher feedback will be shown here */}
+            <Alert severity="info" sx={{ mt: 2 }}>
+              Tính năng nhận xét giáo viên sẽ được triển khai trong phiên bản tiếp theo.
+            </Alert>
+          </TabPanel>
+        )}
+      </Card>
+    </Container>
+  );
+}

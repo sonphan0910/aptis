@@ -1,0 +1,410 @@
+const {
+  Exam,
+  ExamSection,
+  ExamSectionQuestion,
+  AptisType,
+  SkillType,
+  Question,
+  User,
+} = require('../../models');
+const { Op } = require('sequelize');
+const { paginate, paginationResponse } = require('../../utils/helpers');
+const { NotFoundError, BadRequestError } = require('../../utils/errors');
+const EmailService = require('../../services/EmailService');
+
+/**
+ * Create exam
+ */
+exports.createExam = async (req, res, next) => {
+  try {
+    const { aptis_type_id, title, duration_minutes, instructions } = req.body;
+    const teacherId = req.user.userId;
+
+    const exam = await Exam.create({
+      aptis_type_id,
+      title,
+      duration_minutes,
+      instructions: instructions || null,
+      status: 'draft',
+      created_by: teacherId,
+      total_score: 0,
+    });
+
+    res.status(201).json({
+      success: true,
+      data: exam,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Update exam
+ */
+exports.updateExam = async (req, res, next) => {
+  try {
+    const { examId } = req.params;
+    const updateData = req.body;
+
+    const exam = await Exam.findByPk(examId);
+
+    if (!exam) {
+      throw new NotFoundError('Exam not found');
+    }
+
+    if (exam.status === 'published') {
+      throw new BadRequestError('Cannot update published exam');
+    }
+
+    await exam.update(updateData);
+
+    res.json({
+      success: true,
+      data: exam,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Add section to exam
+ */
+exports.addSection = async (req, res, next) => {
+  try {
+    const { examId } = req.params;
+    const { skill_type_id, section_order, duration_minutes } = req.body;
+
+    const exam = await Exam.findByPk(examId);
+
+    if (!exam) {
+      throw new NotFoundError('Exam not found');
+    }
+
+    if (exam.status !== 'draft') {
+      throw new BadRequestError('Cannot modify published exam');
+    }
+
+    const section = await ExamSection.create({
+      exam_id: examId,
+      skill_type_id,
+      section_order,
+      duration_minutes: duration_minutes || null,
+    });
+
+    res.status(201).json({
+      success: true,
+      data: section,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Add question to section
+ */
+exports.addQuestionToSection = async (req, res, next) => {
+  try {
+    const { examId, sectionId } = req.params;
+    const { question_id, question_order, max_score } = req.body;
+
+    const section = await ExamSection.findOne({
+      where: { id: sectionId, exam_id: examId },
+    });
+
+    if (!section) {
+      throw new NotFoundError('Section not found');
+    }
+
+    const question = await Question.findByPk(question_id);
+    if (!question) {
+      throw new NotFoundError('Question not found');
+    }
+
+    const esq = await ExamSectionQuestion.create({
+      exam_section_id: sectionId,
+      question_id,
+      question_order,
+      max_score,
+    });
+
+    // Update total score
+    const exam = await Exam.findByPk(examId, {
+      include: [
+        {
+          model: ExamSection,
+          as: 'sections',
+          include: [
+            {
+              model: ExamSectionQuestion,
+              as: 'questions',
+            },
+          ],
+        },
+      ],
+    });
+
+    const totalScore = exam.sections.reduce(
+      (sum, sec) => sum + sec.questions.reduce((s, q) => s + parseFloat(q.max_score), 0),
+      0,
+    );
+
+    await exam.update({ total_score: totalScore });
+
+    res.status(201).json({
+      success: true,
+      data: esq,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Remove question from section
+ */
+exports.removeQuestionFromSection = async (req, res, next) => {
+  try {
+    const { examId, sectionId, questionId } = req.params;
+
+    const exam = await Exam.findByPk(examId);
+    if (!exam || exam.status !== 'draft') {
+      throw new BadRequestError('Cannot modify published exam');
+    }
+
+    const esq = await ExamSectionQuestion.findOne({
+      where: {
+        exam_section_id: sectionId,
+        question_id: questionId,
+      },
+    });
+
+    if (!esq) {
+      throw new NotFoundError('Question not found in section');
+    }
+
+    await esq.destroy();
+
+    res.json({
+      success: true,
+      message: 'Question removed from section',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Update question order in section (for drag-drop reordering)
+ */
+exports.updateQuestionInSection = async (req, res, next) => {
+  try {
+    const { examId, sectionId, questionId } = req.params;
+    const { order_index, points } = req.body;
+
+    const exam = await Exam.findByPk(examId);
+    if (!exam || exam.status !== 'draft') {
+      throw new BadRequestError('Cannot modify published exam');
+    }
+
+    const esq = await ExamSectionQuestion.findOne({
+      where: {
+        exam_section_id: sectionId,
+        question_id: questionId,
+      },
+    });
+
+    if (!esq) {
+      throw new NotFoundError('Question not found in section');
+    }
+
+    // Update order_index and/or points if provided
+    if (order_index !== undefined) {
+      esq.order_index = order_index;
+    }
+    if (points !== undefined) {
+      esq.points = points;
+    }
+
+    await esq.save();
+
+    res.json({
+      success: true,
+      message: 'Question updated in section',
+      data: esq,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Publish exam
+ */
+exports.publishExam = async (req, res, next) => {
+  try {
+    const { examId } = req.params;
+    const { notify_students = false } = req.body;
+
+    const exam = await Exam.findByPk(examId, {
+      include: [
+        {
+          model: ExamSection,
+          as: 'sections',
+          include: [
+            {
+              model: ExamSectionQuestion,
+              as: 'questions',
+            },
+          ],
+        },
+      ],
+    });
+
+    if (!exam) {
+      throw new NotFoundError('Exam not found');
+    }
+
+    if (exam.status === 'published') {
+      throw new BadRequestError('Exam already published');
+    }
+
+    // Validate exam has sections and questions
+    if (!exam.sections || exam.sections.length === 0) {
+      throw new BadRequestError('Exam must have at least one section');
+    }
+
+    for (const section of exam.sections) {
+      if (!section.questions || section.questions.length === 0) {
+        throw new BadRequestError('All sections must have at least one question');
+      }
+    }
+
+    await exam.update({
+      status: 'published',
+      published_at: new Date(),
+    });
+
+    // Send notification emails if requested
+    if (notify_students) {
+      const students = await User.findAll({
+        where: { role: 'student', status: 'active' },
+      });
+
+      const emailPromises = students.map((student) =>
+        EmailService.sendExamPublishedEmail(student.email, student.full_name, exam),
+      );
+
+      await Promise.allSettled(emailPromises);
+    }
+
+    res.json({
+      success: true,
+      data: exam,
+      message: 'Exam published successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get teacher's exams
+ */
+exports.getMyExams = async (req, res, next) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 20, 
+      status,
+      aptis_type,
+      skill,
+      search 
+    } = req.query;
+    const { offset, limit: validLimit } = paginate(page, limit);
+    const teacherId = req.user.userId;
+
+    const where = { created_by: teacherId };
+    
+    // Status filter
+    if (status) {
+      where.status = status;
+    }
+    
+    // APTIS type filter
+    if (aptis_type) {
+      where.aptis_type_id = aptis_type;
+    }
+    
+    // Search filter
+    if (search) {
+      where[Op.or] = [
+        { title: { [Op.like]: `%${search}%` } },
+        { description: { [Op.like]: `%${search}%` } }
+      ];
+    }
+
+    // Build include array
+    const include = [
+      {
+        model: AptisType,
+        as: 'aptisType',
+        attributes: ['id', 'code', 'aptis_type_name'],
+      },
+      {
+        model: ExamSection,
+        as: 'sections',
+        attributes: ['id', 'skill_type_id'],
+        include: [
+          {
+            model: SkillType,
+            as: 'skillType',
+            attributes: ['id', 'skill_type_name', 'code']
+          }
+        ]
+      },
+    ];
+
+    // If skill filter is applied, filter by related SkillType
+    if (skill) {
+      include[1].where = { skill_type_id: skill };
+      include[1].required = true; // INNER JOIN
+    }
+
+    const { count, rows } = await Exam.findAndCountAll({
+      where,
+      include,
+      offset,
+      limit: validLimit,
+      order: [['created_at', 'DESC']],
+      distinct: true, // Important for counting with joins
+    });
+
+    // Transform data to match frontend expectations
+    const transformedRows = rows.map(exam => ({
+      id: exam.id,
+      title: exam.title,
+      description: exam.description || '',
+      aptis_type: exam.aptisType?.aptis_type_name || 'Unknown',
+      aptis_type_id: exam.aptis_type_id,
+      duration_minutes: exam.duration_minutes || 0,
+      total_score: exam.total_score || 0,
+      status: exam.status,
+      is_published: exam.status === 'published',
+      total_sections: exam.sections?.length || 0,
+      total_questions: 0, // Calculate this from sections if needed
+      created_at: exam.created_at,
+      updated_at: exam.updated_at,
+      published_at: exam.published_at,
+    }));
+
+    res.json({
+      success: true,
+      ...paginationResponse(transformedRows, parseInt(page), validLimit, count),
+    });
+  } catch (error) {
+    next(error);
+  }
+};

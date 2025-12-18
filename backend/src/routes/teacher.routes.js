@@ -1,0 +1,218 @@
+const express = require('express');
+const router = express.Router();
+const questionController = require('../controllers/teacherController/questionController');
+const examController = require('../controllers/teacherController/examController');
+const criteriaController = require('../controllers/teacherController/criteriaController');
+const reviewController = require('../controllers/teacherController/reviewController');
+const reportController = require('../controllers/teacherController/reportController');
+const { authMiddleware } = require('../middleware/auth');
+const { isTeacherOrAdmin } = require('../middleware/roleCheck');
+const {
+  validate,
+  questionSchemas,
+  examSchemas,
+  criteriaSchemas,
+} = require('../middleware/validation');
+const { apiLimiter } = require('../middleware/rateLimiter');
+
+// Question routes
+router.post(
+  '/questions',
+  authMiddleware,
+  isTeacherOrAdmin,
+  validate(questionSchemas.createQuestion),
+  questionController.createQuestion,
+);
+
+router.get(
+  '/questions',
+  authMiddleware,
+  isTeacherOrAdmin,
+  apiLimiter,
+  questionController.getQuestions,
+);
+
+router.get(
+  '/questions/filter-options',
+  authMiddleware,
+  isTeacherOrAdmin,
+  questionController.getFilterOptions,
+);
+
+router.get(
+  '/questions/:questionId',
+  authMiddleware,
+  isTeacherOrAdmin,
+  questionController.getQuestionDetails,
+);
+
+router.put(
+  '/questions/:questionId',
+  authMiddleware,
+  isTeacherOrAdmin,
+  validate(questionSchemas.updateQuestion),
+  questionController.updateQuestion,
+);
+
+router.delete(
+  '/questions/:questionId',
+  authMiddleware,
+  isTeacherOrAdmin,
+  questionController.deleteQuestion,
+);
+
+router.get(
+  '/questions/:questionId/usage',
+  authMiddleware,
+  isTeacherOrAdmin,
+  questionController.getQuestionUsage,
+);
+
+// Exam routes
+router.post(
+  '/exams',
+  authMiddleware,
+  isTeacherOrAdmin,
+  validate(examSchemas.createExam),
+  examController.createExam,
+);
+
+router.put(
+  '/exams/:examId',
+  authMiddleware,
+  isTeacherOrAdmin,
+  validate(examSchemas.updateExam),
+  examController.updateExam,
+);
+
+router.post(
+  '/exams/:examId/sections',
+  authMiddleware,
+  isTeacherOrAdmin,
+  validate(examSchemas.addSection),
+  examController.addSection,
+);
+
+router.post(
+  '/exams/:examId/sections/:sectionId/questions',
+  authMiddleware,
+  isTeacherOrAdmin,
+  validate(examSchemas.addQuestion),
+  examController.addQuestionToSection,
+);
+
+router.delete(
+  '/exams/:examId/sections/:sectionId/questions/:questionId',
+  authMiddleware,
+  isTeacherOrAdmin,
+  examController.removeQuestionFromSection,
+);
+
+router.put(
+  '/exams/:examId/sections/:sectionId/questions/:questionId',
+  authMiddleware,
+  isTeacherOrAdmin,
+  validate(examSchemas.updateQuestionOrder),
+  examController.updateQuestionInSection,
+);
+
+router.post('/exams/:examId/publish', authMiddleware, isTeacherOrAdmin, examController.publishExam);
+
+router.get('/exams', authMiddleware, isTeacherOrAdmin, apiLimiter, examController.getMyExams);
+
+// AI Criteria routes
+router.post(
+  '/criteria',
+  authMiddleware,
+  isTeacherOrAdmin,
+  validate(criteriaSchemas.createCriteria),
+  criteriaController.createCriteria,
+);
+
+router.get(
+  '/criteria',
+  authMiddleware,
+  isTeacherOrAdmin,
+  apiLimiter,
+  criteriaController.getCriteriaList,
+);
+
+router.put(
+  '/criteria/:criteriaId',
+  authMiddleware,
+  isTeacherOrAdmin,
+  validate(criteriaSchemas.updateCriteria),
+  criteriaController.updateCriteria,
+);
+
+router.delete(
+  '/criteria/:criteriaId',
+  authMiddleware,
+  isTeacherOrAdmin,
+  criteriaController.deleteCriteria,
+);
+
+router.get(
+  '/criteria/:criteriaId/preview',
+  authMiddleware,
+  isTeacherOrAdmin,
+  criteriaController.previewCriteria,
+);
+
+// Review routes
+router.get(
+  '/review/pending',
+  authMiddleware,
+  isTeacherOrAdmin,
+  apiLimiter,
+  reviewController.getPendingReviews,
+);
+
+router.get(
+  '/review/answers/:answerId',
+  authMiddleware,
+  isTeacherOrAdmin,
+  reviewController.getAnswerForReview,
+);
+
+router.put(
+  '/review/answers/:answerId',
+  authMiddleware,
+  isTeacherOrAdmin,
+  reviewController.submitReview,
+);
+
+router.get(
+  '/review/exam/:examId',
+  authMiddleware,
+  isTeacherOrAdmin,
+  apiLimiter,
+  reviewController.getReviewsByExam,
+);
+
+// Report routes
+router.get(
+  '/reports/exam-statistics/:examId',
+  authMiddleware,
+  isTeacherOrAdmin,
+  reportController.getExamStatistics,
+);
+
+router.get(
+  '/reports/student-statistics',
+  authMiddleware,
+  isTeacherOrAdmin,
+  apiLimiter,
+  reportController.getStudentStatistics,
+);
+
+router.get(
+  '/reports/student/:studentId',
+  authMiddleware,
+  isTeacherOrAdmin,
+  reportController.getStudentReport,
+);
+
+router.get('/reports/export', authMiddleware, isTeacherOrAdmin, reportController.exportStatistics);
+
+module.exports = router;
