@@ -35,6 +35,11 @@ const QuestionItem = sequelize.define(
       allowNull: true,
       comment: 'For Fill Blanks/Gap Filling types',
     },
+    media_url: {
+      type: DataTypes.STRING(500),
+      allowNull: true,
+      comment: 'Individual audio file for this specific item (used in listening matching)'
+    },
   },
   {
     tableName: 'question_items',

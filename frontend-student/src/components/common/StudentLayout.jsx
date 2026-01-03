@@ -45,7 +45,7 @@ const bottomNavItems = [
   { label: 'Trang chủ', icon: <Home />, path: '/home' },
   { label: 'Đề thi', icon: <Assessment />, path: '/exams' },
   { label: 'Kết quả', icon: <History />, path: '/results' },
-  { label: 'Tiến độ', icon: <TrendingUp />, path: '/progress' },
+
   { label: 'Cá nhân', icon: <Person />, path: '/profile' },
 ];
 
@@ -53,7 +53,7 @@ const drawerItems = [
   { label: 'Trang chủ', icon: <Home />, path: '/home' },
   { label: 'Đề thi', icon: <Assessment />, path: '/exams' },
   { label: 'Kết quả', icon: <History />, path: '/results' },
-  { label: 'Tiến độ', icon: <TrendingUp />, path: '/progress' },
+
   { label: 'Cá nhân', icon: <Person />, path: '/profile' },
 ];
 

@@ -86,7 +86,6 @@ export default function ResultDetailPage() {
 
   const handleDownloadReport = () => {
     // Implementation for PDF download
-    console.log('Downloading report...');
   };
 
   const handleShare = () => {
@@ -164,8 +163,16 @@ export default function ResultDetailPage() {
   const questionResults = attemptResults.answers || [];
 
   // Create overallStats object with safe values
-  const finalScore = totalScore || attempt.total_score || 0;
-  const finalMaxScore = exam.total_score || 100;
+  // For skill_practice attempts, calculate based on selected skill only
+  let finalScore = totalScore || attempt.total_score || 0;
+  let finalMaxScore = exam.total_score || 100;
+  
+  // If this is a skill practice attempt, use only that skill's score
+  if (attempt.attempt_type === 'skill_practice' && skillScores.length === 1) {
+    finalScore = skillScores[0].score || 0;
+    finalMaxScore = skillScores[0].maxScore || skillScores[0].max_score || 1;
+  }
+  
   const safePercentage = finalMaxScore > 0 
     ? Math.round((finalScore / finalMaxScore) * 100) 
     : 0;
@@ -175,7 +182,8 @@ export default function ResultDetailPage() {
     maxScore: finalMaxScore,
     percentage: safePercentage,
     accuracy_percentage: safePercentage,
-    timeSpent: timeSpent
+    timeSpent: timeSpent,
+    isSkillPractice: attempt.attempt_type === 'skill_practice'
   };
 
   const isGradingComplete = attempt.status === 'submitted' || attempt.status === 'completed';
@@ -233,15 +241,7 @@ export default function ResultDetailPage() {
           </Typography>
         </Box>
         
-        <Box display="flex" gap={1}>
-          <Button
-            variant="contained"
-            startIcon={<Refresh />}
-            onClick={handleRetakeExam}
-          >
-            Làm lại
-          </Button>
-        </Box>
+        
       </Box>
 
       {/* Status Alert */}
@@ -272,14 +272,21 @@ export default function ResultDetailPage() {
         overallStats={overallStats}
       />
 
-      {/* Skills Performance */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        {skillScores.map((skill) => (
-          <Grid item xs={12} sm={6} md={4} key={skill.skillName}>
-            <SkillScoreCard skill={skill} />
+      {/* Skills Performance - only show if multiple skills */}
+      {skillScores.length > 1 && (
+        <>
+          <Typography variant="h5" gutterBottom sx={{ mt: 2, mb: 2 }}>
+            Phân tích theo kỹ năng
+          </Typography>
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            {skillScores.map((skill) => (
+              <Grid item xs={12} sm={6} md={4} key={skill.skillName}>
+                <SkillScoreCard skill={skill} />
+              </Grid>
+            ))}
           </Grid>
-        ))}
-      </Grid>
+        </>
+      )}
 
       {/* Radar Chart */}
       {skillScores.length >= 3 && (
@@ -315,8 +322,12 @@ export default function ResultDetailPage() {
               </Typography>
               <Typography variant="body2" paragraph>
                 <strong>Loại:</strong> {attempt.attempt_type === 'full_exam' ? 'Toàn bộ bài thi' : 'Luyện tập kỹ năng'}<br/>
-                <strong>Thời gian làm bài:</strong> {Math.round((attempt.time_spent || 0) / 60)} phút<br/>
-                <strong>Số câu đã trả lời:</strong> {questionResults.length > 0 ? questionResults.filter(q => q.is_answered).length : '-'}/{questionResults.length > 0 ? questionResults.length : '-'}<br/>
+                {attempt.attempt_type === 'skill_practice' && skillScores.length > 0 && (
+                  <>
+                    <strong>Kỹ năng:</strong> {skillScores[0].skillName || skillScores[0].skill_type || 'Unknown'}<br/>
+                  </>
+                )}
+                <strong>Số câu đã trả lời:</strong> {attemptResults.answered_questions ?? '-'}/{attemptResults.questions_count ?? '-'}<br/>
                 <strong>Tỷ lệ đúng:</strong> {overallStats.accuracy_percentage ?? 0}%
               </Typography>
             </Grid>
@@ -325,12 +336,19 @@ export default function ResultDetailPage() {
               <Typography variant="subtitle1" gutterBottom>
                 Điểm chi tiết
               </Typography>
-              {skillScores.map((skill) => (
-                <Typography key={skill.skillName || 'unknown'} variant="body2">
-                  <strong>{skill.skillName || 'Unknown'}:</strong> {skill.score || 0}/{skill.maxScore || skill.max_score || 0} 
-                  ({skill.percentage ?? 0}%)
+              {attempt.attempt_type === 'skill_practice' && skillScores.length === 1 ? (
+                <Typography variant="body2">
+                  <strong>{skillScores[0].skillName || skillScores[0].skill_type || 'Unknown'}:</strong> {overallStats.totalScore || 0}/{overallStats.maxScore || 0} 
+                  ({overallStats.percentage ?? 0}%)
                 </Typography>
-              ))}
+              ) : (
+                skillScores.map((skill) => (
+                  <Typography key={skill.skillName || 'unknown'} variant="body2">
+                    <strong>{skill.skillName || 'Unknown'}:</strong> {skill.score || 0}/{skill.maxScore || skill.max_score || 0} 
+                    ({skill.percentage ?? 0}%)
+                  </Typography>
+                ))
+              )}
             </Grid>
           </Grid>
         </TabPanel>

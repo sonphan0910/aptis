@@ -77,37 +77,37 @@ export default function RegisterPage() {
     const errors = {};
     
     if (!formData.fullName.trim()) {
-      errors.fullName = 'Full name is required';
+      errors.fullName = 'Họ và tên là bắt buộc';
     } else if (formData.fullName.length < 2) {
-      errors.fullName = 'Full name must be at least 2 characters';
+      errors.fullName = 'Họ và tên phải có ít nhất 2 ký tự';
     }
 
     if (!formData.email.trim()) {
-      errors.email = 'Email is required';
+      errors.email = 'Email là bắt buộc';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      errors.email = 'Please enter a valid email';
+      errors.email = 'Vui lòng nhập email hợp lệ';
     }
 
     if (!formData.phone.trim()) {
-      errors.phone = 'Phone number is required';
-    } else if (!/^[0-9]{10,15}$/.test(formData.phone.replace(/\s+/g, ''))) {
-      errors.phone = 'Please enter a valid phone number';
+      errors.phone = 'Số điện thoại là bắt buộc';
+    } else if (!/^[\+]?[\s\-\(\)]*([0-9][\s\-\(\)]*){10,15}$/.test(formData.phone)) {
+      errors.phone = 'Vui lòng nhập số điện thoại hợp lệ (VD: +84 901 234 567)';
     }
 
     if (!formData.password.trim()) {
-      errors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      errors.password = 'Password must be at least 8 characters';
+      errors.password = 'Mật khẩu là bắt buộc';
+    } else if (formData.password.length < 6) {
+      errors.password = 'Mật khẩu phải có ít nhất 6 ký tự';
     }
 
     if (!formData.confirmPassword.trim()) {
-      errors.confirmPassword = 'Please confirm your password';
+      errors.confirmPassword = 'Vui lòng xác nhận mật khẩu';
     } else if (formData.password !== formData.confirmPassword) {
-      errors.confirmPassword = 'Passwords do not match';
+      errors.confirmPassword = 'Mật khẩu không khớp';
     }
 
     if (!formData.agreeToTerms) {
-      errors.agreeToTerms = 'You must agree to the terms and conditions';
+      errors.agreeToTerms = 'Bạn phải đồng ý với điều khoản và điều kiện';
     }
 
     setValidationErrors(errors);
@@ -142,10 +142,10 @@ export default function RegisterPage() {
   };
 
   const getPasswordStrengthText = () => {
-    if (passwordStrength < 25) return 'Very Weak';
-    if (passwordStrength < 50) return 'Weak';
-    if (passwordStrength < 75) return 'Medium';
-    return 'Strong';
+    if (passwordStrength < 25) return 'Rất yếu';
+    if (passwordStrength < 50) return 'Yếu';
+    if (passwordStrength < 75) return 'Trung bình';
+    return 'Mạnh';
   };
 
   return (
@@ -166,10 +166,10 @@ export default function RegisterPage() {
             <Box sx={{ textAlign: 'center', mb: 3 }}>
               <School sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
               <Typography variant="h4" component="h1" gutterBottom>
-                Join APTIS
+                Tham gia APTIS
               </Typography>
               <Typography variant="body1" color="text.secondary">
-                Create your student account to start practicing
+                Tạo tài khoản học viên để bắt đầu luyện tập
               </Typography>
             </Box>
 
@@ -186,7 +186,7 @@ export default function RegisterPage() {
                 fullWidth
                 id="fullName"
                 name="fullName"
-                label="Full Name"
+                label="Họ và tên"
                 type="text"
                 value={formData.fullName}
                 onChange={handleChange}
@@ -205,7 +205,7 @@ export default function RegisterPage() {
                 fullWidth
                 id="email"
                 name="email"
-                label="Email Address"
+                label="Địa chỉ Email"
                 type="email"
                 value={formData.email}
                 onChange={handleChange}
@@ -223,7 +223,7 @@ export default function RegisterPage() {
                 fullWidth
                 id="phone"
                 name="phone"
-                label="Phone Number"
+                label="Số điện thoại"
                 type="tel"
                 value={formData.phone}
                 onChange={handleChange}
@@ -241,7 +241,7 @@ export default function RegisterPage() {
                 fullWidth
                 id="password"
                 name="password"
-                label="Password"
+                label="Mật khẩu"
                 type="password"
                 value={formData.password}
                 onChange={handleChange}
@@ -260,7 +260,7 @@ export default function RegisterPage() {
                 <Box sx={{ mb: 2 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                     <Typography variant="caption" color="text.secondary">
-                      Password Strength:
+                      Độ mạnh mật khẩu:
                     </Typography>
                     <Chip
                       label={getPasswordStrengthText()}
@@ -282,7 +282,7 @@ export default function RegisterPage() {
                 fullWidth
                 id="confirmPassword"
                 name="confirmPassword"
-                label="Confirm Password"
+                label="Xác nhận mật khẩu"
                 type="password"
                 value={formData.confirmPassword}
                 onChange={handleChange}
@@ -307,13 +307,13 @@ export default function RegisterPage() {
                 }
                 label={
                   <Typography variant="body2">
-                    I agree to the{' '}
+                    Tôi đồng ý với{' '}
                     <Link href="/terms" variant="body2" sx={{ textDecoration: 'none' }}>
-                      Terms and Conditions
+                      Điều khoản và Điều kiện
                     </Link>{' '}
-                    and{' '}
+                    và{' '}
                     <Link href="/privacy" variant="body2" sx={{ textDecoration: 'none' }}>
-                      Privacy Policy
+                      Chính sách Bảo mật
                     </Link>
                   </Typography>
                 }
@@ -337,21 +337,21 @@ export default function RegisterPage() {
                 {isLoading ? (
                   <CircularProgress size={24} color="inherit" />
                 ) : (
-                  'Create Account'
+                  'Tạo tài khoản'
                 )}
               </Button>
             </Box>
 
             <Divider sx={{ my: 3 }}>
               <Typography variant="body2" color="text.secondary">
-                Already have an account?
+                Đã có tài khoản?
               </Typography>
             </Divider>
 
             <Box sx={{ textAlign: 'center' }}>
               <Typography variant="body2" color="text.secondary">
                 <Link href="/login" variant="body2" sx={{ textDecoration: 'none' }}>
-                  Sign in here
+                  Đăng nhập tại đây
                 </Link>
               </Typography>
             </Box>

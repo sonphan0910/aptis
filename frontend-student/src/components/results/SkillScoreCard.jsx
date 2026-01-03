@@ -16,8 +16,8 @@ import {
 
 export default function SkillScoreCard({ skill }) {
   // Safe calculation to avoid NaN
-  const maxScore = skill.maxScore ?? skill.max_score ?? 1; // Fallback to 1 to avoid division by zero
-  const score = skill.score ?? 0;
+  const maxScore = Number(skill.maxScore ?? skill.max_score ?? 1); // Fallback to 1 to avoid division by zero
+  const score = Number(skill.score ?? 0);
   const percentage = maxScore > 0 ? (score / maxScore) * 100 : 0;
   
   const getPerformanceColor = () => {
@@ -65,10 +65,10 @@ export default function SkillScoreCard({ skill }) {
         
         <Box display="flex" alignItems="baseline" mb={2}>
           <Typography variant="h4" component="div" fontWeight="bold">
-            {skill.score}
+            {score}
           </Typography>
           <Typography variant="body1" color="textSecondary" sx={{ ml: 1 }}>
-            / {skill.max_score}
+            / {maxScore}
           </Typography>
           <Typography variant="h6" color="primary" sx={{ ml: 'auto' }}>
             {percentage.toFixed(1)}%

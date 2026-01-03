@@ -19,13 +19,6 @@ apiClient.interceptors.request.use(
       const tokenFromSessionStorage = sessionStorage.getItem('token');
       const token = tokenFromLocalStorage || tokenFromSessionStorage;
       
-      console.log('[API Request]', config.url, {
-        hasTokenLS: !!tokenFromLocalStorage,
-        hasTokenSS: !!tokenFromSessionStorage,
-        willSendToken: !!token,
-        tokenLength: token?.length
-      });
-      
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -52,7 +45,6 @@ apiClient.interceptors.response.use(
           throw new Error('No refresh token available');
         }
 
-        console.log('Attempting to refresh token...');
         const response = await axios.post(`${API_BASE_URL}/auth/refresh-token`, {
           refresh_token: refreshToken,
         });
@@ -80,10 +72,8 @@ apiClient.interceptors.response.use(
 
         // Update the authorization header and retry the request
         originalRequest.headers.Authorization = `Bearer ${newToken}`;
-        console.log('Token refreshed successfully, retrying request');
         return apiClient(originalRequest);
       } catch (refreshError) {
-        console.error('Token refresh failed:', refreshError);
         // Refresh failed, clear tokens and redirect to login
         localStorage.removeItem('token');
         localStorage.removeItem('refreshToken');
@@ -107,6 +97,24 @@ apiClient.interceptors.response.use(
 );
 
 // Generic API methods
+// Helper to get full URL for static assets (uploads)
+export const getAssetUrl = (relativePath) => {
+  if (!relativePath) return '';
+  
+  // If already absolute URL, return as-is
+  if (relativePath.startsWith('http://') || relativePath.startsWith('https://')) {
+    return relativePath;
+  }
+  
+  // Build URL from backend server (remove /api from base URL)
+  const serverUrl = API_BASE_URL.replace('/api', '');
+  
+  // Ensure path starts with /
+  const path = relativePath.startsWith('/') ? relativePath : `/${relativePath}`;
+  
+  return `${serverUrl}${path}`;
+};
+
 export const api = {
   get: (url, config = {}) => apiClient.get(url, config),
   post: (url, data = {}, config = {}) => apiClient.post(url, data, config),

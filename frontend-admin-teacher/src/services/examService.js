@@ -38,9 +38,33 @@ export const examApi = {
     return response.data;
   },
 
+  // Unpublish an exam
+  unpublishExam: async (id) => {
+    const response = await apiClient.post(API_ENDPOINTS.TEACHER.EXAMS.UNPUBLISH(id));
+    return response.data;
+  },
+
+  // Duplicate an exam
+  duplicateExam: async (id) => {
+    const response = await apiClient.post(API_ENDPOINTS.TEACHER.EXAMS.DUPLICATE(id));
+    return response.data;
+  },
+
   // Add section to exam
   addSection: async (examId, sectionData) => {
     const response = await apiClient.post(API_ENDPOINTS.TEACHER.EXAMS.ADD_SECTION(examId), sectionData);
+    return response.data;
+  },
+
+  // Remove section from exam
+  removeSection: async (examId, sectionId) => {
+    const response = await apiClient.delete(API_ENDPOINTS.TEACHER.EXAMS.REMOVE_SECTION(examId, sectionId));
+    return response.data;
+  },
+
+  // Update section
+  updateSection: async (examId, sectionId, sectionData) => {
+    const response = await apiClient.put(API_ENDPOINTS.TEACHER.EXAMS.UPDATE_SECTION(examId, sectionId), sectionData);
     return response.data;
   },
 

@@ -18,14 +18,30 @@ export const attemptService = {
 
   // Save answer for a question
   saveAnswer: (answerData) => {
-    return api.post(`/student/attempts/${answerData.attempt_id}/answers`, answerData);
+    // Ensure answer_type is always included
+    const dataWithType = {
+      ...answerData,
+      answer_type: answerData.answer_type || 'text' // Default to text if not specified
+    };
+    return api.post(`/student/attempts/${dataWithType.attempt_id}/answers`, dataWithType);
   },
 
   // Upload audio answer for speaking questions
   uploadAudioAnswer: (attemptId, questionId, audioFile, onUploadProgress) => {
     const formData = new FormData();
-    formData.append('audio', audioFile);
+    
+    // Create proper filename with extension based on MIME type
+    const mimeType = audioFile.type || 'audio/webm';
+    const extension = mimeType.includes('opus') ? '.webm' : 
+                     mimeType.includes('webm') ? '.webm' : 
+                     mimeType.includes('mp4') ? '.mp4' : '.webm';
+    const filename = `speaking_q${questionId}_${Date.now()}${extension}`;
+    
+    formData.append('audio', audioFile, filename);
     formData.append('question_id', questionId);
+    formData.append('answer_type', 'audio'); // Explicitly specify answer_type
+    formData.append('duration', Math.round(audioFile.duration || 30));
+    
     
     return api.upload(
       `/student/attempts/${attemptId}/answers/audio`,

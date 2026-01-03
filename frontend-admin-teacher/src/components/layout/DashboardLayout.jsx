@@ -15,12 +15,10 @@ import {
   MenuItem,
   useMediaQuery,
   useTheme,
-  Badge,
   Tooltip,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
-  Notifications as NotificationsIcon,
   AccountCircle,
   Logout,
   Settings,
@@ -28,9 +26,8 @@ import {
   School,
 } from '@mui/icons-material';
 import { logout } from '@/store/slices/authSlice';
-import { toggleSidebar, setSidebarOpen } from '@/store/slices/uiSlice';
+import { setSidebarOpen } from '@/store/slices/uiSlice';
 import Sidebar from './Sidebar';
-import Notifications from './Notifications';
 
 const DRAWER_WIDTH = 280;
 
@@ -39,28 +36,33 @@ export default function DashboardLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
   const dispatch = useDispatch();
-  const isMobile = useMediaQuery(theme.breakpoints.down('lg'));
 
-  const { user } = useSelector((state) => state.auth);
-  const { sidebarOpen, mobileOpen } = useSelector((state) => state.ui);
-
+  const [mounted, setMounted] = useState(false);
   const [anchorElUser, setAnchorElUser] = useState(null);
-  const [notificationAnchor, setNotificationAnchor] = useState(null);
+  const [isMobile, setIsMobile] = useState(false);
 
-  // Handle drawer toggle for mobile
+  // Always call hooks unconditionally
+  const user = useSelector((state) => state?.auth?.user);
+  const sidebarOpen = useSelector((state) => state?.ui?.sidebarOpen ?? true);
+
+  // Hydration fix - only run on client side
   useEffect(() => {
-    if (isMobile) {
-      dispatch(setSidebarOpen(false));
-    }
-  }, [pathname, isMobile, dispatch]);
+    setMounted(true);
+    // Set mobile state after mount
+    const mediaQuery = window.matchMedia(theme.breakpoints.down('lg').replace('@media ', ''));
+    setIsMobile(mediaQuery.matches);
+    
+    const handleChange = (e) => setIsMobile(e.matches);
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, [theme]);
 
-  const handleDrawerToggle = () => {
-    if (isMobile) {
-      dispatch(setSidebarOpen(!mobileOpen));
-    } else {
-      dispatch(toggleSidebar());
+  // Ensure sidebar is always open
+  useEffect(() => {
+    if (mounted && !sidebarOpen) {
+      dispatch(setSidebarOpen(true));
     }
-  };
+  }, [mounted, sidebarOpen, dispatch]);
 
   const handleUserMenuOpen = (event) => {
     setAnchorElUser(event.currentTarget);
@@ -68,14 +70,6 @@ export default function DashboardLayout({ children }) {
 
   const handleUserMenuClose = () => {
     setAnchorElUser(null);
-  };
-
-  const handleNotificationOpen = (event) => {
-    setNotificationAnchor(event.currentTarget);
-  };
-
-  const handleNotificationClose = () => {
-    setNotificationAnchor(null);
   };
 
   const handleLogout = async () => {
@@ -118,7 +112,7 @@ export default function DashboardLayout({ children }) {
   );
 
   return (
-    <Box sx={{ display: 'flex' }}>
+    <Box sx={{ display: 'flex' }} suppressHydrationWarning>
       {/* App Bar */}
       <AppBar
         position="fixed"
@@ -133,16 +127,6 @@ export default function DashboardLayout({ children }) {
         }}
       >
         <Toolbar>
-          <IconButton
-            color="inherit"
-            aria-label="open drawer"
-            edge="start"
-            onClick={handleDrawerToggle}
-            sx={{ mr: 2 }}
-          >
-            <MenuIcon />
-          </IconButton>
-
           <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
             <School sx={{ mr: 1 }} />
             <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 'bold' }}>
@@ -155,20 +139,6 @@ export default function DashboardLayout({ children }) {
           </Typography>
 
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            {/* Notifications */}
-            <Tooltip title="Thông báo">
-              <IconButton
-                size="large"
-                color="inherit"
-                onClick={handleNotificationOpen}
-                sx={{ mr: 1 }}
-              >
-                <Badge badgeContent={3} color="error">
-                  <NotificationsIcon />
-                </Badge>
-              </IconButton>
-            </Tooltip>
-
             {/* User Menu */}
             <Tooltip title="Tài khoản">
               <IconButton
@@ -224,37 +194,11 @@ export default function DashboardLayout({ children }) {
         </MenuItem>
       </Menu>
 
-      {/* Notifications Popover */}
-      <Notifications
-        anchorEl={notificationAnchor}
-        open={Boolean(notificationAnchor)}
-        onClose={handleNotificationClose}
-      />
-
       {/* Navigation Drawer */}
       <Box
         component="nav"
         sx={{ width: { lg: sidebarOpen ? DRAWER_WIDTH : 0 }, flexShrink: { lg: 0 } }}
       >
-        {/* Mobile drawer */}
-        <Drawer
-          variant="temporary"
-          open={mobileOpen}
-          onClose={() => dispatch(setSidebarOpen(false))}
-          ModalProps={{
-            keepMounted: true, // Better open performance on mobile.
-          }}
-          sx={{
-            display: { xs: 'block', lg: 'none' },
-            '& .MuiDrawer-paper': {
-              boxSizing: 'border-box',
-              width: DRAWER_WIDTH,
-            },
-          }}
-        >
-          {drawerContent}
-        </Drawer>
-
         {/* Desktop drawer */}
         <Drawer
           variant="persistent"

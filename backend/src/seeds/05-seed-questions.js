@@ -8,20 +8,20 @@ const {
   AptisType,
   User,
 } = require('../models');
+const VoiceRSSService = require('../services/VoiceRSSService');
 
 /**
- * Seed APTIS questions theo cấu trúc thực tế (250 điểm tổng)
+ * Seed APTIS questions theo cấu trúc thực tế (200 điểm tổng)
  * 
- * CẤUTRÚC ĐỀ THI APTIS:
- * - Grammar & Vocabulary: 50 điểm (25 Grammar + 25 Vocabulary)
- * - Reading: 50 điểm (25 câu trong 4 parts)
- * - Listening: 50 điểm (25 câu trong 4 parts)
- * - Writing: 50 điểm (4 tasks, AI scoring)
- * - Speaking: 50 điểm (4 tasks, AI scoring)
+ * CẤU TRÚC ĐỀ THI APTIS:
+ * - Reading: 20 câu (Part 1: 5 Gap Filling, Part 2: 5 Ordering, Part 3: 5 Matching, Part 4: 5 Matching Headings)
+ * - Listening: 25 câu (4 parts)
+ * - Writing: 4 tasks (AI scoring)
+ * - Speaking: 4 tasks (AI scoring)
  */
 async function seedQuestions() {
   try {
-    console.log('[Seed] Seeding APTIS questions (250 điểm tổng)...');
+    console.log('[Seed] Seeding APTIS questions...');
 
     const aptisType = await AptisType.findOne({ where: { code: 'APTIS_GENERAL' } });
     const teacher = await User.findOne({ where: { email: 'teacher1@aptis.local' } });
@@ -31,8 +31,6 @@ async function seedQuestions() {
     }
 
     // Seed questions for each skill
-    await seedGrammarQuestions(aptisType, teacher);
-    await seedVocabularyQuestions(aptisType, teacher);
     await seedReadingQuestions(aptisType, teacher);
     await seedListeningQuestions(aptisType, teacher);
     await seedWritingQuestions(aptisType, teacher);
@@ -46,396 +44,548 @@ async function seedQuestions() {
 }
 
 // ========================================
-// GRAMMAR - 25 câu MCQ (25 điểm, mỗi câu 1 điểm)
+// GRAMMAR (REMOVED - Only 4 skills: Reading, Listening, Writing, Speaking)
 // ========================================
 async function seedGrammarQuestions(aptisType, teacher) {
-  console.log('[Seed] Seeding 25 Grammar questions...');
-  
-  const grammarType = await QuestionType.findOne({ where: { code: 'GV_MCQ' } });
-
-  const questions = [
-    { content: 'She _____ to work by bus every day.', options: ['go', 'goes', 'going', 'gone'], correct: 1, difficulty: 'easy' },
-    { content: 'I _____ my homework when the phone rang.', options: ['do', 'did', 'was doing', 'have done'], correct: 2, difficulty: 'medium' },
-    { content: 'If I _____ rich, I would buy a yacht.', options: ['am', 'was', 'were', 'be'], correct: 2, difficulty: 'medium' },
-    { content: 'The book _____ by many students.', options: ['reads', 'is read', 'read', 'reading'], correct: 1, difficulty: 'easy' },
-    { content: 'She is _____ than her sister.', options: ['tall', 'taller', 'tallest', 'more tall'], correct: 1, difficulty: 'easy' },
-    { content: 'By next year, I _____ here for 10 years.', options: ['work', 'will work', 'will have worked', 'worked'], correct: 2, difficulty: 'hard' },
-    { content: 'The meeting _____ at 3 PM tomorrow.', options: ['start', 'starts', 'is starting', 'will start'], correct: 3, difficulty: 'medium' },
-    { content: 'She _____ English for 5 years.', options: ['learns', 'is learning', 'has been learning', 'learned'], correct: 2, difficulty: 'medium' },
-    { content: 'The report _____ yesterday.', options: ['completed', 'was completed', 'completes', 'completing'], correct: 1, difficulty: 'easy' },
-    { content: 'Neither John nor his friends _____ coming.', options: ['is', 'are', 'was', 'were'], correct: 1, difficulty: 'hard' },
-    { content: 'I would rather you _____ smoke here.', options: ["don't", "didn't", "not", "doesn't"], correct: 1, difficulty: 'hard' },
-    { content: 'She asked me where _____.', options: ['do I live', 'I live', 'I lived', 'did I live'], correct: 2, difficulty: 'medium' },
-    { content: 'He _____ be at home. His car is there.', options: ['must', 'can', 'may', 'should'], correct: 0, difficulty: 'medium' },
-    { content: 'The window _____ by the kids.', options: ['broke', 'was broken', 'has broken', 'breaking'], correct: 1, difficulty: 'easy' },
-    { content: 'I _____ to Paris three times.', options: ['went', 'have been', 'go', 'going'], correct: 1, difficulty: 'easy' },
-    { content: 'She _____ dinner when I called.', options: ['cooks', 'was cooking', 'cooked', 'cooking'], correct: 1, difficulty: 'medium' },
-    { content: 'The faster you run, _____ you finish.', options: ['the sooner', 'sooner', 'soonest', 'soon'], correct: 0, difficulty: 'hard' },
-    { content: '_____ it rains, we will cancel.', options: ['If', 'When', 'Unless', 'Although'], correct: 0, difficulty: 'medium' },
-    { content: 'I look forward _____ you.', options: ['to see', 'to seeing', 'see', 'seeing'], correct: 1, difficulty: 'medium' },
-    { content: 'He denied _____ the money.', options: ['to steal', 'stealing', 'steal', 'stole'], correct: 1, difficulty: 'hard' },
-    { content: 'She _____ have left. Her bag is gone.', options: ['must', 'can', 'should', 'may'], correct: 0, difficulty: 'medium' },
-    { content: 'The house _____ we lived was old.', options: ['which', 'where', 'what', 'who'], correct: 0, difficulty: 'medium' },
-    { content: '_____ you help me?', options: ['Can', 'May', 'Must', 'Should'], correct: 0, difficulty: 'easy' },
-    { content: 'He is _____ person I know.', options: ['the kindest', 'kinder', 'kind', 'more kind'], correct: 0, difficulty: 'easy' },
-    { content: 'She would have passed if she _____ harder.', options: ['studied', 'had studied', 'studies', 'studying'], correct: 1, difficulty: 'hard' },
-  ];
-
-  for (let i = 0; i < questions.length; i++) {
-    const q = questions[i];
-    const question = await Question.create({
-      question_type_id: grammarType.id,
-      aptis_type_id: aptisType.id,
-      difficulty: q.difficulty,
-      content: q.content,
-      created_by: teacher.id,
-      status: 'active',
-    });
-
-    for (let j = 0; j < q.options.length; j++) {
-      await QuestionOption.create({
-        question_id: question.id,
-        item_id: null,
-        option_text: q.options[j],
-        option_order: j + 1,
-        is_correct: j === q.correct,
-      });
-    }
-  }
-
-  console.log(`[Seed] ✓ 25 Grammar questions created (25 điểm)`);
+  // Deprecated: Grammar & Vocabulary removed from APTIS structure
+  console.log('[Seed] Skipping Grammar questions (removed from APTIS)');
 }
 
 // ========================================
-// VOCABULARY - 25 câu MCQ (25 điểm, mỗi câu 1 điểm)
-// ========================================
-async function seedVocabularyQuestions(aptisType, teacher) {
-  console.log('[Seed] Seeding 25 Vocabulary questions...');
-  
-  const vocabType = await QuestionType.findOne({ where: { code: 'GV_MCQ' } });
-
-  const questions = [
-    { content: 'Choose the word closest to "abundant":', options: ['scarce', 'plentiful', 'expensive', 'rare'], correct: 1, difficulty: 'medium' },
-    { content: 'Synonym of "immediately":', options: ['slowly', 'later', 'instantly', 'eventually'], correct: 2, difficulty: 'easy' },
-    { content: 'Opposite of "transparent":', options: ['clear', 'opaque', 'visible', 'obvious'], correct: 1, difficulty: 'medium' },
-    { content: 'What does "meticulous" mean?', options: ['careless', 'very careful', 'quick', 'simple'], correct: 1, difficulty: 'hard' },
-    { content: 'She has a _____ for languages.', options: ['hatred', 'talent', 'difficulty', 'problem'], correct: 1, difficulty: 'medium' },
-    { content: 'Synonym of "ancient":', options: ['modern', 'new', 'old', 'recent'], correct: 2, difficulty: 'easy' },
-    { content: 'Opposite of "expand":', options: ['grow', 'enlarge', 'contract', 'extend'], correct: 2, difficulty: 'medium' },
-    { content: 'What does "ambiguous" mean?', options: ['clear', 'uncertain', 'definite', 'obvious'], correct: 1, difficulty: 'hard' },
-    { content: 'Synonym of "diligent":', options: ['lazy', 'hardworking', 'careless', 'slow'], correct: 1, difficulty: 'medium' },
-    { content: 'Synonym of "eloquent":', options: ['silent', 'articulate', 'quiet', 'confused'], correct: 1, difficulty: 'hard' },
-    { content: 'Opposite of "artificial":', options: ['fake', 'natural', 'synthetic', 'manufactured'], correct: 1, difficulty: 'easy' },
-    { content: 'Meaning of "innovative":', options: ['traditional', 'creative', 'old', 'boring'], correct: 1, difficulty: 'medium' },
-    { content: 'Synonym of "crucial":', options: ['unimportant', 'optional', 'essential', 'minor'], correct: 2, difficulty: 'medium' },
-    { content: 'What does "concise" mean?', options: ['lengthy', 'brief', 'detailed', 'complex'], correct: 1, difficulty: 'medium' },
-    { content: 'Opposite of "genuine":', options: ['real', 'authentic', 'fake', 'true'], correct: 2, difficulty: 'easy' },
-    { content: 'Word meaning "to make worse":', options: ['improve', 'exacerbate', 'fix', 'solve'], correct: 1, difficulty: 'hard' },
-    { content: 'Synonym of "adequate":', options: ['insufficient', 'enough', 'excessive', 'lacking'], correct: 1, difficulty: 'medium' },
-    { content: 'Meaning of "tedious":', options: ['exciting', 'boring', 'interesting', 'fun'], correct: 1, difficulty: 'medium' },
-    { content: 'Opposite of "obsolete":', options: ['outdated', 'old', 'modern', 'ancient'], correct: 2, difficulty: 'hard' },
-    { content: 'What does "candid" mean?', options: ['dishonest', 'frank', 'secretive', 'shy'], correct: 1, difficulty: 'medium' },
-    { content: 'Synonym of "benevolent":', options: ['cruel', 'kind', 'mean', 'selfish'], correct: 1, difficulty: 'hard' },
-    { content: 'Word meaning "to spread throughout":', options: ['contain', 'permeate', 'block', 'stop'], correct: 1, difficulty: 'hard' },
-    { content: 'Opposite of "voluntary":', options: ['willing', 'compulsory', 'optional', 'free'], correct: 1, difficulty: 'medium' },
-    { content: 'Meaning of "frugal":', options: ['wasteful', 'economical', 'generous', 'expensive'], correct: 1, difficulty: 'hard' },
-    { content: 'Synonym of "contemporary":', options: ['ancient', 'modern', 'historical', 'past'], correct: 1, difficulty: 'medium' },
-  ];
-
-  for (let i = 0; i < questions.length; i++) {
-    const q = questions[i];
-    const question = await Question.create({
-      question_type_id: vocabType.id,
-      aptis_type_id: aptisType.id,
-      difficulty: q.difficulty,
-      content: q.content,
-      created_by: teacher.id,
-      status: 'active',
-    });
-
-    for (let j = 0; j < q.options.length; j++) {
-      await QuestionOption.create({
-        question_id: question.id,
-        item_id: null,
-        option_text: q.options[j],
-        option_order: j + 1,
-        is_correct: j === q.correct,
-      });
-    }
-  }
-
-  console.log(`[Seed] ✓ 25 Vocabulary questions created (25 điểm)`);
-}
-
-// ========================================
-// READING - 25 câu trong 4 parts (50 điểm tổng)
-// Part 1: MCQ - 7 câu x 2 điểm = 14 điểm
-// Part 2: Matching - 6 câu x 2 điểm = 12 điểm
-// Part 3: True/False - 7 câu x 2 điểm = 14 điểm
-// Part 4: Short Answer - 5 câu x 2 điểm = 10 điểm
+// READING - 20 câu trong 4 parts
+// Part 1: Gap Filling - 5 câu
+// Part 2: Ordering - 5 câu
+// Part 3: Matching - 5 items
+// Part 4: Matching Headings - 5 items
 // ========================================
 async function seedReadingQuestions(aptisType, teacher) {
-  console.log('[Seed] Seeding 25 Reading questions in 4 parts...');
+  console.log('[Seed] Seeding 25 Reading questions in 5 parts...');
 
-  // Part 1: MCQ (7 câu)
-  const readingMcqType = await QuestionType.findOne({ where: { code: 'READING_MCQ' } });
+  // Part 1: Gap Filling (5 câu) - Chọn từ từ danh sách để điền vào chỗ trống
+  const readingGapFillType = await QuestionType.findOne({ where: { code: 'READING_GAP_FILL' } });
   
-  const passage1 = `Climate change is one of the most pressing issues facing our planet today. Rising global temperatures are causing ice caps to melt, sea levels to rise, and weather patterns to become increasingly unpredictable. Scientists around the world are working to understand the full impact of climate change and develop strategies to mitigate its effects.`;
-
-  const mcqQuestions = [
-    'What is the main topic of the passage?',
-    'According to the passage, what is happening to ice caps?',
-    'What are scientists trying to do?',
-    'What is mentioned about weather patterns?',
-    'What does "mitigate" mean in this context?',
-    'What is causing sea levels to rise?',
-    'What is described as "pressing" in the passage?',
+  const gapFillingQuestions = [
+    {
+      passage: 'Dear Sam,\n\nI hope you\'re doing [GAP1]! I wanted to tell you about my recent trip to the park. It was [GAP2] a lovely day to be outside. I thought it was [GAP3] hot to walk around for long. I met friends [GAP4] my birthday party, and we had a great time. We decided to grab [GAP5] snacks for our picnic. After you come, we will have [GAP6].',
+      options: ['well', 'only', 'under', 'much', 'really', 'food'],
+      correctAnswers: ['well', 'only', 'really', 'under', 'much', 'food'],
+      prompt: 'Choose one word from the list for each gap. The first one is done for you.'
+    },
+    {
+      passage: 'The museum is [GAP1] from 10 AM to 6 PM. Entrance [GAP2] is 15 dollars for adults. Children [GAP3] twelve get in for [GAP4]. [GAP5] you need directions, staff can help.',
+      options: ['free', 'fee', 'under', 'If', 'open'],
+      correctAnswers: ['open', 'fee', 'under', 'free', 'If'],
+      prompt: 'Complete the text with appropriate words from the list.'
+    },
+    {
+      passage: 'Learning English [GAP1] important for international communication. Many students [GAP2] difficulty with pronunciation. [GAP3] practice every day helps improve fluency. Online [GAP4] are very useful nowadays. Teachers recommend [GAP5] at least one hour daily.',
+      options: ['resources', 'studying', 'Regular', 'is', 'have'],
+      correctAnswers: ['is', 'have', 'Regular', 'resources', 'studying'],
+      prompt: 'Fill in the gaps with words from the provided list.'
+    },
+    {
+      passage: 'Technology has [GAP1] our lives significantly. Smart devices are [GAP2] in every household. The [GAP3] of artificial intelligence grows every year. However, we must [GAP4] about privacy and security. Education systems must [GAP5] students for the digital world.',
+      options: ['concern', 'prepare', 'growth', 'common', 'changed'],
+      correctAnswers: ['changed', 'common', 'growth', 'concern', 'prepare'],
+      prompt: 'Select appropriate words to complete the sentences.'
+    },
+    {
+      passage: 'Environmental [GAP1] is one of our biggest challenges. Climate [GAP2] affects weather patterns worldwide. Governments must [GAP3] action to reduce carbon emissions. Individuals can also [GAP4] by using renewable energy. Together, we can [GAP5] our planet for future generations.',
+      options: ['protect', 'change', 'take', 'pollution', 'contribute'],
+      correctAnswers: ['pollution', 'change', 'take', 'contribute', 'protect'],
+      prompt: 'Complete the passage with words from the list.'
+    }
   ];
 
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < 5; i++) {
     const question = await Question.create({
-      question_type_id: readingMcqType.id,
+      question_type_id: readingGapFillType.id,
       aptis_type_id: aptisType.id,
-      difficulty: i < 3 ? 'easy' : i < 5 ? 'medium' : 'hard',
-      content: `${passage1}\n\n${mcqQuestions[i]}`,
+      difficulty: i < 2 ? 'easy' : i < 4 ? 'medium' : 'hard',
+      content: `${gapFillingQuestions[i].prompt}\n\n${gapFillingQuestions[i].passage}`,
       created_by: teacher.id,
       status: 'active',
     });
 
-    const options = ['Climate change', 'They are melting', 'Understand and develop strategies', 'Becoming unpredictable'];
-    for (let j = 0; j < 4; j++) {
+    // Create option choices
+    for (let j = 0; j < gapFillingQuestions[i].options.length; j++) {
       await QuestionOption.create({
         question_id: question.id,
         item_id: null,
-        option_text: j < options.length ? options[j] : `Option ${j + 1}`,
+        option_text: gapFillingQuestions[i].options[j],
         option_order: j + 1,
-        is_correct: j === 0,
+        is_correct: false,
+      });
+    }
+
+    // Create gap items with correct answers (item_number for gap numbering)
+    for (let j = 0; j < gapFillingQuestions[i].correctAnswers.length; j++) {
+      await QuestionItem.create({
+        question_id: question.id,
+        item_text: `[GAP${j + 1}]`,
+        item_number: j + 1,
+        item_order: j + 1,
+        answer_text: gapFillingQuestions[i].correctAnswers[j],
       });
     }
   }
 
-  // Part 2: Matching (6 câu)
+  console.log(`[Seed]   - Part 1: 5 Gap Filling questions`);
+
+  // Part 2: Ordering (5 câu) - Sắp xếp các câu theo thứ tự đúng
+  const readingOrderingType = await QuestionType.findOne({ where: { code: 'READING_ORDERING' } });
+  
+  const orderingQuestions = [
+    {
+      title: 'Tom Harper (Biography Ordering)',
+      passage: 'This is the short summary of Tom Harper life.',
+      sentences: [
+        'When he was young, he began writing short stories for a magazine.',
+        'He soon wrote regularly for that magazine, sharing his creative ideas with many readers.',
+        'At one point, he almost left his job, but then he decided to create unusual characters.',
+        'The characters he imagined became some of the most famous in literature.',
+        'This popularity made him rich and successful.'
+      ],
+      correctOrder: [1, 2, 3, 4, 5]
+    },
+    {
+      title: 'Key Card Information (Instructions Ordering)',
+      passage: 'The following is the instruction of how to use the key card.',
+      sentences: [
+        'To access the building and use the lift, you need to use the key card.',
+        'He or she will ask your name and flat number and will write these down.',
+        'You will also need to show him or her your identification card.',
+        'He or she will take a copy of it and give you a new card.',
+        'If you lose this, please see the staff member at the front desk.'
+      ],
+      correctOrder: [1, 2, 3, 4, 5]
+    },
+    {
+      title: 'Recipe Steps (Process Ordering)',
+      passage: 'Steps for making a simple pasta dish.',
+      sentences: [
+        'Boil water in a large pot and add salt.',
+        'Add pasta to the boiling water and cook until tender.',
+        'Drain the pasta and add it to a bowl.',
+        'Pour your favorite sauce over the pasta.',
+        'Mix well and serve hot with grated cheese.'
+      ],
+      correctOrder: [1, 2, 3, 4, 5]
+    },
+    {
+      title: 'Historical Event (Chronological Ordering)',
+      passage: 'Key events in the development of the internet.',
+      sentences: [
+        'The World Wide Web was invented in 1989 by Tim Berners-Lee.',
+        'Early computer networks like ARPANET were created in the 1960s.',
+        'Commercial internet service became available to the public in the 1990s.',
+        'Personal computers became affordable for most households in the 1980s.',
+        'Today, the internet is essential infrastructure in modern society.'
+      ],
+      correctOrder: [2, 4, 1, 3, 5]
+    },
+    {
+      title: 'Problem Solving (Logical Ordering)',
+      passage: 'Steps to solve a common technical problem.',
+      sentences: [
+        'First, check if your device is properly connected to power.',
+        'If the problem persists, restart your device completely.',
+        'Verify that all cables are securely connected.',
+        'If it still doesn\'t work, consult the user manual or support.',
+        'Turn it off and wait for 30 seconds before turning it back on.'
+      ],
+      correctOrder: [1, 3, 2, 5, 4]
+    }
+  ];
+
+  for (let i = 0; i < 5; i++) {
+    const question = await Question.create({
+      question_type_id: readingOrderingType.id,
+      aptis_type_id: aptisType.id,
+      difficulty: i < 2 ? 'easy' : i < 4 ? 'medium' : 'hard',
+      content: `${orderingQuestions[i].title}\n\n0. ${orderingQuestions[i].passage}\n\n${orderingQuestions[i].sentences.map((s, idx) => `${idx + 1}. ${s}`).join('\n\n')}\n\nPut the sentences in the right order.`,
+      created_by: teacher.id,
+      status: 'active',
+    });
+
+    // Shuffle sentences để item_order không trùng với answer
+    const shuffled = [...orderingQuestions[i].sentences]
+      .map((s, idx) => ({ text: s, originalIdx: idx + 1 }))
+      .sort(() => Math.random() - 0.5);
+
+    // Create items with random display order, but correct answer order
+    for (let j = 0; j < orderingQuestions[i].sentences.length; j++) {
+      const correctPosition = orderingQuestions[i].correctOrder[shuffled[j].originalIdx - 1];
+      
+      await QuestionItem.create({
+        question_id: question.id,
+        item_text: `${shuffled[j].originalIdx}. ${shuffled[j].text}`,
+        item_order: j + 1,  // Display order (random)
+        answer_text: `${correctPosition}`,  // Correct position
+      });
+    }
+  }
+
+  console.log(`[Seed]   - Part 2: 5 Ordering questions`);
+
+  // Part 3: Matching (5 câu) - Ghép người/câu hỏi với câu trả lời
   const readingMatchingType = await QuestionType.findOne({ where: { code: 'READING_MATCHING' } });
   
-  const question2 = await Question.create({
+  const question3 = await Question.create({
     question_type_id: readingMatchingType.id,
     aptis_type_id: aptisType.id,
     difficulty: 'medium',
-    content: 'Match each person with their hobby:\n\nJohn loves outdoor activities.\nMary enjoys creative arts.\nPeter likes technology.\nSarah prefers physical exercise.\nTom enjoys nature.\nLisa likes culinary arts.',
+    content: `Four people share their feelings about reading books. Read their answers and answer the questions below.
+
+Person A: I have to read a lot for my job, and I find that reading factual books is often boring. The material tends to be dry and lacks excitement. After a long day at work, I usually feel too exhausted to read much, which means I have limited time for reading anything enjoyable.
+
+Person B: My wife is always complaining that she can't read many books. I don't have that problem because I plan the reading schedule carefully. I set aside specific times each week for reading, which helps me stay on track. This way, I can enjoy my books while she finds it challenging to keep up.
+
+Person C: When I was a child, I struggled to finish one book at a time. It felt overwhelming to stay focused on a single story. However, now that I'm older, I enjoy exploring many genres and even read multiple books at once. I have a long list of books I want to read in the future, which keeps me excited.
+
+Person D: I keep a novel on the bedside table because I want to read before sleeping. However, I often find myself getting sleepy as soon as I start reading, which makes it difficult to concentrate. As a result, it has taken me several months to finish this book, and I still haven't completed it.
+
+Match the following questions with the correct person:
+- Who thinks reading factual books is boring? → Person _____
+- Who reads more than another family member? → Person _____
+- Who has limited time for reading? → Person _____
+- Who has difficulty in finishing a book? → Person _____
+- Who reads many books at once? → Person _____`,
     created_by: teacher.id,
     status: 'active',
   });
 
-  const people = ['John', 'Mary', 'Peter', 'Sarah', 'Tom', 'Lisa'];
-  const hobbies = ['Hiking', 'Painting', 'Coding', 'Yoga', 'Gardening', 'Cooking'];
+  const questions = [
+    { text: 'Who thinks reading factual books is boring?', correct: 'A' },
+    { text: 'Who reads more than another family member?', correct: 'B' },
+    { text: 'Who has limited time for reading?', correct: 'A' },
+    { text: 'Who has difficulty in finishing a book?', correct: 'D' },
+    { text: 'Who reads many books at once?', correct: 'C' }
+  ];
 
-  for (let i = 0; i < 6; i++) {
-    const item = await QuestionItem.create({
-      question_id: question2.id,
-      item_text: people[i],
-      item_order: i + 1,
-    });
-
+  // Create options once (question-level)
+  const optionMap = {};
+  const personOptions = ['Person A', 'Person B', 'Person C', 'Person D'];
+  for (let k = 0; k < personOptions.length; k++) {
     const option = await QuestionOption.create({
-      question_id: question2.id,
+      question_id: question3.id,
       item_id: null,
-      option_text: hobbies[i],
-      option_order: i + 1,
+      option_text: personOptions[k],
+      option_order: k + 1,
       is_correct: false,
     });
-
-    await item.update({ correct_option_id: option.id });
+    optionMap[personOptions[k]] = option.id;
   }
 
-  // Part 3: True/False (7 câu)
-  const readingTrueFalseType = await QuestionType.findOne({ where: { code: 'READING_TRUE_FALSE' } });
-  
-  const passage3 = `The Internet has revolutionized communication, making it possible for people worldwide to connect instantly. However, it has also raised concerns about privacy and security. Social media platforms have become integral to modern life, but they also pose risks related to data protection and misinformation.`;
+  // Create items linked to correct options
+  for (let j = 0; j < 5; j++) {
+    const item = await QuestionItem.create({
+      question_id: question3.id,
+      item_text: questions[j].text,
+      item_order: j + 1,
+      answer_text: questions[j].correct,
+    });
 
-  const statements = [
-    'The Internet has made global communication easier.',
-    'Privacy concerns have been raised about the Internet.',
-    'Social media is mentioned in the passage.',
-    'The passage discusses data protection.',
-    'Misinformation is not mentioned.',
-    'The Internet has no negative effects.',
-    'Social media is part of modern life.',
+    // Update item with correct option reference
+    const correctOptionText = `Person ${questions[j].correct}`;
+    await item.update({ correct_option_id: optionMap[correctOptionText] });
+  }
+
+  console.log(`[Seed]   - Part 3: 5 Matching questions (Person-based)`);
+
+  // Part 4: Matching Headings (5 câu) - Ghép tiêu đề với đoạn văn
+  const readingHeadingsType = await QuestionType.findOne({ where: { code: 'READING_MATCHING_HEADINGS' } });
+  
+  const question4 = await Question.create({
+    question_type_id: readingHeadingsType.id,
+    aptis_type_id: aptisType.id,
+    difficulty: 'medium',
+    content: `Read the passage quickly. Choose a heading for each numbered paragraph (1-5) from the drop-down box.
+
+Vegetarian Food
+
+Available Headings:
+- Understanding the possible global food crisis and its causes
+- Recipes for popular vegetarian dishes
+- Diverse types of vegetarian meals
+- The ethical and environmental implications of factory farming
+- Numerous health benefits of plant-based diets
+- Shared global responsibility towards sustainable eating
+- Respect for life: embracing compassion for all living beings
+- Various explanations behind dietary choices and preferences
+
+PARAGRAPH 1:
+No longer seeing food as simply protein from animals, there are innumerable options for those opting not to eat meat. From vibrant salads loaded with fresh vegetables to hearty plant-based entrees and numerous delicious desserts, the possibilities are endless. Creative approaches to vegetarian cooking, providing a satisfying array of nutritious dishes, showcase how one can enjoy plant-based meals.
+
+PARAGRAPH 2:
+Understanding the different reasons individuals are making them. Many people opt for a vegetarian diet for health considerations. Some may be motivated by cultural traditions or personal beliefs, while others seek new culinary experiences. Understanding these motivations fosters respectful discussions about food choices and their implications, promoting a more inclusive dialogue around dietary preferences.
+
+PARAGRAPH 3:
+As the global population continues to grow, concerns about food security and sustainability intensify. The increasing demand for resources puts immense pressure on agricultural systems, leading to potential shortages and rising prices. Without significant changes in our consumption patterns and food production methods, widespread shortages could threaten global food availability, necessitating immediate action including vegetarian options, which can alleviate some of the pressure on our food systems.
+
+PARAGRAPH 4:
+The industrial approach to livestock production raises numerous ethical and environmental questions. Large-scale operations often prioritize efficiency over animal welfare, resulting in cramped living conditions and the overuse of antibiotics. This practice not only impacts the lives of animals but contributes to pollution and greenhouse gas emissions. As awareness of these issues grows, many advocates push for more humane and sustainable farming practices, which align better with the ethical motivations of those choosing plant-based diets.
+
+PARAGRAPH 5:
+Plant-based diets have been extensively researched and shown to offer numerous health benefits. Studies demonstrate that vegetarian diets can lower the risk of chronic diseases including heart disease and type 2 diabetes. Plant-based nutrition provides essential nutrients and is low in unhealthy fats. Embracing a vegetarian diet supports not only personal health but also aligns with global environmental sustainability efforts.
+
+PARAGRAPH 6:
+In an interconnected world, our food consumption choices carry significant weight. Each individual's decisions can influence broader societal impacts, affecting everything from environmental sustainability to animal welfare. Embracing a sense of stewardship encourages us to consider how our eating habits impact not just our health, but also the health of the planet. By making conscious choices, such as incorporating more plant-based meals, we can collectively work towards a more equitable and sustainable future for all.
+
+PARAGRAPH 7:
+Of course, one cannot discuss the benefits of vegetarianism without understanding the broader implications for overall well-being. Research on plant-based dietary approaches demonstrates that these eating patterns can lower the risk of chronic diseases. Embracing plant-based nutrition provides essential nutrients and low in unhealthy fats. Enjoying plant-based foods in moderation, ensuring a compassionate world. This approach inspires actions that contribute to a more peaceful and sustainable planet, ultimately benefiting both individuals and society as a whole.`,
+    created_by: teacher.id,
+    status: 'active',
+  });
+
+  const paragraphs = [
+    { num: 1, heading: 'Diverse types of vegetarian meals', correct: 3 },
+    { num: 2, heading: 'Various explanations behind dietary choices and preferences', correct: 8 },
+    { num: 3, heading: 'Understanding the possible global food crisis and its causes', correct: 1 },
+    { num: 4, heading: 'The ethical and environmental implications of factory farming', correct: 4 },
+    { num: 5, heading: 'Numerous health benefits of plant-based diets', correct: 5 }
   ];
 
-  const correctAnswers = [true, true, true, true, false, false, true];
-
-  for (let i = 0; i < 7; i++) {
-    const question = await Question.create({
-      question_type_id: readingTrueFalseType.id,
-      aptis_type_id: aptisType.id,
-      difficulty: i < 3 ? 'easy' : i < 5 ? 'medium' : 'hard',
-      content: `${passage3}\n\n${statements[i]}`,
-      created_by: teacher.id,
-      status: 'active',
-    });
-
-    await QuestionOption.create({
-      question_id: question.id,
-      item_id: null,
-      option_text: 'True',
-      option_order: 1,
-      is_correct: correctAnswers[i],
-    });
-
-    await QuestionOption.create({
-      question_id: question.id,
-      item_id: null,
-      option_text: 'False',
-      option_order: 2,
-      is_correct: !correctAnswers[i],
-    });
-  }
-
-  // Part 4: Short Answer (5 câu)
-  const readingShortAnswerType = await QuestionType.findOne({ where: { code: 'READING_SHORT_ANSWER' } });
-  
-  const passage4 = `William Shakespeare was born in Stratford-upon-Avon in 1564. He is widely regarded as the greatest writer in the English language. He wrote approximately 38 plays and 154 sonnets during his lifetime. His works have been translated into every major language and are performed more often than those of any other playwright.`;
-
-  const shortQuestions = [
-    'Where was Shakespeare born?',
-    'In what year was he born?',
-    'How many plays did he write approximately?',
-    'How many sonnets did he write?',
-    'What language is mentioned?',
+  const headingOptions = [
+    'Understanding the possible global food crisis and its causes',
+    'Recipes for popular vegetarian dishes',
+    'Diverse types of vegetarian meals',
+    'The ethical and environmental implications of factory farming',
+    'Numerous health benefits of plant-based diets',
+    'Shared global responsibility towards sustainable eating',
+    'Respect for life: embracing compassion for all living beings',
+    'Various explanations behind dietary choices and preferences'
   ];
 
-  for (let i = 0; i < 5; i++) {
-    await Question.create({
-      question_type_id: readingShortAnswerType.id,
-      aptis_type_id: aptisType.id,
-      difficulty: i < 2 ? 'easy' : i < 3 ? 'medium' : 'hard',
-      content: `${passage4}\n\n${shortQuestions[i]}`,
-      created_by: teacher.id,
-      status: 'active',
+  // Create 8 heading options once (question-level, NOT per item)
+  const headingOptionMap = {};
+  for (let k = 0; k < headingOptions.length; k++) {
+    const option = await QuestionOption.create({
+      question_id: question4.id,
+      item_id: null,
+      option_text: headingOptions[k],
+      option_order: k + 1,
+      is_correct: false,
     });
+    headingOptionMap[headingOptions[k]] = option.id;
   }
 
-  console.log(`[Seed] ✓ 25 Reading questions created (7 MCQ + 6 Matching + 7 T/F + 5 Short = 50 điểm)`);
+  // Create 5 items linked to correct heading options
+  for (let j = 0; j < 5; j++) {
+    const item = await QuestionItem.create({
+      question_id: question4.id,
+      item_text: `Paragraph ${paragraphs[j].num}`,
+      item_order: j + 1,
+      answer_text: paragraphs[j].heading,
+    });
+
+    // Update item with correct option reference
+    await item.update({ correct_option_id: headingOptionMap[paragraphs[j].heading] });
+  }
+
+  console.log(`[Seed]   - Part 4: 5 Matching Headings questions (8 headings created once, not 40 times)`);
+  console.log(`[Seed] ✓ 25 Reading questions created (5+5+5+5 Gap Fill + Ordering + Matching + Matching Headings = 100 điểm)`);
 }
 
 // ========================================
-// LISTENING - 25 câu trong 4 parts (50 điểm tổng)
-// Part 1: MCQ - 7 câu x 2 điểm = 14 điểm
-// Part 2: Matching - 6 câu x 2 điểm = 12 điểm
-// Part 3: MCQ - 7 câu x 2 điểm = 14 điểm
-// Part 4: Gap Filling - 5 gaps x 2 điểm = 10 điểm
+// LISTENING - 17 câu trong 4 parts (50 điểm tổng)
+// Part 1: MCQ - 5 câu x 3 điểm = 15 điểm
+// Part 2: Speaker Matching - 4 speakers x 3 điểm = 12 điểm
+// Part 3: MCQ Multi-question - 2 shared audio (4 câu) x 3 điểm = 12 điểm
+// Part 4: Statement Matching - 4 statements x 3 điểm = 12 điểm (Tổng 17 câu)
 // ========================================
 async function seedListeningQuestions(aptisType, teacher) {
-  console.log('[Seed] Seeding 25 Listening questions in 4 parts...');
+  console.log('[Seed] Seeding 17 Listening questions in 4 parts...');
 
-  // Part 1: MCQ (7 câu)
+  // Part 1: MCQ (5 câu)
   const listeningMcqType = await QuestionType.findOne({ where: { code: 'LISTENING_MCQ' } });
   
-  for (let i = 1; i <= 7; i++) {
+  const part1Scripts = [
+    'A man is calling his mother. How long will he be late?',
+    'A woman is going to the cinema with her husband. What time does the movie begin?',
+    'A teacher is talking to her students. Where are the students now?',
+    'A man is sharing a new guidebook. Choose the correct answers.',
+    'A reviewer discussing a book about the life of a scientist. Choose the correct answers.'
+  ];
+
+  const mcqOptions = [
+    ['10 minutes', '15 minutes', '20 minutes'],
+    ['6:40', '7:00', '9:20'],
+    ['At school', 'In a townhouse', 'In a museum'],
+    ['It focuses solely on historical landmarks', 'It creates an adventure', 'It is difficult to navigate'],
+    ['It is focused on technical details', 'It is exciting to read', 'It is more of a textbook than a biography']
+  ];
+
+  for (let i = 0; i < 5; i++) {
     const question = await Question.create({
       question_type_id: listeningMcqType.id,
       aptis_type_id: aptisType.id,
-      difficulty: i <= 3 ? 'easy' : i <= 5 ? 'medium' : 'hard',
-      content: `Listen to the conversation and answer: What is the main topic discussed?`,
-      media_url: `/audio/listening_part1_q${i}.mp3`,
+      difficulty: i <= 1 ? 'easy' : i <= 2 ? 'medium' : 'hard',
+      content: part1Scripts[i],
+      media_url: '/uploads/audio/test.mp3',
       created_by: teacher.id,
       status: 'active',
     });
 
-    const options = ['Travel plans', 'Work schedule', 'Weather', 'Shopping'];
-    for (let j = 0; j < 4; j++) {
+    for (let j = 0; j < 3; j++) {
       await QuestionOption.create({
         question_id: question.id,
         item_id: null,
-        option_text: options[j],
+        option_text: mcqOptions[i][j],
         option_order: j + 1,
-        is_correct: j === 0,
+        is_correct: j === (i === 0 ? 1 : i === 1 ? 0 : 0),
       });
     }
   }
 
-  // Part 2: Matching (6 câu)
+  console.log(`[Seed]   - Part 1: 5 MCQ questions with audio`);
+
+  // Part 2: Speaker Matching (4 speakers với các file audio riêng)
   const listeningMatchingType = await QuestionType.findOne({ where: { code: 'LISTENING_MATCHING' } });
   
   const question2 = await Question.create({
     question_type_id: listeningMatchingType.id,
     aptis_type_id: aptisType.id,
     difficulty: 'medium',
-    content: 'Listen and match each speaker with their opinion:',
-    media_url: '/audio/listening_part2.mp3',
+    content: 'Listen to opinions of 4 people A B C D about when they like listening to music',
+    media_url: '/uploads/audio/test.mp3', // Main instruction audio
     created_by: teacher.id,
     status: 'active',
   });
 
-  const speakers = ['Speaker 1', 'Speaker 2', 'Speaker 3', 'Speaker 4', 'Speaker 5', 'Speaker 6'];
-  const opinions = ['Agrees strongly', 'Disagrees', 'Neutral', 'Partially agrees', 'Strongly disagrees', 'Uncertain'];
+  const speakers = ['Speaker A', 'Speaker B', 'Speaker C', 'Speaker D'];
+  const musicOptions = ['After waking up', 'While singing', 'To relax', 'While reading', 'While studying', 'While sleeping'];
 
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 4; i++) {
     const item = await QuestionItem.create({
       question_id: question2.id,
       item_text: speakers[i],
       item_order: i + 1,
+      media_url: `/uploads/audio/speaker_${String.fromCharCode(65 + i)}.mp3`, // Individual audio for each speaker
     });
+  }
 
-    const option = await QuestionOption.create({
+  // Create options for all speakers
+  for (let i = 0; i < musicOptions.length; i++) {
+    await QuestionOption.create({
       question_id: question2.id,
       item_id: null,
-      option_text: opinions[i],
+      option_text: musicOptions[i],
       option_order: i + 1,
       is_correct: false,
     });
-
-    await item.update({ correct_option_id: option.id });
   }
 
-  // Part 3: MCQ (7 câu)
-  for (let i = 1; i <= 7; i++) {
-    const question = await Question.create({
-      question_type_id: listeningMcqType.id,
-      aptis_type_id: aptisType.id,
-      difficulty: i <= 3 ? 'easy' : i <= 5 ? 'medium' : 'hard',
-      content: `Listen to the lecture and answer: What does the speaker emphasize?`,
-      media_url: `/audio/listening_part3_q${i}.mp3`,
-      created_by: teacher.id,
-      status: 'active',
-    });
+  console.log(`[Seed]   - Part 2: 4 Speaker Matching with individual audio files`);
 
-    const options = ['Practice is important', 'Research is needed', 'Experience matters', 'Technology helps'];
-    for (let j = 0; j < 4; j++) {
-      await QuestionOption.create({
-        question_id: question.id,
-        item_id: null,
-        option_text: options[j],
-        option_order: j + 1,
-        is_correct: j === 0,
-      });
-    }
-  }
-
-  // Part 4: Gap Filling (5 gaps)
-  const listeningGapType = await QuestionType.findOne({ where: { code: 'LISTENING_GAP_FILL' } });
+  // Part 3: Statement Matching (1 câu hỏi với 4 statements)
+  const statementMatchingType = await QuestionType.findOne({ where: { code: 'LISTENING_STATEMENT_MATCHING' } });
   
-  const question4 = await Question.create({
-    question_type_id: listeningGapType.id,
+  const question3 = await Question.create({
+    question_type_id: statementMatchingType.id,
     aptis_type_id: aptisType.id,
     difficulty: 'medium',
-    content: 'Listen and fill in the missing words:\n\nThe conference will take place in _____ on _____ at _____ o\'clock in the _____ building on _____ street.',
-    media_url: '/audio/listening_part4.mp3',
+    content: 'Listen to two people discussing singers and music. Read the opinions below and decide whose opinion matches the statements, the man, the woman, or both the man and the woman.',
+    media_url: '/uploads/audio/discussion.mp3',
     created_by: teacher.id,
     status: 'active',
   });
 
-  const answers = ['London', 'Friday', 'three', 'main', 'Oxford'];
-  for (let i = 0; i < 5; i++) {
+  const statements = [
+    'Singer can be good models for the young.',
+    'Taste in music is a highly personal thing.',
+    'Music is a universal language.',
+    'Music can be used to manipulate people\'s feelings.'
+  ];
+
+  for (let i = 0; i < 4; i++) {
     await QuestionItem.create({
-      question_id: question4.id,
-      item_text: `Gap ${i + 1}`,
+      question_id: question3.id,
+      item_text: statements[i],
       item_order: i + 1,
-      answer_text: answers[i],
     });
   }
 
-  console.log(`[Seed] ✓ 25 Listening questions created (7+7 MCQ + 6 Matching + 5 Gap = 50 điểm)`);
+  // Create options for statement matching
+  const statementOptions = ['Man', 'Woman', 'Both'];
+  for (let i = 0; i < 3; i++) {
+    await QuestionOption.create({
+      question_id: question3.id,
+      item_id: null,
+      option_text: statementOptions[i],
+      option_order: i + 1,
+      is_correct: false,
+    });
+  }
+
+  console.log(`[Seed]   - Part 3: 4 Statement Matching items`);
+
+  // Part 4: MCQ Multi-question (2 shared audio files với 2 câu hỏi mỗi file)
+  const multiQuestionScripts = [
+    {
+      audio: '/uploads/audio/guidebook.mp3',
+      content: 'A man is sharing a new guidebook. Choose the correct answers.',
+      questions: [
+        'What does this guidebook offer to its audience?',
+        'What is the speaker\'s opinion about this guidebook?'
+      ],
+      options: [
+        ['It focuses solely on historical landmarks', 'It creates an adventure', 'It is difficult to navigate'],
+        ['It caters only to seasoned travelers', 'It is outdated and irrelevant', 'It is suitable for particular generations']
+      ]
+    },
+    {
+      audio: '/uploads/audio/book_review.mp3',
+      content: 'A reviewer discussing a book about the life of a scientist. Choose the correct answers.',
+      questions: [
+        'What does the speaker say about the way of writing?',
+        'What does the speaker say about the overall content of the book?'
+      ],
+      options: [
+        ['It is focused on technical details', 'It is exciting to read', 'It is more of a textbook than a biography'],
+        ['It has been written for a general audience', 'It is only suitable for experts in the field', 'It lacks engaging storytelling']
+      ]
+    }
+  ];
+
+  for (let i = 0; i < 2; i++) {
+    const question = await Question.create({
+      question_type_id: listeningMcqType.id,
+      aptis_type_id: aptisType.id,
+      difficulty: 'hard',
+      content: multiQuestionScripts[i].content,
+      media_url: multiQuestionScripts[i].audio,
+      additional_media: JSON.stringify([
+        { type: 'audio', description: 'Question 1', url: multiQuestionScripts[i].audio },
+        { type: 'audio', description: 'Question 2', url: multiQuestionScripts[i].audio }
+      ]),
+      created_by: teacher.id,
+      status: 'active',
+    });
+
+    // Create 2 question items for each audio
+    for (let j = 0; j < 2; j++) {
+      await QuestionItem.create({
+        question_id: question.id,
+        item_text: multiQuestionScripts[i].questions[j],
+        item_order: j + 1,
+      });
+
+      // Create options for each sub-question  
+      for (let k = 0; k < 3; k++) {
+        await QuestionOption.create({
+          question_id: question.id,
+          item_id: null,
+          option_text: multiQuestionScripts[i].options[j][k],
+          option_order: (j * 3) + k + 1,
+          is_correct: k === (j === 0 ? 1 : j === 1 ? 0 : 1), // Set correct answers
+        });
+      }
+    }
+  }
+
+  console.log(`[Seed]   - Part 4: 2 Multi-question MCQ (4 total sub-questions)`);
+  console.log(`[Seed] ✓ 17 Listening questions created (5+4+4+4 = 50 điểm)`);
 }
 
 // ========================================
@@ -449,76 +599,135 @@ async function seedWritingQuestions(aptisType, teacher) {
   console.log('[Seed] Seeding 4 Writing tasks...');
 
   const writingShortType = await QuestionType.findOne({ where: { code: 'WRITING_SHORT' } });
-  const writingEmailType = await QuestionType.findOne({ where: { code: 'WRITING_EMAIL' } });
+  const writingFormType = await QuestionType.findOne({ where: { code: 'WRITING_FORM' } });
   const writingLongType = await QuestionType.findOne({ where: { code: 'WRITING_LONG' } });
-  const writingEssayType = await QuestionType.findOne({ where: { code: 'WRITING_ESSAY' } });
+  const writingEmailType = await QuestionType.findOne({ where: { code: 'WRITING_EMAIL' } });
 
-  // Task 1: Short message (30-50 words)
-  const task1 = await Question.create({
+  // Part 1: Short Answers (1-5 words each)
+  const part1 = await Question.create({
     question_type_id: writingShortType.id,
     aptis_type_id: aptisType.id,
     difficulty: 'easy',
-    content: 'You are organizing a team meeting. Write a short message to your colleague:\n- Date and time\n- Location\n- What to prepare\n\nWrite 30-50 words.',
+    content: JSON.stringify({
+      title: "Book Club Membership",
+      description: "You want to join a Book club. You have 5 messages from a member of the club. Write short answers (1-5 words) to each message.",
+      messages: [
+        "Which sport is the most popular in your country?",
+        "What do you like doing with your friend?", 
+        "Which sport do you like to play the most?",
+        "Where do you usually go at weekends?",
+        "How often do you play sport with friends?"
+      ]
+    }),
     created_by: teacher.id,
     status: 'active',
   });
 
   await QuestionSampleAnswer.create({
-    question_id: task1.id,
-    answer_text: 'Hi Sarah, Team meeting next Monday 2PM in Conference Room B. Please prepare your project update and bring latest sales figures. Thanks!',
+    question_id: part1.id,
+    answer_text: JSON.stringify({
+      "0": "Football",
+      "1": "Watch movies together",
+      "2": "Basketball",
+      "3": "Shopping mall",
+      "4": "Every weekend"
+    }),
     score: 12.5,
-    comment: 'Clear, concise, covers all points.',
+    comment: 'Perfect short answers within word limit.',
   });
 
-  // Task 2: Email (50-100 words)
-  const task2 = await Question.create({
-    question_type_id: writingEmailType.id,
+  // Part 2: Form Filling (20-30 words)
+  const part2 = await Question.create({
+    question_type_id: writingFormType.id,
     aptis_type_id: aptisType.id,
-    difficulty: 'medium',
-    content: 'You bought a product online but received wrong item. Write email to customer service:\n- What you ordered\n- The problem\n- What you want\n\nWrite 50-100 words.',
+    difficulty: 'easy',
+    content: JSON.stringify({
+      title: "Book Club Application Form",
+      description: "You want to join a book club. Fill in the form. Write in sentences. Use 20-30 words.",
+      question: "When and where do you usually read books?",
+      placeholder: "Please describe your reading habits in complete sentences."
+    }),
     created_by: teacher.id,
     status: 'active',
   });
 
   await QuestionSampleAnswer.create({
-    question_id: task2.id,
-    answer_text: 'Dear Customer Service,\n\nI ordered a blue laptop bag (Order #12345) but received a red one. I would like the correct item sent or a full refund processed.\n\nThank you.\nJohn Smith',
+    question_id: part2.id,
+    answer_text: 'I usually read books in the evening at home after dinner. I like to sit in my comfortable chair in the living room with a cup of tea.',
     score: 12.5,
-    comment: 'Professional tone, clear explanation.',
+    comment: 'Good sentence structure and appropriate length.',
   });
 
-  // Task 3: Long response (120-150 words)
-  const task3 = await Question.create({
+  // Part 3: Chat Responses (30-40 words each)
+  const part3 = await Question.create({
     question_type_id: writingLongType.id,
     aptis_type_id: aptisType.id,
     difficulty: 'medium',
-    content: 'Write an article: "The importance of learning English"\n\nInclude:\n- Why English is important\n- How it has helped you\n- Advice for learners\n\nWrite 120-150 words.',
+    content: JSON.stringify({
+      title: "Book Club Chat Room",
+      description: "You are talking to other members of the club in the chat room. Talk to them using sentences. Use 30-40 words per answer.",
+      messages: [
+        {
+          person: "Person A",
+          message: "Tell me about your favourite time and place to read a book?"
+        },
+        {
+          person: "Person B", 
+          message: "I bought a book as a gift for my friend but I don't know what kind of book he likes. Can you give me some advice?"
+        }
+      ]
+    }),
     created_by: teacher.id,
     status: 'active',
   });
 
   await QuestionSampleAnswer.create({
-    question_id: task3.id,
-    answer_text: 'English has become the global language, essential for business, education, and cultural exchange. It opens countless opportunities.\n\nLearning English transformed my life, allowing me to access information, connect globally, and pursue education abroad. I can read academic papers and participate in international discussions.\n\nMy advice: practice consistently, immerse yourself, watch English movies, read books, and don\'t fear mistakes. Join conversation groups and use apps. Remember, every expert was once a beginner.',
+    question_id: part3.id,
+    answer_text: JSON.stringify({
+      "personA": "My favourite time to read is in the evening after work. I love sitting in my garden with a good book and a cup of coffee. The quiet atmosphere helps me focus and relax completely.",
+      "personB": "I suggest asking your friend about their hobbies and interests first. Maybe choose a popular thriller or mystery novel as most people enjoy them. You could also check what books are currently bestsellers."
+    }),
     score: 12.5,
-    comment: 'Well-organized with examples and advice.',
+    comment: 'Good conversational responses within word limits.',
   });
 
-  // Task 4: Essay (200-250 words)
-  const task4 = await Question.create({
-    question_type_id: writingEssayType.id,
+  // Part 4: Email Writing (50 words + 120-150 words)
+  const part4 = await Question.create({
+    question_type_id: writingEmailType.id,
     aptis_type_id: aptisType.id,
     difficulty: 'hard',
-    content: 'Some people believe social media has positive impact, others think it has negative effects.\n\nDiscuss both views and give your opinion.\n\nWrite 200-250 words.',
+    content: JSON.stringify({
+      title: "Book Club Author Event",
+      description: "You are a member of the book club. You received this email from the club's manager.",
+      managerEmail: {
+        subject: "Author Event Planning",
+        body: "Dear member,\n\nOur club wants to organize an event for the public by inviting a famous author as a speaker. What kind of author do you suggest? What topic should the speaker speak on?\n\nI am writing to ask all members for their suggestions. Please send me your ideas in an email.\n\nThe manager."
+      },
+      tasks: [
+        {
+          type: "friend",
+          description: "Write an email to your friend, who is also a member of the group. (50 words)",
+          wordLimit: 50
+        },
+        {
+          type: "manager", 
+          description: "Write an email to the manager of the club. Tell the manager about your opinion. (120-150 words)",
+          wordLimit: {min: 120, max: 150}
+        }
+      ]
+    }),
     created_by: teacher.id,
     status: 'active',
   });
 
   await QuestionSampleAnswer.create({
-    question_id: task4.id,
-    answer_text: 'Social media has become integral to modern life, sparking debate about its impact.\n\nAdvocates highlight its ability to connect people globally, facilitate communication, and democratize information. Platforms like Facebook enable social movements, help businesses reach customers, and maintain relationships across distances. Social media also provides educational resources and networking opportunities.\n\nHowever, critics argue it contributes to mental health issues, spreads misinformation, and reduces face-to-face interaction. Studies link excessive use to anxiety and depression. Fake news and echo chambers can polarize society and undermine democracy.\n\nIn my opinion, social media is a tool whose impact depends on usage. While it offers tremendous benefits for connection and information sharing, users must develop digital literacy and practice moderation. Society should focus on educating about responsible use rather than demonizing technology. The key is finding balance and using platforms consciously and purposefully.',
+    question_id: part4.id,
+    answer_text: JSON.stringify({
+      "friendEmail": "Hi Alex! Did you see the manager's email about the author event? I think we should suggest a mystery writer like Agatha Christie style. What do you think? Let me know your ideas!",
+      "managerEmail": "Dear Manager,\n\nThank you for your email about organizing an author event for the public.\n\nI would like to suggest inviting a mystery or thriller novelist as the speaker. These genres are very popular and attract a wide audience. The topic should be about creative writing techniques and how to develop compelling characters.\n\nI believe this would attract many people and benefit our club by gaining new members who are interested in writing and reading mysteries. A practical workshop on plot development would be engaging.\n\nI look forward to hearing your thoughts.\n\nBest regards,\n[Student Name]"
+    }),
     score: 12.5,
-    comment: 'Balanced essay with clear structure and opinion.',
+    comment: 'Both emails well-structured with appropriate tone and word counts.',
   });
 
   console.log(`[Seed] ✓ 4 Writing tasks created (4 x 12.5 = 50 điểm)`);

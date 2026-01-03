@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { useRouter, useParams } from 'next/navigation';
 import {
   Box,
@@ -9,55 +9,56 @@ import {
   Card,
   CardContent,
   Button,
-  CircularProgress,
-  Tab,
-  Tabs
+  Alert,
+  Skeleton,
+  Chip,
+  Grid,
+  Divider
 } from '@mui/material';
-import { Save, ArrowBack, Publish, UnpublishedOutlined } from '@mui/icons-material';
+import {
+  ArrowBack,
+  Edit,
+  Save,
+  Publish,
+  UnpublishedOutlined,
+  Settings,
+  Quiz
+} from '@mui/icons-material';
 import ExamForm from '@/components/teacher/exams/ExamForm';
-import ExamBuilder from '@/components/teacher/exams/ExamBuilder';
-import ExamPreview from '@/components/teacher/exams/ExamPreview';
-import { fetchExamById as fetchExam, updateExam, publishExam, unpublishExam } from '@/store/slices/examSlice';
+import { 
+  fetchExamById, 
+  updateExam, 
+  publishExam, 
+  unpublishExam 
+} from '@/store/slices/examSlice';
 import { showNotification } from '@/store/slices/uiSlice';
 
-export default function EditExamPage() {
+export default function ExamDetailPage() {
   const router = useRouter();
-  const params = useParams();
   const dispatch = useDispatch();
+  const params = useParams();
   
   const examId = params.examId;
-  const { currentExam, loading } = useSelector(state => state.exam);
+  const examState = useSelector(state => state.exam || {});
+  const { currentExam, isLoading, error } = examState;
   
-  const [activeTab, setActiveTab] = useState(0);
-  const [examData, setExamData] = useState(null);
-  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [publishLoading, setPublishLoading] = useState(false);
 
+  // Fetch exam data on mount
   useEffect(() => {
     if (examId) {
-      dispatch(fetchExam(examId));
+      dispatch(fetchExamById(examId));
     }
-  }, [examId, dispatch]);
+  }, [dispatch, examId]);
 
-  useEffect(() => {
-    if (currentExam) {
-      setExamData(currentExam);
-    }
-  }, [currentExam]);
-
-  const handleFormSubmit = (data) => {
-    setExamData(prev => ({ ...prev, ...data }));
-  };
-
-  const handleBuilderSubmit = (sections) => {
-    setExamData(prev => ({ ...prev, sections }));
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
+  const handleUpdate = async (formData) => {
+    setLoading(true);
     try {
-      const result = await dispatch(updateExam({
-        id: examId,
-        examData: examData
+      const result = await dispatch(updateExam({ 
+        id: examId, 
+        data: formData 
       }));
       
       if (updateExam.fulfilled.match(result)) {
@@ -65,6 +66,9 @@ export default function EditExamPage() {
           message: 'Cập nhật bài thi thành công!',
           type: 'success'
         }));
+        setIsEditing(false);
+        // Refresh exam data
+        dispatch(fetchExamById(examId));
       }
     } catch (error) {
       dispatch(showNotification({
@@ -72,74 +76,53 @@ export default function EditExamPage() {
         type: 'error'
       }));
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
-  const handlePublish = async () => {
+  const handlePublishToggle = async () => {
+    setPublishLoading(true);
     try {
-      if (examData.is_published) {
+      if (currentExam?.status === 'published') {
         await dispatch(unpublishExam(examId));
       } else {
         await dispatch(publishExam(examId));
       }
-      
-      setExamData(prev => ({ ...prev, is_published: !prev.is_published }));
-      
-      dispatch(showNotification({
-        message: `${!examData.is_published ? 'Công khai' : 'Hủy công khai'} bài thi thành công!`,
-        type: 'success'
-      }));
+      // Refresh exam data
+      dispatch(fetchExamById(examId));
     } catch (error) {
       dispatch(showNotification({
-        message: 'Có lỗi xảy ra',
+        message: 'Có lỗi xảy ra khi thay đổi trạng thái bài thi',
         type: 'error'
       }));
-    }
-  };
+    } finally {
+      setPublishLoading(false);
+  }
 
-  if (loading || !examData) {
+  // Loading skeleton
+  if (isLoading && !currentExam) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
-        <CircularProgress />
+      <Box>
+        <Skeleton variant="text" width={300} height={40} />
+        <Skeleton variant="rectangular" height={200} sx={{ mt: 2 }} />
+        <Skeleton variant="rectangular" height={400} sx={{ mt: 2 }} />
       </Box>
     );
   }
 
-  const tabs = [
-    { label: 'Thông tin cơ bản', value: 0 },
-    { label: 'Xây dựng bài thi', value: 1 },
-    { label: 'Xem trước', value: 2 }
-  ];
-
-  const getTabContent = (tabValue) => {
-    switch (tabValue) {
-      case 0:
-        return (
-          <ExamForm
-            initialData={examData}
-            onSubmit={handleFormSubmit}
-            isEditing={true}
-          />
-        );
-      case 1:
-        return (
-          <ExamBuilder
-            examData={examData}
-            onSubmit={handleBuilderSubmit}
-            isEditing={true}
-          />
-        );
-      case 2:
-        return <ExamPreview exam={examData} />;
-      default:
-        return null;
-    }
-  };
+  // Error state
+  if (error) {
+    return (
+      <Alert severity="error" sx={{ mt: 2 }}>
+        Có lỗi xảy ra khi tải bài thi: {error}
+      </Alert>
+    );
+  }
 
   return (
     <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+      {/* Header */}
+      <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
         <Box display="flex" alignItems="center">
           <Button
             startIcon={<ArrowBack />}
@@ -148,46 +131,172 @@ export default function EditExamPage() {
           >
             Quay lại
           </Button>
-          <Typography variant="h4" fontWeight="bold">
-            Chỉnh sửa bài thi: {examData.title}
-          </Typography>
+          <Box>
+            <Typography variant="h4" fontWeight="bold">
+              {currentExam?.title || 'Bài thi'}
+            </Typography>
+            <Box display="flex" alignItems="center" gap={1} mt={1}>
+              <Chip 
+                size="small" 
+                label={currentExam?.status === 'published' ? 'Đã xuất bản' : 'Bản nháp'}
+                color={currentExam?.status === 'published' ? 'success' : 'default'}
+              />
+              <Chip 
+                size="small" 
+                label={currentExam?.aptisType?.aptis_type_name || 'N/A'}
+                variant="outlined"
+              />
+            </Box>
+          </Box>
         </Box>
-        
+
         <Box display="flex" gap={2}>
           <Button
             variant="outlined"
-            onClick={handlePublish}
-            startIcon={examData.is_published ? <UnpublishedOutlined /> : <Publish />}
-            color={examData.is_published ? "warning" : "success"}
+            startIcon={<Settings />}
+            onClick={() => router.push(`/teacher/exams/${examId}/manage`)}
           >
-            {examData.is_published ? 'Hủy công khai' : 'Công khai'}
+            Quản lý Sections
           </Button>
+          
           <Button
-            variant="contained"
-            onClick={handleSave}
-            disabled={saving}
-            startIcon={saving ? <CircularProgress size={16} /> : <Save />}
+            variant="outlined"
+            startIcon={<Quiz />}
+            onClick={() => router.push(`/teacher/exams/${examId}/preview`)}
           >
-            Lưu thay đổi
+            Xem trước
+          </Button>
+
+          <Button
+            variant={currentExam?.status === 'published' ? 'outlined' : 'contained'}
+            startIcon={currentExam?.status === 'published' ? <UnpublishedOutlined /> : <Publish />}
+            onClick={handlePublishToggle}
+            disabled={publishLoading}
+            color={currentExam?.status === 'published' ? 'default' : 'primary'}
+          >
+            {publishLoading ? 'Đang xử lý...' : 
+             currentExam?.status === 'published' ? 'Hủy xuất bản' : 'Xuất bản'}
           </Button>
         </Box>
       </Box>
 
+      {/* Overview Info */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom>
+            Tổng quan
+          </Typography>
+          <Grid container spacing={3}>
+            <Grid item xs={6} sm={3}>
+              <Typography variant="body2" color="text.secondary">
+                Số phần thi
+              </Typography>
+              <Typography variant="h6">
+                {currentExam?.sections?.length || 0}
+              </Typography>
+            </Grid>
+            
+            <Grid item xs={6} sm={3}>
+              <Typography variant="body2" color="text.secondary">
+                Tổng câu hỏi
+              </Typography>
+              <Typography variant="h6">
+                {currentExam?.sections?.reduce((total, section) => 
+                  total + (section.questions?.length || 0), 0) || 0}
+              </Typography>
+            </Grid>
+            
+            <Grid item xs={6} sm={3}>
+              <Typography variant="body2" color="text.secondary">
+                Thời gian
+              </Typography>
+              <Typography variant="h6">
+                {currentExam?.duration_minutes || 0} phút
+              </Typography>
+            </Grid>
+            
+            <Grid item xs={6} sm={3}>
+              <Typography variant="body2" color="text.secondary">
+                Điểm tối đa
+              </Typography>
+              <Typography variant="h6">
+                {currentExam?.total_score || 0}
+              </Typography>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      {/* Edit Form */}
       <Card>
         <CardContent>
-          <Tabs 
-            value={activeTab} 
-            onChange={(_, newValue) => setActiveTab(newValue)}
-            sx={{ mb: 3 }}
-          >
-            {tabs.map((tab) => (
-              <Tab key={tab.value} label={tab.label} />
-            ))}
-          </Tabs>
+          <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
+            <Typography variant="h6">
+              Thông tin cơ bản
+            </Typography>
+            <Button
+              variant="outlined"
+              startIcon={<Edit />}
+              onClick={() => setIsEditing(!isEditing)}
+              size="small"
+            >
+              {isEditing ? 'Hủy' : 'Chỉnh sửa'}
+            </Button>
+          </Box>
+          
+          <Divider sx={{ mb: 3 }} />
+          
+          {isEditing ? (
+            <ExamForm
+              examData={currentExam}
+              onSubmit={handleUpdate}
+              loading={loading}
+              isEditing={true}
+            />
+          ) : (
+            <Grid container spacing={3}>
+              <Grid item xs={12}>
+                <Typography variant="body2" color="text.secondary">
+                  Tên bài thi
+                </Typography>
+                <Typography variant="body1" sx={{ mb: 2 }}>
+                  {currentExam?.title || 'Chưa có tên'}
+                </Typography>
+              </Grid>
 
-          {getTabContent(activeTab)}
+              {currentExam?.description && (
+                <Grid item xs={12}>
+                  <Typography variant="body2" color="text.secondary">
+                    Mô tả
+                  </Typography>
+                  <Typography variant="body1" sx={{ mb: 2 }}>
+                    {currentExam.description}
+                  </Typography>
+                </Grid>
+              )}
+
+              <Grid item xs={6}>
+                <Typography variant="body2" color="text.secondary">
+                  Loại APTIS
+                </Typography>
+                <Typography variant="body1">
+                  {currentExam?.aptisType?.aptis_type_name || 'N/A'}
+                </Typography>
+              </Grid>
+
+              <Grid item xs={6}>
+                <Typography variant="body2" color="text.secondary">
+                  Thời gian
+                </Typography>
+                <Typography variant="body1">
+                  {currentExam?.duration_minutes || 0} phút
+                </Typography>
+              </Grid>
+            </Grid>
+          )}
         </CardContent>
       </Card>
     </Box>
   );
+}
 }

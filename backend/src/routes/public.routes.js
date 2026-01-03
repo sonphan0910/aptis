@@ -182,4 +182,7 @@ router.get('/ai/criteria', aiTestController.getAiCriteria);
  */
 router.post('/ai/requeue', aiTestController.requeuPendingAnswers);
 
+// GET /public/questions/writing - Get all Writing questions for testing dynamic content
+router.get('/questions/writing', apiLimiter, publicController.getWritingQuestions);
+
 module.exports = router;

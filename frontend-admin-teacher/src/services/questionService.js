@@ -14,15 +14,67 @@ export const questionApi = {
     return response.data;
   },
 
-  // Create a new question
+  // Create a new question with proper backend structure
   createQuestion: async (questionData) => {
-    const response = await apiClient.post(API_ENDPOINTS.TEACHER.QUESTIONS.CREATE, questionData);
+    // Transform frontend data to backend structure
+    const backendData = {
+      question_type_id: questionData.question_type_id,
+      aptis_type_id: questionData.aptis_type_id,
+      difficulty: questionData.difficulty,
+      content: questionData.content, // JSON string from forms
+      media_url: questionData.media_url || null,
+      duration_seconds: questionData.duration_seconds || null,
+      status: questionData.status || 'draft'
+    };
+
+    const response = await apiClient.post(API_ENDPOINTS.TEACHER.QUESTIONS.CREATE, backendData);
     return response.data;
   },
 
   // Update an existing question
   updateQuestion: async (id, questionData) => {
-    const response = await apiClient.put(API_ENDPOINTS.TEACHER.QUESTIONS.UPDATE(id), questionData);
+    const backendData = {
+      question_type_id: questionData.question_type_id,
+      aptis_type_id: questionData.aptis_type_id,
+      difficulty: questionData.difficulty,
+      content: questionData.content,
+      media_url: questionData.media_url || null,
+      duration_seconds: questionData.duration_seconds || null,
+      status: questionData.status || 'draft'
+    };
+
+    const response = await apiClient.put(API_ENDPOINTS.TEACHER.QUESTIONS.UPDATE(id), backendData);
+    return response.data;
+  },
+
+  // Get APTIS types
+  getAptisTypes: async () => {
+    const response = await apiClient.get('/api/aptis-types');
+    return response.data;
+  },
+
+  // Get skill types
+  getSkillTypes: async () => {
+    const response = await apiClient.get('/api/skill-types');
+    return response.data;
+  },
+
+  // Get question types by skill
+  getQuestionTypes: async (skillCode = null) => {
+    const params = skillCode ? { skill_code: skillCode } : {};
+    const response = await apiClient.get('/api/question-types', { params });
+    return response.data;
+  },
+
+  // Get question type by code
+  getQuestionTypeByCode: async (code) => {
+    const response = await apiClient.get(`/api/question-types/${code}`);
+    return response.data;
+  },
+
+  // Get APTIS type by code  
+  getAptisTypeByCode: async (code) => {
+    const response = await apiClient.get(`/api/aptis-types/${code}`);
     return response.data;
   },
 

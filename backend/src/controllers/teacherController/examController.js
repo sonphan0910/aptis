@@ -408,3 +408,128 @@ exports.getMyExams = async (req, res, next) => {
     next(error);
   }
 };
+
+/**
+ * Unpublish exam
+ */
+exports.unpublishExam = async (req, res, next) => {
+  try {
+    const { examId } = req.params;
+
+    const exam = await Exam.findByPk(examId);
+
+    if (!exam) {
+      throw new NotFoundError('Exam not found');
+    }
+
+    if (exam.status !== 'published') {
+      throw new BadRequestError('Exam is not published');
+    }
+
+    await exam.update({
+      status: 'draft',
+      published_at: null,
+    });
+
+    res.json({
+      success: true,
+      data: exam,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Remove section from exam
+ */
+exports.removeSection = async (req, res, next) => {
+  try {
+    const { examId, sectionId } = req.params;
+
+    const exam = await Exam.findByPk(examId);
+    if (!exam || exam.status !== 'draft') {
+      throw new BadRequestError('Cannot modify published exam');
+    }
+
+    const section = await ExamSection.findOne({
+      where: { id: sectionId, exam_id: examId },
+    });
+
+    if (!section) {
+      throw new NotFoundError('Section not found');
+    }
+
+    // Remove all questions from section first
+    await ExamSectionQuestion.destroy({
+      where: { exam_section_id: sectionId },
+    });
+
+    // Remove the section
+    await section.destroy();
+
+    res.json({
+      success: true,
+      message: 'Section removed successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get exam by ID (for detailed view)
+ */
+exports.getExamById = async (req, res, next) => {
+  try {
+    const { examId } = req.params;
+
+    const exam = await Exam.findByPk(examId, {
+      include: [
+        {
+          model: AptisType,
+          as: 'aptisType',
+          attributes: ['id', 'code', 'aptis_type_name'],
+        },
+        {
+          model: ExamSection,
+          as: 'sections',
+          include: [
+            {
+              model: SkillType,
+              as: 'skillType',
+              attributes: ['id', 'code', 'skill_type_name'],
+            },
+            {
+              model: ExamSectionQuestion,
+              as: 'questions',
+              include: [
+                {
+                  model: Question,
+                  as: 'question',
+                  attributes: ['id', 'content', 'question_type_id', 'difficulty'],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          model: User,
+          as: 'creator',
+          attributes: ['id', 'full_name'],
+        },
+      ],
+    });
+
+    if (!exam) {
+      throw new NotFoundError('Exam not found');
+    }
+
+    res.json({
+      success: true,
+      data: exam,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

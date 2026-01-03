@@ -48,9 +48,9 @@ async function seedAptisTypes() {
 async function seedSkillTypes() {
   const skills = [
     {
-      code: 'GRAMMAR_VOCABULARY',
-      skill_type_name: 'Grammar and Vocabulary',
-      description: 'Test grammar rules and vocabulary knowledge',
+      code: 'LISTENING',
+      skill_type_name: 'Listening',
+      description: 'Test listening comprehension skills',
       display_order: 1,
     },
     {
@@ -60,9 +60,9 @@ async function seedSkillTypes() {
       display_order: 2,
     },
     {
-      code: 'LISTENING',
-      skill_type_name: 'Listening',
-      description: 'Test listening comprehension skills',
+      code: 'SPEAKING',
+      skill_type_name: 'Speaking',
+      description: 'Test spoken communication skills',
       display_order: 3,
     },
     {
@@ -70,12 +70,6 @@ async function seedSkillTypes() {
       skill_type_name: 'Writing',
       description: 'Test written communication skills',
       display_order: 4,
-    },
-    {
-      code: 'SPEAKING',
-      skill_type_name: 'Speaking',
-      description: 'Test spoken communication skills',
-      display_order: 5,
     },
   ];
 
@@ -94,109 +88,70 @@ async function seedSkillTypes() {
  */
 async function seedQuestionTypes() {
   // Get skill IDs
-  const grammarVocab = await SkillType.findOne({ where: { code: 'GRAMMAR_VOCABULARY' } });
-  const reading = await SkillType.findOne({ where: { code: 'READING' } });
   const listening = await SkillType.findOne({ where: { code: 'LISTENING' } });
-  const writing = await SkillType.findOne({ where: { code: 'WRITING' } });
+  const reading = await SkillType.findOne({ where: { code: 'READING' } });
   const speaking = await SkillType.findOne({ where: { code: 'SPEAKING' } });
+  const writing = await SkillType.findOne({ where: { code: 'WRITING' } });
 
   const types = [
-    // Grammar & Vocabulary
-    {
-      skill_type_id: grammarVocab.id,
-      code: 'GV_MCQ',
-      question_type_name: 'Multiple Choice',
-      scoring_method: 'auto',
-    },
-    {
-      skill_type_id: grammarVocab.id,
-      code: 'GV_GAP_FILL',
-      question_type_name: 'Gap Filling',
-      scoring_method: 'auto',
-    },
-    {
-      skill_type_id: grammarVocab.id,
-      code: 'GV_MATCHING',
-      question_type_name: 'Matching',
-      scoring_method: 'auto',
-    },
-
-    // Reading
-    {
-      skill_type_id: reading.id,
-      code: 'READING_MCQ',
-      question_type_name: 'Multiple Choice',
-      scoring_method: 'auto',
-    },
-    {
-      skill_type_id: reading.id,
-      code: 'READING_TRUE_FALSE',
-      question_type_name: 'True/False',
-      scoring_method: 'auto',
-    },
-    {
-      skill_type_id: reading.id,
-      code: 'READING_MATCHING',
-      question_type_name: 'Matching Headings',
-      scoring_method: 'auto',
-    },
-    {
-      skill_type_id: reading.id,
-      code: 'READING_SHORT_ANSWER',
-      question_type_name: 'Short Answer',
-      scoring_method: 'ai',
-    },
-
     // Listening
     {
       skill_type_id: listening.id,
       code: 'LISTENING_MCQ',
       question_type_name: 'Multiple Choice',
+      instruction_template: 'Listen and choose the best answer.',
       scoring_method: 'auto',
     },
     {
       skill_type_id: listening.id,
       code: 'LISTENING_GAP_FILL',
       question_type_name: 'Gap Filling',
+      instruction_template: 'Listen and fill in the missing words.',
       scoring_method: 'auto',
     },
     {
       skill_type_id: listening.id,
       code: 'LISTENING_MATCHING',
-      question_type_name: 'Matching',
+      question_type_name: 'Speaker Matching',
+      instruction_template: 'Listen to each speaker and match them with the correct option.',
       scoring_method: 'auto',
     },
     {
       skill_type_id: listening.id,
-      code: 'LISTENING_NOTE_COMPLETION',
-      question_type_name: 'Note Completion',
+      code: 'LISTENING_STATEMENT_MATCHING',
+      question_type_name: 'Statement Matching',
+      instruction_template: 'Listen to the conversation and match each statement with the correct person.',
       scoring_method: 'auto',
     },
 
-    // Writing
+    // Reading
     {
-      skill_type_id: writing.id,
-      code: 'WRITING_SHORT',
-      question_type_name: 'Short Writing (50-100 words)',
-      scoring_method: 'ai',
+      skill_type_id: reading.id,
+      code: 'READING_GAP_FILL',
+      question_type_name: 'Gap Filling',
+      instruction_template: 'Choose one word from the list for each gap.',
+      scoring_method: 'auto',
     },
     {
-      skill_type_id: writing.id,
-      code: 'WRITING_LONG',
-      question_type_name: 'Long Writing (150-200 words)',
-      scoring_method: 'ai',
+      skill_type_id: reading.id,
+      code: 'READING_ORDERING',
+      question_type_name: 'Ordering',
+      instruction_template: 'Put the sentences in the right order.',
+      scoring_method: 'auto',
     },
     {
-      skill_type_id: writing.id,
-      code: 'WRITING_EMAIL',
-      question_type_name: 'Email Writing',
-      scoring_method: 'ai',
+      skill_type_id: reading.id,
+      code: 'READING_MATCHING',
+      question_type_name: 'Matching',
+      instruction_template: 'Match each item in the left column with the correct item in the right column.',
+      scoring_method: 'auto',
     },
     {
-      skill_type_id: writing.id,
-      code: 'WRITING_ESSAY',
-      question_type_name: 'Essay Writing',
-      scoring_method: 'ai',
+      skill_type_id: reading.id,
+      code: 'READING_MATCHING_HEADINGS',
+      question_type_name: 'Matching Headings',
+      instruction_template: 'Read the passage quickly. Choose a heading for each numbered paragraph from the drop-down box.',
+      scoring_method: 'auto',
     },
 
     // Speaking
@@ -222,6 +177,38 @@ async function seedQuestionTypes() {
       skill_type_id: speaking.id,
       code: 'SPEAKING_DISCUSSION',
       question_type_name: 'Topic Discussion',
+      scoring_method: 'ai',
+    },
+
+    // Writing
+    {
+      skill_type_id: writing.id,
+      code: 'WRITING_SHORT',
+      question_type_name: 'Short Answers (1-5 words)',
+      scoring_method: 'ai',
+    },
+    {
+      skill_type_id: writing.id,
+      code: 'WRITING_FORM',
+      question_type_name: 'Form Filling (20-30 words)',
+      scoring_method: 'ai',
+    },
+    {
+      skill_type_id: writing.id,
+      code: 'WRITING_LONG',
+      question_type_name: 'Chat Responses (30-40 words)', 
+      scoring_method: 'ai',
+    },
+    {
+      skill_type_id: writing.id,
+      code: 'WRITING_EMAIL',
+      question_type_name: 'Email Writing (50 & 120-150 words)',
+      scoring_method: 'ai',
+    },
+    {
+      skill_type_id: writing.id,
+      code: 'WRITING_ESSAY',
+      question_type_name: 'Essay Writing',
       scoring_method: 'ai',
     },
   ];

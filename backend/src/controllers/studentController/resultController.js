@@ -8,6 +8,7 @@ const {
   ExamSectionQuestion,
   Question,
   QuestionType,
+  QuestionItem,
   SkillType,
   Exam,
 } = require('../../models');
@@ -135,6 +136,47 @@ exports.getResults = async (req, res, next) => {
       ],
     });
 
+    // Count answers by type for accurate question counting
+    let totalQuestionsCount = 0;
+    let answeredQuestionsCount = 0;
+
+    for (const answer of answers) {
+      const questionType = answer.question?.questionType?.code;
+      
+      // For matching questions, count individual items, not the question itself
+      if (questionType === 'READING_MATCHING' || questionType === 'LISTENING_MATCHING') {
+        // Get the number of items for this matching question
+        const matchingItems = await QuestionItem.count({
+          where: { question_id: answer.question_id }
+        });
+        
+        totalQuestionsCount += matchingItems;
+        
+        // Check if answer exists (for matching, check if answer_json is not empty)
+        if (answer.answer_json) {
+          try {
+            const answerData = typeof answer.answer_json === 'string' 
+              ? JSON.parse(answer.answer_json) 
+              : answer.answer_json;
+            
+            const matches = answerData.matches || answerData || {};
+            const answeredItems = Object.keys(matches).filter(key => matches[key]).length;
+            answeredQuestionsCount += answeredItems;
+          } catch (e) {
+            // If parsing fails, assume no answers
+            console.warn('Failed to parse matching answer JSON:', e);
+          }
+        }
+      } else {
+        // For regular questions, count normally
+        totalQuestionsCount += 1;
+        
+        if (answer.selected_option_id || answer.text_answer || answer.audio_url) {
+          answeredQuestionsCount += 1;
+        }
+      }
+    }
+
     res.json({
       success: true,
       data: {
@@ -143,6 +185,8 @@ exports.getResults = async (req, res, next) => {
         answers: answersWithFeedback,
         totalScore: attempt.total_score,
         status: attempt.status,
+        questions_count: totalQuestionsCount, // Updated to reflect actual questions
+        answered_questions: answeredQuestionsCount, // Updated to reflect actual answered questions
       },
     });
   } catch (error) {

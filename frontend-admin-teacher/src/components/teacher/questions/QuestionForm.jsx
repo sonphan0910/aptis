@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Box,
   TextField,
@@ -11,7 +11,11 @@ import {
   Button,
   Grid,
   Typography,
-  Paper
+  Paper,
+  Chip,
+  FormControlLabel,
+  Checkbox,
+  Slider
 } from '@mui/material';
 import { Save, ArrowBack } from '@mui/icons-material';
 import { useFormik } from 'formik';
@@ -19,200 +23,235 @@ import * as Yup from 'yup';
 import MCQForm from './MCQForm';
 import MatchingForm from './MatchingForm';
 import GapFillingForm from './GapFillingForm';
-import OrderingForm from './OrderingForm';
 import WritingPromptForm from './WritingPromptForm';
 import SpeakingTaskForm from './SpeakingTaskForm';
+import TrueFalseForm from './TrueFalseForm';
+import NoteCompletionForm from './NoteCompletionForm';
+import { 
+  APTIS_TYPES, 
+  SKILL_TYPES, 
+  getQuestionTypeByCode,
+  DIFFICULTY_LEVELS
+} from '@/constants/questionTypes';
 
 const questionSchema = Yup.object().shape({
-  title: Yup.string().required('Tên câu hỏi là bắt buộc'),
-  description: Yup.string(),
-  aptis_type: Yup.string().required('Loại APTIS là bắt buộc'),
-  skill: Yup.string().required('Kỹ năng là bắt buộc'),
+  content: Yup.string().required('Nội dung câu hỏi là bắt buộc'),
   difficulty: Yup.string().required('Độ khó là bắt buộc'),
-  content: Yup.object().required('Nội dung câu hỏi là bắt buộc')
 });
 
-const skillOptions = {
-  mcq: ['listening', 'reading'],
-  matching: ['listening', 'reading'],
-  gap_filling: ['listening', 'reading'],
-  ordering: ['listening', 'reading'],
-  writing: ['writing'],
-  speaking: ['speaking']
-};
-
 export default function QuestionForm({
+  aptisType,
+  skillType, 
   questionType,
   initialData = {},
   onSubmit,
   onBack,
   isEditing = false
 }) {
-  const [content, setContent] = useState(initialData.content || {});
+  const [questionContent, setQuestionContent] = useState(initialData.content || '');
+  const [mediaUrl, setMediaUrl] = useState(initialData.media_url || '');
+  const [hasDuration, setHasDuration] = useState(!!initialData.duration_seconds);
+  const [duration, setDuration] = useState(initialData.duration_seconds ? Math.floor(initialData.duration_seconds / 60) : 5);
+
+  const aptisData = APTIS_TYPES.find(a => a.code === aptisType);
+  const skillData = SKILL_TYPES.find(s => s.code === skillType);
+  const questionTypeData = getQuestionTypeByCode(questionType?.code);
 
   const formik = useFormik({
     initialValues: {
-      title: initialData.title || '',
-      description: initialData.description || '',
-      aptis_type: initialData.aptis_type || 'general',
-      skill: initialData.skill || skillOptions[questionType]?.[0] || '',
+      content: initialData.content || '',
       difficulty: initialData.difficulty || 'medium',
-      question_type: questionType,
-      content: initialData.content || {}
+      media_url: initialData.media_url || '',
+      duration_seconds: initialData.duration_seconds || null,
+      status: initialData.status || 'draft'
     },
     validationSchema: questionSchema,
     enableReinitialize: true,
     onSubmit: (values) => {
-      onSubmit({ ...values, content });
+      const submissionData = {
+        ...values,
+        content: questionContent,
+        media_url: mediaUrl,
+        duration_seconds: hasDuration ? duration * 60 : null
+      };
+      onSubmit(submissionData);
     }
   });
 
-  useEffect(() => {
-    if (questionType && !formik.values.skill) {
-      formik.setFieldValue('skill', skillOptions[questionType]?.[0] || '');
-    }
-  }, [questionType]);
-
-  const handleContentChange = (newContent) => {
-    setContent(newContent);
-    formik.setFieldValue('content', newContent);
-  };
-
   const renderSpecificForm = () => {
     const props = {
-      content,
-      onChange: handleContentChange,
-      skill: formik.values.skill
+      content: questionContent,
+      onChange: setQuestionContent,
+      skillType: skillType,
+      questionType: questionType
     };
 
-    switch (questionType) {
-      case 'mcq':
+    switch (questionType?.code) {
+      case 'GV_MCQ':
+      case 'READING_MCQ':
+      case 'LISTENING_MCQ':
         return <MCQForm {...props} />;
-      case 'matching':
+      
+      case 'GV_MATCHING':
+      case 'READING_MATCHING':  
+      case 'LISTENING_MATCHING':
         return <MatchingForm {...props} />;
-      case 'gap_filling':
+      
+      case 'GV_GAP_FILL':
+      case 'LISTENING_GAP_FILL':
         return <GapFillingForm {...props} />;
-      case 'ordering':
-        return <OrderingForm {...props} />;
-      case 'writing':
-        return <WritingPromptForm {...props} />;
-      case 'speaking':
-        return <SpeakingTaskForm {...props} />;
+      
+      case 'READING_TRUE_FALSE':
+        return <TrueFalseForm {...props} />;
+      
+      case 'LISTENING_NOTE_COMPLETION':
+        return <NoteCompletionForm {...props} />;
+      
+      case 'WRITING_SHORT':
+      case 'WRITING_LONG':
+      case 'WRITING_EMAIL':
+      case 'WRITING_ESSAY':
+        return <WritingPromptForm {...props} writingType={questionType.code} />;
+      
+      case 'SPEAKING_INTRO':
+      case 'SPEAKING_DESCRIPTION':
+      case 'SPEAKING_COMPARISON':
+      case 'SPEAKING_DISCUSSION':
+        return <SpeakingTaskForm {...props} speakingType={questionType.code} />;
+      
       default:
-        return <Typography>Chọn loại câu hỏi</Typography>;
+        return (
+          <Box textAlign="center" py={4}>
+            <Typography color="text.secondary">
+              Loại câu hỏi này chưa được hỗ trợ: {questionType?.code}
+            </Typography>
+          </Box>
+        );
     }
   };
 
   return (
     <Box component="form" onSubmit={formik.handleSubmit}>
-      <Paper sx={{ p: 3, mb: 3 }}>
+      {/* Header Info */}
+      <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
         <Typography variant="h6" gutterBottom>
-          Thông tin cơ bản
+          Thông tin câu hỏi
         </Typography>
+        <Box display="flex" gap={1} mb={2}>
+          <Chip label={aptisData?.name} color="primary" />
+          <Chip label={skillData?.name} color="secondary" />
+          <Chip label={questionTypeData?.name} color="info" />
+        </Box>
         
-        <Grid container spacing={2}>
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              label="Tên câu hỏi"
-              name="title"
-              value={formik.values.title}
-              onChange={formik.handleChange}
-              onBlur={formik.handleBlur}
-              error={formik.touched.title && !!formik.errors.title}
-              helperText={formik.touched.title && formik.errors.title}
-              required
-            />
-          </Grid>
-
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              label="Mô tả"
-              name="description"
-              multiline
-              rows={2}
-              value={formik.values.description}
-              onChange={formik.handleChange}
-              onBlur={formik.handleBlur}
-            />
-          </Grid>
-
-          <Grid item xs={12} md={4}>
-            <FormControl fullWidth required>
-              <InputLabel>Loại APTIS</InputLabel>
+        <Grid container spacing={3}>
+          {/* Difficulty */}
+          <Grid item xs={12} md={6}>
+            <FormControl fullWidth>
+              <InputLabel>Độ khó</InputLabel>
               <Select
-                name="aptis_type"
-                value={formik.values.aptis_type}
-                label="Loại APTIS"
+                name="difficulty"
+                value={formik.values.difficulty}
                 onChange={formik.handleChange}
+                label="Độ khó"
+                error={formik.touched.difficulty && Boolean(formik.errors.difficulty)}
               >
-                <MenuItem value="general">General</MenuItem>
-                <MenuItem value="advanced">Advanced</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-
-          <Grid item xs={12} md={4}>
-            <FormControl fullWidth required>
-              <InputLabel>Kỹ năng</InputLabel>
-              <Select
-                name="skill"
-                value={formik.values.skill}
-                label="Kỹ năng"
-                onChange={formik.handleChange}
-              >
-                {skillOptions[questionType]?.map((skill) => (
-                  <MenuItem key={skill} value={skill}>
-                    {skill.charAt(0).toUpperCase() + skill.slice(1)}
+                {DIFFICULTY_LEVELS.map((level) => (
+                  <MenuItem key={level.value} value={level.value}>
+                    <Box display="flex" alignItems="center" gap={1}>
+                      <Box
+                        sx={{
+                          width: 12,
+                          height: 12,
+                          borderRadius: '50%',
+                          bgcolor: level.color
+                        }}
+                      />
+                      {level.label}
+                    </Box>
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
           </Grid>
 
-          <Grid item xs={12} md={4}>
-            <FormControl fullWidth required>
-              <InputLabel>Độ khó</InputLabel>
-              <Select
-                name="difficulty"
-                value={formik.values.difficulty}
-                label="Độ khó"
-                onChange={formik.handleChange}
-              >
-                <MenuItem value="easy">Dễ</MenuItem>
-                <MenuItem value="medium">Trung bình</MenuItem>
-                <MenuItem value="hard">Khó</MenuItem>
-              </Select>
-            </FormControl>
+          {/* Media URL (for listening/speaking) */}
+          {(skillType === 'LISTENING' || skillType === 'SPEAKING') && (
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="URL Media (Audio/Video)"
+                name="media_url"
+                value={mediaUrl}
+                onChange={(e) => setMediaUrl(e.target.value)}
+                placeholder="https://example.com/audio.mp3"
+                helperText="URL file âm thanh hoặc video cho câu hỏi"
+              />
+            </Grid>
+          )}
+
+          {/* Duration */}
+          <Grid item xs={12}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={hasDuration}
+                  onChange={(e) => setHasDuration(e.target.checked)}
+                />
+              }
+              label="Giới hạn thời gian làm bài"
+            />
+            
+            {hasDuration && (
+              <Box sx={{ ml: 4, mt: 2 }}>
+                <Typography gutterBottom>
+                  Thời gian: {duration} phút
+                </Typography>
+                <Slider
+                  value={duration}
+                  onChange={(e, value) => setDuration(value)}
+                  min={1}
+                  max={30}
+                  step={1}
+                  marks={[
+                    { value: 1, label: '1 phút' },
+                    { value: 10, label: '10 phút' },
+                    { value: 20, label: '20 phút' },
+                    { value: 30, label: '30 phút' }
+                  ]}
+                />
+              </Box>
+            )}
           </Grid>
         </Grid>
       </Paper>
 
-      <Paper sx={{ p: 3, mb: 3 }}>
+      {/* Question Content Form */}
+      <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
         <Typography variant="h6" gutterBottom>
           Nội dung câu hỏi
         </Typography>
         {renderSpecificForm()}
       </Paper>
 
-      <Box display="flex" gap={2}>
-        {onBack && (
-          <Button
-            variant="outlined"
-            startIcon={<ArrowBack />}
-            onClick={onBack}
-          >
-            Quay lại
-          </Button>
-        )}
+      {/* Actions */}
+      <Box display="flex" gap={2} justifyContent="space-between">
+        <Button
+          variant="outlined"
+          startIcon={<ArrowBack />}
+          onClick={onBack}
+          disabled={formik.isSubmitting}
+        >
+          Quay lại
+        </Button>
+        
         <Button
           type="submit"
           variant="contained"
           startIcon={<Save />}
-          disabled={!formik.isValid || !content}
+          disabled={formik.isSubmitting || !questionContent.trim()}
+          size="large"
         >
-          {isEditing ? 'Cập nhật' : 'Tiếp tục'}
+          {isEditing ? 'Cập nhật câu hỏi' : 'Tiếp tục'}
         </Button>
       </Box>
     </Box>

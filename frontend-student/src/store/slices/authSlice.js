@@ -21,11 +21,6 @@ const getInitialState = () => {
     const userStr = localStorage.getItem('user');
     const user = userStr ? JSON.parse(userStr) : null;
 
-    console.log('[AuthSlice] Loading initial state:', {
-      hasToken: !!token,
-      hasRefreshToken: !!refreshToken,
-      hasUser: !!user,
-    });
 
     return {
       user,
@@ -37,7 +32,6 @@ const getInitialState = () => {
       error: null,
     };
   } catch (error) {
-    console.error('[AuthSlice] Error loading initial state:', error);
     return {
       user: null,
       token: null,
@@ -57,13 +51,10 @@ export const loginUser = createAsyncThunk(
   'auth/login',
   async (credentials, { rejectWithValue }) => {
     try {
-      console.log('[AuthSlice] Starting login for:', credentials.email);
       const response = await authService.login(credentials);
-      console.log('[AuthSlice] Login response received');
       // Backend returns: { success: true, data: { user, accessToken, refreshToken } }
       return response.data.data || response.data;
     } catch (error) {
-      console.error('[AuthSlice] Login error:', error);
       return rejectWithValue(error.response?.data?.message || 'Login failed');
     }
   }
@@ -92,7 +83,6 @@ export const refreshTokenThunk = createAsyncThunk(
       const response = await authService.refreshToken(state.auth.refreshToken);
       return response.data.data || response.data;
     } catch (error) {
-      console.error('[AuthSlice] Token refresh error:', error);
       return rejectWithValue(error.response?.data?.message || 'Token refresh failed');
     }
   }
@@ -109,19 +99,12 @@ export const checkAuthStatus = createAsyncThunk(
       const token = localStorage.getItem('token');
       const refreshToken = localStorage.getItem('refreshToken');
 
-      console.log('[AuthSlice] Checking auth status:', {
-        hasToken: !!token,
-        hasRefreshToken: !!refreshToken,
-      });
-
       if (!token) {
-        console.log('[AuthSlice] No token found');
         throw new Error('No token found');
       }
 
       // Verify token is valid by getting user profile
       const response = await authService.getProfile();
-      console.log('[AuthSlice] Auth check successful');
 
       return {
         user: response.data.data, // Backend trả về { success: true, data: user }
@@ -129,7 +112,6 @@ export const checkAuthStatus = createAsyncThunk(
         refreshToken,
       };
     } catch (error) {
-      console.error('[AuthSlice] Auth check failed:', error);
       // Clear storage on auth check failure
       if (typeof window !== 'undefined') {
         localStorage.removeItem('token');
@@ -164,7 +146,6 @@ const authSlice = createSlice({
       state.user = action.payload;
     },
     clearAuth: (state) => {
-      console.log('[AuthSlice] Clearing auth state');
       if (typeof window !== 'undefined') {
         localStorage.removeItem('token');
         localStorage.removeItem('refreshToken');
@@ -199,7 +180,6 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(loginUser.fulfilled, (state, action) => {
-        console.log('[AuthSlice] Login fulfilled');
         state.isLoading = false;
         state.error = null;
 
@@ -217,10 +197,7 @@ const authSlice = createSlice({
               localStorage.setItem('refreshToken', state.refreshToken);
             }
           }
-
-          console.log('[AuthSlice] Authentication successful');
         } else {
-          console.error('[AuthSlice] Invalid login response structure');
           state.error = 'Invalid login response';
           state.isAuthenticated = false;
         }

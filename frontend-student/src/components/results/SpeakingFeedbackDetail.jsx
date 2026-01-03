@@ -16,6 +16,7 @@ import {
   Paper,
   IconButton,
 } from '@mui/material';
+import { getAssetUrl } from '@/services/api';
 import {
   ExpandMore,
   CheckCircle,
@@ -48,7 +49,11 @@ export default function SpeakingFeedbackDetail({ answer }) {
     reviewed_at,
     reviewed_by,
     aiFeedbacks = [],
+    answer_type,
   } = answer;
+
+  // Verify this is an audio answer
+  const isAudioAnswer = answer_type === 'audio' || audio_url;
 
   // Calculate percentage
   const displayScore = final_score !== null ? final_score : score;
@@ -128,7 +133,7 @@ export default function SpeakingFeedbackDetail({ answer }) {
       </Card>
 
       {/* Audio Player */}
-      {audio_url && (
+      {isAudioAnswer && audio_url && (
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
@@ -155,7 +160,7 @@ export default function SpeakingFeedbackDetail({ answer }) {
               <Box flex={1}>
                 <audio
                   ref={audioRef}
-                  src={audio_url}
+                  src={getAssetUrl(audio_url)}
                   onEnded={() => setIsPlaying(false)}
                   style={{ width: '100%' }}
                   controls
@@ -164,6 +169,15 @@ export default function SpeakingFeedbackDetail({ answer }) {
             </Box>
           </CardContent>
         </Card>
+      )}
+
+      {/* Show warning if not an audio answer */}
+      {!isAudioAnswer && (
+        <Alert severity="warning" sx={{ mb: 3 }}>
+          <Typography variant="body2">
+            ⚠️ Đây không phải là câu trả lời speaking (answer_type: {answer_type}). Có thể có lỗi trong việc lưu câu trả lời.
+          </Typography>
+        </Alert>
       )}
 
       {/* Transcription */}

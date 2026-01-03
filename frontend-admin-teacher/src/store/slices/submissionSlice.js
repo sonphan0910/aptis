@@ -73,6 +73,45 @@ export const fetchSubmissionsByUser = createAsyncThunk(
   }
 );
 
+// Get detailed submission for review
+export const fetchSubmissionDetail = createAsyncThunk(
+  'submissions/fetchDetail',
+  async (attemptId, { rejectWithValue }) => {
+    try {
+      const response = await submissionApi.getSubmissionDetail(attemptId);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.message || 'Failed to fetch submission detail');
+    }
+  }
+);
+
+// Submit review for an answer
+export const submitAnswerReview = createAsyncThunk(
+  'submissions/submitAnswerReview',
+  async ({ answerId, reviewData }, { rejectWithValue }) => {
+    try {
+      const response = await submissionApi.submitAnswerReview(answerId, reviewData);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.message || 'Failed to submit answer review');
+    }
+  }
+);
+
+// Submit complete attempt review
+export const submitAttemptReview = createAsyncThunk(
+  'submissions/submitAttemptReview',
+  async ({ attemptId, reviewData }, { rejectWithValue }) => {
+    try {
+      const response = await submissionApi.submitAttemptReview(attemptId, reviewData);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.message || 'Failed to submit attempt review');
+    }
+  }
+);
+
 export const gradeSubmission = createAsyncThunk(
   'submissions/gradeSubmission',
   async ({ id, scores, feedback }, { rejectWithValue }) => {
@@ -309,6 +348,69 @@ const submissionSlice = createSlice({
         state.error = null;
       })
       .addCase(fetchSubmissionsByUser.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      });
+
+    // Fetch submission detail for review
+    builder
+      .addCase(fetchSubmissionDetail.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchSubmissionDetail.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.currentSubmission = action.payload;
+        state.submissionDetails = action.payload;
+        state.error = null;
+      })
+      .addCase(fetchSubmissionDetail.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      });
+
+    // Submit answer review
+    builder
+      .addCase(submitAnswerReview.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(submitAnswerReview.fulfilled, (state, action) => {
+        state.isLoading = false;
+        // Update answer in submission details
+        if (state.submissionDetails?.answers) {
+          const answerIndex = state.submissionDetails.answers.findIndex(
+            answer => answer.id === action.payload.id
+          );
+          if (answerIndex !== -1) {
+            state.submissionDetails.answers[answerIndex] = action.payload;
+          }
+        }
+        state.error = null;
+      })
+      .addCase(submitAnswerReview.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      });
+
+    // Submit attempt review
+    builder
+      .addCase(submitAttemptReview.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(submitAttemptReview.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.currentSubmission = action.payload;
+        state.submissionDetails = action.payload;
+        // Update in list if present
+        const index = state.submissions.findIndex(s => s.id === action.payload.id);
+        if (index !== -1) {
+          state.submissions[index] = action.payload;
+        }
+        state.error = null;
+      })
+      .addCase(submitAttemptReview.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload;
       });

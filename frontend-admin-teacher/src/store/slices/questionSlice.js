@@ -4,14 +4,15 @@ import { questionApi } from '@/services/questionService';
 const initialState = {
   questions: [],
   currentQuestion: null,
+  aptisTypes: [],
+  skillTypes: [],
   questionTypes: [],
-  categories: [],
   filterOptions: {
     aptisTypes: [],
     skills: [],
     questionTypes: [],
-    difficulties: [],
-    statuses: []
+    difficulties: ['easy', 'medium', 'hard'],
+    statuses: ['draft', 'active', 'inactive']
   },
   pagination: {
     page: 1,
@@ -20,9 +21,11 @@ const initialState = {
     totalPages: 0,
   },
   filters: {
-    type: 'all',
-    category: 'all',
-    level: 'all',
+    aptis_type_id: '',
+    skill_type_code: '',
+    question_type_code: '',
+    difficulty: '',
+    status: '',
     search: '',
   },
   isLoading: false,
@@ -61,8 +64,22 @@ export const createQuestion = createAsyncThunk(
   'questions/createQuestion',
   async (questionData, { rejectWithValue }) => {
     try {
-      const response = await questionApi.createQuestion(questionData);
-      return response;
+      // Get IDs for question type and aptis type
+      const questionTypeResponse = await questionApi.getQuestionTypeByCode(questionData.question_type_code);
+      const aptisTypeResponse = await questionApi.getAptisTypeByCode(questionData.aptis_type_id);
+
+      const backendData = {
+        question_type_id: questionTypeResponse.data.id,
+        aptis_type_id: aptisTypeResponse.data.id,
+        difficulty: questionData.difficulty,
+        content: questionData.content,
+        media_url: questionData.media_url,
+        duration_seconds: questionData.duration_seconds,
+        status: questionData.status
+      };
+
+      const response = await questionApi.createQuestion(backendData);
+      return response.data;
     } catch (error) {
       return rejectWithValue(error.message || 'Failed to create question');
     }

@@ -26,25 +26,10 @@ export default function ExamModeDialog({
   exam,
   availableSkills = [] 
 }) {
-  console.log('[ExamModeDialog] Component rendered with props:', { 
-    open, 
-    onClose: !!onClose, 
-    onStartExam: !!onStartExam, 
-    exam: exam?.title, 
-    availableSkillsCount: availableSkills?.length,
-    availableSkills: availableSkills?.slice(0, 3)
-  });
-
   const [attemptType, setAttemptType] = useState('full_exam');
   const [selectedSkill, setSelectedSkill] = useState('');
 
   useEffect(() => {
-    console.log('[ExamModeDialog] Dialog open state changed:', { 
-      open, 
-      exam: exam?.title, 
-      skillsCount: availableSkills?.length,
-      skills: availableSkills 
-    });
     if (open) {
       setAttemptType('full_exam');
       setSelectedSkill('');
@@ -52,14 +37,9 @@ export default function ExamModeDialog({
   }, [open, availableSkills]);
 
   const handleStart = () => {
-    console.log('[ExamModeDialog] Start button clicked:', { attemptType, selectedSkill, canStart: attemptType === 'full_exam' || (attemptType === 'single_skill' && selectedSkill) });
-    
     if (attemptType === 'single_skill' && !selectedSkill) {
-      console.log('[ExamModeDialog] Skill not selected, returning');
       return; // Don't start if skill not selected
     }
-
-    console.log('[ExamModeDialog] Calling onStartExam callback');
     onStartExam({
       attemptType,
       selectedSkill: attemptType === 'single_skill' ? selectedSkill : null
@@ -67,14 +47,6 @@ export default function ExamModeDialog({
   };
 
   const canStart = attemptType === 'full_exam' || (attemptType === 'single_skill' && selectedSkill);
-
-  console.log('[ExamModeDialog] Render state:', { 
-    open, 
-    attemptType, 
-    selectedSkill, 
-    canStart,
-    skillsLength: availableSkills?.length 
-  });
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>

@@ -21,9 +21,11 @@ import {
   CheckCircle,
   RadioButtonUnchecked,
   Grade,
+  Schedule,
 } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
+import { vi } from 'date-fns/locale';
 
 export default function RecentAttempts({ attempts, showActions = false, maxItems = 5 }) {
   const router = useRouter();
@@ -33,8 +35,9 @@ export default function RecentAttempts({ attempts, showActions = false, maxItems
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'completed':
+      case 'submitted':
       case 'graded':
+      case 'reviewed':
         return <CheckCircle color="success" />;
       case 'in_progress':
         return <RadioButtonUnchecked color="primary" />;
@@ -45,13 +48,42 @@ export default function RecentAttempts({ attempts, showActions = false, maxItems
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'completed':
+      case 'submitted':
+        return 'info';
       case 'graded':
         return 'success';
+      case 'reviewed':
+        return 'success';
       case 'in_progress':
-        return 'primary';
+        return 'warning';
       default:
         return 'default';
+    }
+  };
+
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'in_progress':
+        return 'Đang làm';
+      case 'submitted':
+        return 'Đã nộp';
+      case 'graded':
+        return 'Đã chấm';
+      case 'reviewed':
+        return 'Đã xem lại';
+      default:
+        return status;
+    }
+  };
+
+  const getAttemptTypeText = (type) => {
+    switch (type) {
+      case 'full_exam':
+        return 'Thi đầy đủ';
+      case 'single_skill':
+        return 'Luyện kỹ năng';
+      default:
+        return type;
     }
   };
 
@@ -73,7 +105,7 @@ export default function RecentAttempts({ attempts, showActions = false, maxItems
     return (
       <Box sx={{ textAlign: 'center', py: 4 }}>
         <Typography variant="body2" color="text.secondary">
-          No recent attempts to show
+          Chưa có kết quả nào
         </Typography>
       </Box>
     );
@@ -92,41 +124,74 @@ export default function RecentAttempts({ attempts, showActions = false, maxItems
               <ListItemText
                 primary={
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                    <Typography variant="subtitle2" component="span">
-                      {attempt.exam?.title || 'Unknown Exam'}
+                    <Typography variant="subtitle1" component="span" sx={{ fontWeight: 'medium' }}>
+                      {attempt.exam?.title || 'Bài thi không rõ'}
                     </Typography>
                     <Chip
-                      label={attempt.status}
+                      label={getStatusText(attempt.status)}
                       size="small"
                       color={getStatusColor(attempt.status)}
-                      variant="outlined"
+                      variant="filled"
                     />
+                    {attempt.exam?.aptisType && (
+                      <Chip
+                        label={attempt.exam.aptisType.aptis_type_name}
+                        size="small"
+                        variant="outlined"
+                        color="default"
+                      />
+                    )}
                   </Box>
                 }
                 secondary={
                   <Box>
                     <Typography variant="body2" color="text.secondary" gutterBottom>
-                      {attempt.attempt_type === 'single_skill' 
-                        ? `${attempt.selected_skill?.name || 'Single Skill'} Practice`
-                        : 'Full Exam'
-                      }
+                      <strong>{getAttemptTypeText(attempt.attempt_type)}</strong>
+                      {attempt.selected_skill && (
+                        <span> - {attempt.selected_skill.skill_type_name}</span>
+                      )}
+                      {attempt.exam?.duration_minutes && (
+                        <span> • Thời gian: {attempt.exam.duration_minutes} phút</span>
+                      )}
                     </Typography>
                     
-                    {attempt.total_score !== null && (
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                        <Grade sx={{ fontSize: 16, color: 'text.secondary' }} />
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 0.5, flexWrap: 'wrap' }}>
+                      {attempt.total_score !== null ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Grade sx={{ fontSize: 16, color: 'text.secondary' }} />
+                          <Chip
+                            label={`${Math.round(attempt.total_score * 100) / 100}%`}
+                            size="small"
+                            color={getScoreColor(attempt.total_score)}
+                            variant="filled"
+                          />
+                        </Box>
+                      ) : (
                         <Chip
-                          label={`${Math.round(attempt.total_score)}%`}
+                          label="Chưa có điểm"
                           size="small"
-                          color={getScoreColor(attempt.total_score)}
+                          color="default"
+                          variant="outlined"
                         />
-                      </Box>
-                    )}
+                      )}
+                      
+                      <Typography variant="caption" color="text.secondary">
+                        Lần {attempt.attempt_number}
+                      </Typography>
+                    </Box>
                     
-                    <Typography variant="caption" color="text.secondary">
-                      {formatDistanceToNow(new Date(attempt.start_time || attempt.created_at), { 
-                        addSuffix: true 
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <Schedule sx={{ fontSize: 14 }} />
+                      {attempt.start_time && formatDistanceToNow(new Date(attempt.start_time), { 
+                        addSuffix: true,
+                        locale: vi
                       })}
+                      {attempt.end_time && (
+                        <span> • Kết thúc {formatDistanceToNow(new Date(attempt.end_time), { 
+                          addSuffix: true,
+                          locale: vi
+                        })}</span>
+                      )}
                     </Typography>
                   </Box>
                 }
@@ -137,18 +202,20 @@ export default function RecentAttempts({ attempts, showActions = false, maxItems
                   {attempt.status === 'in_progress' ? (
                     <Button
                       size="small"
+                      variant="contained"
                       startIcon={<PlayArrow />}
                       onClick={() => handleContinueAttempt(attempt.id)}
                     >
-                      Continue
+                      Tiếp tục
                     </Button>
                   ) : (
                     <Button
                       size="small"
                       variant="outlined"
+                      startIcon={<Grade />}
                       onClick={() => handleViewResults(attempt.id)}
                     >
-                      View Results
+                      Xem kết quả
                     </Button>
                   )}
                 </ListItemSecondaryAction>
@@ -167,7 +234,7 @@ export default function RecentAttempts({ attempts, showActions = false, maxItems
             onClick={() => setExpanded(!expanded)}
             size="small"
           >
-            {expanded ? 'Show Less' : `Show ${attempts.length - maxItems} More`}
+            {expanded ? 'Thu gọn' : `Xem thêm ${attempts.length - maxItems} kết quả`}
           </Button>
         </Box>
       )}

@@ -69,15 +69,36 @@ class AuthService {
   getToken() {
     if (typeof window !== 'undefined') {
       // Try both 'token' and 'accessToken' for compatibility
-      return localStorage.getItem('accessToken') || localStorage.getItem('token');
+      const accessToken = localStorage.getItem('accessToken');
+      const token = localStorage.getItem('token');
+      const result = accessToken || token;
+      
+      console.log('[AuthService] getToken called:', {
+        hasAccessToken: !!accessToken,
+        hasToken: !!token,
+        returning: result ? `${result.substring(0, 30)}...` : 'NO TOKEN',
+        localStorage: {
+          accessToken: accessToken ? 'present' : 'missing',
+          token: token ? 'present' : 'missing'
+        }
+      });
+      
+      return result;
     }
+    console.log('[AuthService] getToken called on server side - returning null');
     return null;
   }
 
   getRefreshToken() {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('refreshToken');
+      const refreshToken = localStorage.getItem('refreshToken');
+      console.log('[AuthService] getRefreshToken called:', {
+        hasRefreshToken: !!refreshToken,
+        returning: refreshToken ? `${refreshToken.substring(0, 30)}...` : 'NO REFRESH TOKEN'
+      });
+      return refreshToken;
     }
+    console.log('[AuthService] getRefreshToken called on server side - returning null');
     return null;
   }
 

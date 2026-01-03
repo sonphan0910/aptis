@@ -8,68 +8,33 @@ import {
   Typography,
   Card,
   CardContent,
-  Button,
-  Stepper,
-  Step,
-  StepLabel
+  Button
 } from '@mui/material';
-import { Save, ArrowBack } from '@mui/icons-material';
+import { ArrowBack } from '@mui/icons-material';
 import ExamForm from '@/components/teacher/exams/ExamForm';
-import ExamBuilder from '@/components/teacher/exams/ExamBuilder';
-import ExamPreview from '@/components/teacher/exams/ExamPreview';
 import { createExam } from '@/store/slices/examSlice';
 import { showNotification } from '@/store/slices/uiSlice';
-
-const steps = ['Thông tin cơ bản', 'Xây dựng bài thi', 'Xem trước'];
 
 export default function NewExamPage() {
   const router = useRouter();
   const dispatch = useDispatch();
   
-  const [activeStep, setActiveStep] = useState(0);
-  const [examData, setExamData] = useState({
-    title: '',
-    description: '',
-    aptis_type: 'general',
-    primary_skill: '',
-    duration_minutes: 60,
-    instructions: '',
-    sections: []
-  });
   const [loading, setLoading] = useState(false);
 
-  const handleNext = () => {
-    setActiveStep((prevActiveStep) => prevActiveStep + 1);
-  };
-
-  const handleBack = () => {
-    setActiveStep((prevActiveStep) => prevActiveStep - 1);
-  };
-
-  const handleFormSubmit = (data) => {
-    setExamData(prev => ({ ...prev, ...data }));
-    handleNext();
-  };
-
-  const handleBuilderSubmit = (sections) => {
-    setExamData(prev => ({ ...prev, sections }));
-    handleNext();
-  };
-
-  const handleSave = async (shouldPublish = false) => {
+  const handleFormSubmit = async (formData) => {
     setLoading(true);
     try {
-      const result = await dispatch(createExam({
-        ...examData,
-        is_published: shouldPublish
-      }));
+      const result = await dispatch(createExam(formData));
       
       if (createExam.fulfilled.match(result)) {
         dispatch(showNotification({
-          message: `${shouldPublish ? 'Tạo và công khai' : 'Lưu'} bài thi thành công!`,
+          message: 'Tạo bài thi thành công!',
           type: 'success'
         }));
-        router.push('/teacher/exams');
+        
+        // Redirect to exam detail page for further editing
+        const examId = result.payload.data.id;
+        router.push(`/teacher/exams/${examId}`);
       }
     } catch (error) {
       dispatch(showNotification({
@@ -78,58 +43,6 @@ export default function NewExamPage() {
       }));
     } finally {
       setLoading(false);
-    }
-  };
-
-  const getStepContent = (step) => {
-    switch (step) {
-      case 0:
-        return (
-          <ExamForm
-            initialData={examData}
-            onSubmit={handleFormSubmit}
-          />
-        );
-      case 1:
-        return (
-          <ExamBuilder
-            examData={examData}
-            onSubmit={handleBuilderSubmit}
-            onBack={handleBack}
-          />
-        );
-      case 2:
-        return (
-          <Box>
-            <ExamPreview exam={examData} />
-            <Box mt={3} display="flex" gap={2}>
-              <Button
-                variant="outlined"
-                onClick={handleBack}
-                disabled={loading}
-              >
-                Quay lại chỉnh sửa
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={() => handleSave(false)}
-                disabled={loading}
-              >
-                Lưu bản nháp
-              </Button>
-              <Button
-                variant="contained"
-                onClick={() => handleSave(true)}
-                disabled={loading}
-                startIcon={<Save />}
-              >
-                Lưu & Công khai
-              </Button>
-            </Box>
-          </Box>
-        );
-      default:
-        return 'Unknown step';
     }
   };
 
@@ -150,15 +63,19 @@ export default function NewExamPage() {
 
       <Card>
         <CardContent>
-          <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-            {steps.map((label) => (
-              <Step key={label}>
-                <StepLabel>{label}</StepLabel>
-              </Step>
-            ))}
-          </Stepper>
-
-          {getStepContent(activeStep)}
+          <Typography variant="h6" gutterBottom>
+            Thông tin cơ bản
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            Tạo thông tin cơ bản cho bài thi. Sau khi tạo, bạn có thể thêm các phần thi và câu hỏi.
+          </Typography>
+          
+          <ExamForm
+            examData={null}
+            onSubmit={handleFormSubmit}
+            loading={loading}
+            isEditing={false}
+          />
         </CardContent>
       </Card>
     </Box>

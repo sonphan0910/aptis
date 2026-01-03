@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { getAssetUrl } from '@/services/api';
 import {
   Box,
   Typography,
@@ -82,7 +83,7 @@ export default function QuestionFeedback({ questionResults }) {
                 const question = answer.question || {};
                 const hasAiFeedback = answer.aiFeedbacks && answer.aiFeedbacks.length > 0;
                 const score = answer.final_score !== null ? answer.final_score : answer.score || 0;
-                const maxScore = question.max_score || 1;
+                const maxScore = answer.max_score || 1; // Use answer.max_score, not question.max_score
                 const percentage = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
 
                 return (
@@ -141,7 +142,7 @@ export default function QuestionFeedback({ questionResults }) {
                               </>
                             )}
                             <audio controls style={{ width: '100%', marginTop: '8px' }}>
-                              <source src={answer.audio_url} />
+                              <source src={getAssetUrl(answer.audio_url)} />
                             </audio>
                           </Box>
                         )}

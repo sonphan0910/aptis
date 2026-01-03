@@ -11,16 +11,14 @@ const {
 } = require('../models');
 
 /**
- * Seed APTIS exams theo cấu trúc thực tế (250 điểm tổng)
+ * Seed APTIS exams theo cấu trúc thực tế (200 điểm tổng)
  * 
  * CẤU TRÚC ĐỀ THI:
- * - Grammar: 25 điểm (25 câu x 1 điểm)
- * - Vocabulary: 25 điểm (25 câu x 1 điểm)
- * - Reading: 50 điểm (25 câu, điểm khác nhau)
- * - Listening: 50 điểm (25 câu, điểm khác nhau)
- * - Writing: 50 điểm (4 tasks x 12.5 điểm, AI)
- * - Speaking: 50 điểm (4 tasks x 12.5 điểm, AI)
- * TỔNG: 250 điểm
+ * - Reading: 100 điểm (5 câu: 1 Gap Filling, 2 Ordering, 1 Matching, 1 Matching Headings)
+ * - Listening: 50 điểm (17 câu: 5 MCQ, 4 Speaker Matching, 4 Statement Matching, 4 Multi-question MCQ)
+ * - Writing: 50 điểm (4 tasks x 12.5 điểm, AI scoring)
+ * - Speaking: 50 điểm (4 tasks x 12.5 điểm, AI scoring)
+ * TỔNG: 200 điểm (4 skills only, no Grammar/Vocabulary)
  */
 async function seedExams() {
   try {
@@ -33,20 +31,18 @@ async function seedExams() {
       throw new Error('APTIS type or teacher not found');
     }
 
-    // Get skills
-    const grammarSkill = await SkillType.findOne({ where: { code: 'GRAMMAR_VOCABULARY' } });
+    // Get skills (only 4: Reading, Listening, Writing, Speaking)
     const readingSkill = await SkillType.findOne({ where: { code: 'READING' } });
     const listeningSkill = await SkillType.findOne({ where: { code: 'LISTENING' } });
     const writingSkill = await SkillType.findOne({ where: { code: 'WRITING' } });
     const speakingSkill = await SkillType.findOne({ where: { code: 'SPEAKING' } });
 
-    if (!grammarSkill || !readingSkill || !listeningSkill || !writingSkill || !speakingSkill) {
+    if (!readingSkill || !listeningSkill || !writingSkill || !speakingSkill) {
       throw new Error('Skills not found');
     }
 
     // Create Full APTIS Exam
     await createFullExam(aptisType, teacher, {
-      grammarSkill,
       readingSkill,
       listeningSkill,
       writingSkill,
@@ -61,7 +57,7 @@ async function seedExams() {
 }
 
 /**
- * Create full APTIS exam (250 điểm)
+ * Create full APTIS exam (200 điểm - 4 skills only)
  */
 async function createFullExam(aptisType, teacher, skills) {
   console.log('[Seed] Creating Full APTIS General Exam...');
@@ -69,9 +65,9 @@ async function createFullExam(aptisType, teacher, skills) {
   const exam = await Exam.create({
     aptis_type_id: aptisType.id,
     title: 'APTIS General - Full Exam',
-    description: 'Complete APTIS General exam testing all skills: Grammar, Vocabulary, Reading, Listening, Writing, Speaking',
+    description: 'Complete APTIS General exam testing all 4 skills: Reading, Listening, Writing, Speaking',
     duration_minutes: 180, // 3 hours total
-    total_score: 250,
+    total_score: 200,
     created_by: teacher.id,
     status: 'published',
     published_at: new Date(),
@@ -79,125 +75,78 @@ async function createFullExam(aptisType, teacher, skills) {
 
   let sectionOrder = 1;
 
-  // Section 1: Grammar (25 điểm)
-  await createGrammarSection(exam.id, skills.grammarSkill, sectionOrder++);
-
-  // Section 2: Vocabulary (25 điểm)
-  await createVocabularySection(exam.id, skills.grammarSkill, sectionOrder++);
-
-  // Section 3: Reading (50 điểm)
+  // Section 1: Reading (100 điểm - 20 câu)
   await createReadingSection(exam.id, skills.readingSkill, sectionOrder++);
 
-  // Section 4: Listening (50 điểm)
+  // Section 2: Listening (50 điểm)
   await createListeningSection(exam.id, skills.listeningSkill, sectionOrder++);
 
-  // Section 5: Writing (50 điểm)
-  await createWritingSection(exam.id, skills.writingSkill, sectionOrder++);
+  // Section 3-6: Writing (50 điểm) - 4 separate sections
+  await createWritingSection(exam.id, skills.writingSkill, sectionOrder++, 'WRITING_SHORT', 'Part 1: Short Answers', 3);
+  await createWritingSection(exam.id, skills.writingSkill, sectionOrder++, 'WRITING_FORM', 'Part 2: Form Filling', 7);  
+  await createWritingSection(exam.id, skills.writingSkill, sectionOrder++, 'WRITING_LONG', 'Part 3: Chat Responses', 10);
+  await createWritingSection(exam.id, skills.writingSkill, sectionOrder++, 'WRITING_EMAIL', 'Part 4: Email Writing', 30);
 
-  // Section 6: Speaking (50 điểm)
+  // Section 7: Speaking (50 điểm)
   await createSpeakingSection(exam.id, skills.speakingSkill, sectionOrder++);
 
-  console.log(`[Seed] ✓ Full exam created with 6 sections (250 điểm tổng)`);
+  console.log(`[Seed] ✓ Full exam created with 7 sections (Reading + Listening + 4 Writing Parts + Speaking = 200 điểm tổng)`);
 }
 
 // ========================================
-// GRAMMAR SECTION - 25 điểm (25 câu x 1 điểm)
-// ========================================
-async function createGrammarSection(examId, skillType, sectionOrder) {
-  const section = await ExamSection.create({
-    exam_id: examId,
-    skill_type_id: skillType.id,
-    section_order: sectionOrder,
-    duration_minutes: 25,
-    instruction: 'Choose the correct answer to complete each sentence. You have 25 minutes to complete 25 questions.',
-  });
-
-  const grammarType = await QuestionType.findOne({ where: { code: 'GV_MCQ' } });
-  const questions = await Question.findAll({
-    where: { question_type_id: grammarType.id },
-    limit: 25,
-  });
-
-  for (let i = 0; i < questions.length; i++) {
-    await ExamSectionQuestion.create({
-      exam_section_id: section.id,
-      question_id: questions[i].id,
-      question_order: i + 1,
-      max_score: 1.0, // Mỗi câu 1 điểm
-    });
-  }
-
-  console.log(`[Seed]   - Grammar section: 25 questions x 1 điểm = 25 điểm`);
-}
-
-// ========================================
-// VOCABULARY SECTION - 25 điểm (25 câu x 1 điểm)
-// ========================================
-async function createVocabularySection(examId, skillType, sectionOrder) {
-  const section = await ExamSection.create({
-    exam_id: examId,
-    skill_type_id: skillType.id,
-    section_order: sectionOrder,
-    duration_minutes: 25,
-    instruction: 'Choose the best word or phrase to complete each sentence. You have 25 minutes for 25 questions.',
-  });
-
-  const vocabType = await QuestionType.findOne({ where: { code: 'GV_MCQ' } });
-  const questions = await Question.findAll({
-    where: { question_type_id: vocabType.id },
-    limit: 25,
-  });
-
-  for (let i = 0; i < questions.length; i++) {
-    await ExamSectionQuestion.create({
-      exam_section_id: section.id,
-      question_id: questions[i].id,
-      question_order: i + 1,
-      max_score: 1.0, // Mỗi câu 1 điểm
-    });
-  }
-
-  console.log(`[Seed]   - Vocabulary section: 25 questions x 1 điểm = 25 điểm`);
-}
-
-// ========================================
-// READING SECTION - 50 điểm (25 câu)
-// Part 1: 7 MCQ x 2 = 14 điểm
-// Part 2: 6 Matching x 2 = 12 điểm
-// Part 3: 7 T/F x 2 = 14 điểm
-// Part 4: 5 Short Answer x 2 = 10 điểm
+// READING SECTION - 100 điểm (5 câu)
+// Part 1: 1 Gap Filling = 20 điểm
+// Part 2: 2 Ordering x 20 = 40 điểm
+// Part 3: 1 Matching (Person) = 20 điểm
+// Part 4: 1 Matching Headings = 20 điểm
 // ========================================
 async function createReadingSection(examId, skillType, sectionOrder) {
   const section = await ExamSection.create({
     exam_id: examId,
     skill_type_id: skillType.id,
     section_order: sectionOrder,
-    duration_minutes: 35,
-    instruction: 'Read the passages and answer the questions. You have 35 minutes to complete all 4 parts.',
+    duration_minutes: 60,
+    instruction: 'Read the passages and answer the questions. Complete all 4 parts of the reading test.',
   });
 
   let questionOrder = 1;
 
-  // Part 1: MCQ (7 câu x 2 điểm)
-  const readingMcqType = await QuestionType.findOne({ where: { code: 'READING_MCQ' } });
-  const mcqQuestions = await Question.findAll({
-    where: { question_type_id: readingMcqType.id },
-    limit: 7,
+  // Part 1: Gap Filling (1 question x 20 điểm)
+  const gapFillType = await QuestionType.findOne({ where: { code: 'READING_GAP_FILL' } });
+  const gapFillingQuestions = await Question.findAll({
+    where: { question_type_id: gapFillType.id },
+    limit: 1,
   });
 
-  for (const q of mcqQuestions) {
+  for (const q of gapFillingQuestions) {
     await ExamSectionQuestion.create({
       exam_section_id: section.id,
       question_id: q.id,
       question_order: questionOrder++,
-      max_score: 2.0,
+      max_score: 20.0,
     });
   }
 
-  // Part 2: Matching (6 items x 2 điểm)
-  const readingMatchingType = await QuestionType.findOne({ where: { code: 'READING_MATCHING' } });
+  // Part 2: Ordering (2 questions x 20 điểm)
+  const orderingType = await QuestionType.findOne({ where: { code: 'READING_ORDERING' } });
+  const orderingQuestions = await Question.findAll({
+    where: { question_type_id: orderingType.id },
+    limit: 2,
+  });
+
+  for (const q of orderingQuestions) {
+    await ExamSectionQuestion.create({
+      exam_section_id: section.id,
+      question_id: q.id,
+      question_order: questionOrder++,
+      max_score: 20.0,
+    });
+  }
+
+  // Part 3: Matching (Person-based, 1 question with 5 items x 20 điểm)
+  const matchingType = await QuestionType.findOne({ where: { code: 'READING_MATCHING' } });
   const matchingQuestions = await Question.findAll({
-    where: { question_type_id: readingMatchingType.id },
+    where: { question_type_id: matchingType.id },
     limit: 1,
   });
 
@@ -206,68 +155,52 @@ async function createReadingSection(examId, skillType, sectionOrder) {
       exam_section_id: section.id,
       question_id: matchingQuestions[0].id,
       question_order: questionOrder++,
-      max_score: 12.0, // 6 items x 2 điểm
+      max_score: 20.0,
     });
   }
 
-  // Part 3: True/False (7 câu x 2 điểm)
-  const readingTFType = await QuestionType.findOne({ where: { code: 'READING_TRUE_FALSE' } });
-  const tfQuestions = await Question.findAll({
-    where: { question_type_id: readingTFType.id },
-    limit: 7,
+  // Part 4: Matching Headings (1 question with 5 items x 20 điểm)
+  const headingsType = await QuestionType.findOne({ where: { code: 'READING_MATCHING_HEADINGS' } });
+  const headingsQuestions = await Question.findAll({
+    where: { question_type_id: headingsType.id },
+    limit: 1,
   });
 
-  for (const q of tfQuestions) {
+  if (headingsQuestions.length > 0) {
     await ExamSectionQuestion.create({
       exam_section_id: section.id,
-      question_id: q.id,
+      question_id: headingsQuestions[0].id,
       question_order: questionOrder++,
-      max_score: 2.0,
+      max_score: 20.0,
     });
   }
 
-  // Part 4: Short Answer (5 câu x 2 điểm)
-  const readingShortType = await QuestionType.findOne({ where: { code: 'READING_SHORT_ANSWER' } });
-  const shortQuestions = await Question.findAll({
-    where: { question_type_id: readingShortType.id },
-    limit: 5,
-  });
-
-  for (const q of shortQuestions) {
-    await ExamSectionQuestion.create({
-      exam_section_id: section.id,
-      question_id: q.id,
-      question_order: questionOrder++,
-      max_score: 2.0,
-    });
-  }
-
-  console.log(`[Seed]   - Reading section: 25 questions (7+6+7+5) = 50 điểm`);
+  console.log(`[Seed]   - Reading section: 1 Gap Fill + 2 Ordering + 1 Matching + 1 Matching Headings = 100 điểm`);
 }
 
 // ========================================
-// LISTENING SECTION - 50 điểm (25 câu)
-// Part 1: 7 MCQ x 2 = 14 điểm
-// Part 2: 6 Matching x 2 = 12 điểm
-// Part 3: 7 MCQ x 2 = 14 điểm
-// Part 4: 5 Gap Filling x 2 = 10 điểm
+// LISTENING SECTION - 50 điểm (17 câu)
+// Part 1: 5 MCQ x 3 = 15 điểm
+// Part 2: 4 Speaker Matching x 3 = 12 điểm
+// Part 3: 4 Statement Matching x 3 = 12 điểm
+// Part 4: 4 Multi-question MCQ x 3 = 12 điểm (Tổng 17 câu = 51 điểm, làm tròn 50)
 // ========================================
 async function createListeningSection(examId, skillType, sectionOrder) {
   const section = await ExamSection.create({
     exam_id: examId,
     skill_type_id: skillType.id,
     section_order: sectionOrder,
-    duration_minutes: 40,
-    instruction: 'Listen to the recordings and answer the questions. You have 40 minutes to complete all 4 parts.',
+    duration_minutes: 50,
+    instruction: 'Listen to the recordings and answer the questions. Complete all 4 parts of the listening test.',
   });
 
   let questionOrder = 1;
 
-  // Part 1: MCQ (7 câu x 2 điểm)
+  // Part 1: MCQ (5 câu x 3 điểm = 15 điểm)
   const listeningMcqType = await QuestionType.findOne({ where: { code: 'LISTENING_MCQ' } });
   const mcqQuestions = await Question.findAll({
     where: { question_type_id: listeningMcqType.id },
-    limit: 7,
+    limit: 5,
   });
 
   for (const q of mcqQuestions) {
@@ -275,11 +208,11 @@ async function createListeningSection(examId, skillType, sectionOrder) {
       exam_section_id: section.id,
       question_id: q.id,
       question_order: questionOrder++,
-      max_score: 2.0,
+      max_score: 3.0,
     });
   }
 
-  // Part 2: Matching (6 items x 2 điểm)
+  // Part 2: Speaker Matching (1 question with 4 speakers x 3 điểm = 12 điểm)
   const listeningMatchingType = await QuestionType.findOne({ where: { code: 'LISTENING_MATCHING' } });
   const matchingQuestions = await Question.findAll({
     where: { question_type_id: listeningMatchingType.id },
@@ -291,124 +224,77 @@ async function createListeningSection(examId, skillType, sectionOrder) {
       exam_section_id: section.id,
       question_id: matchingQuestions[0].id,
       question_order: questionOrder++,
-      max_score: 12.0, // 6 items x 2 điểm
+      max_score: 12.0, // 4 speakers x 3 điểm
     });
   }
 
-  // Part 3: MCQ (7 câu x 2 điểm) - lấy từ questions còn lại
-  const mcqQuestions2 = await Question.findAll({
-    where: { question_type_id: listeningMcqType.id },
-    limit: 14, // Lấy 14 để skip 7 câu đầu
-    offset: 7,
+  // Part 3: Statement Matching (1 question with 4 statements x 3 điểm = 12 điểm)
+  const statementMatchingType = await QuestionType.findOne({ where: { code: 'LISTENING_STATEMENT_MATCHING' } });
+  const statementQuestions = await Question.findAll({
+    where: { question_type_id: statementMatchingType.id },
+    limit: 1,
   });
 
-  for (const q of mcqQuestions2) {
+  if (statementQuestions.length > 0) {
+    await ExamSectionQuestion.create({
+      exam_section_id: section.id,
+      question_id: statementQuestions[0].id,
+      question_order: questionOrder++,
+      max_score: 12.0, // 4 statements x 3 điểm
+    });
+  }
+
+  // Part 4: Multi-question MCQ (4 sub-questions from 2 shared audio files x 3 điểm = 12 điểm)
+  // Note: These are already created in Part 1 MCQ pool but with additional_media field
+  // We need to get the last 2 MCQ questions (the ones with additional_media)
+  const allMcqQuestions = await Question.findAll({
+    where: { question_type_id: listeningMcqType.id },
+  });
+
+  // Get the last 2 MCQ questions (which are the multi-question ones)
+  const multiQuestions = allMcqQuestions.slice(-2);
+  
+  for (const q of multiQuestions) {
     await ExamSectionQuestion.create({
       exam_section_id: section.id,
       question_id: q.id,
       question_order: questionOrder++,
-      max_score: 2.0,
+      max_score: 6.0, // 2 sub-questions x 3 điểm each
     });
   }
 
-  // Part 4: Gap Filling (5 gaps x 2 điểm)
-  const listeningGapType = await QuestionType.findOne({ where: { code: 'LISTENING_GAP_FILL' } });
-  const gapQuestions = await Question.findAll({
-    where: { question_type_id: listeningGapType.id },
-    limit: 1,
-  });
-
-  if (gapQuestions.length > 0) {
-    await ExamSectionQuestion.create({
-      exam_section_id: section.id,
-      question_id: gapQuestions[0].id,
-      question_order: questionOrder++,
-      max_score: 10.0, // 5 gaps x 2 điểm
-    });
-  }
-
-  console.log(`[Seed]   - Listening section: 25 questions (7+6+7+5) = 50 điểm`);
+  console.log(`[Seed]   - Listening section: 5 MCQ + 4 Speakers + 4 Statements + 4 Multi-MCQ = 17 items (50 điểm)`);
 }
 
 // ========================================
-// WRITING SECTION - 50 điểm (4 tasks x 12.5)
+// WRITING SECTION - Each part creates separate section
 // ========================================
-async function createWritingSection(examId, skillType, sectionOrder) {
+async function createWritingSection(examId, skillType, sectionOrder, writingTypeCode, sectionTitle, durationMinutes) {
   const section = await ExamSection.create({
     exam_id: examId,
     skill_type_id: skillType.id,
     section_order: sectionOrder,
-    duration_minutes: 50,
-    instruction: 'Complete all 4 writing tasks. Your responses will be scored by AI based on content, organization, language, and accuracy.',
+    duration_minutes: durationMinutes,
+    instruction: `${sectionTitle}: Follow the instructions carefully and complete within the time limit.`,
   });
 
-  let questionOrder = 1;
-
-  // Task 1: Short message
-  const shortType = await QuestionType.findOne({ where: { code: 'WRITING_SHORT' } });
-  const shortQuestions = await Question.findAll({
-    where: { question_type_id: shortType.id },
+  // Get the specific question type for this writing part
+  const questionType = await QuestionType.findOne({ where: { code: writingTypeCode } });
+  const questions = await Question.findAll({
+    where: { question_type_id: questionType.id },
     limit: 1,
   });
 
-  if (shortQuestions.length > 0) {
+  if (questions.length > 0) {
     await ExamSectionQuestion.create({
       exam_section_id: section.id,
-      question_id: shortQuestions[0].id,
-      question_order: questionOrder++,
-      max_score: 12.5,
+      question_id: questions[0].id,
+      question_order: 1,
+      max_score: 12.5, // Each writing part worth 12.5 points
     });
   }
 
-  // Task 2: Email
-  const emailType = await QuestionType.findOne({ where: { code: 'WRITING_EMAIL' } });
-  const emailQuestions = await Question.findAll({
-    where: { question_type_id: emailType.id },
-    limit: 1,
-  });
-
-  if (emailQuestions.length > 0) {
-    await ExamSectionQuestion.create({
-      exam_section_id: section.id,
-      question_id: emailQuestions[0].id,
-      question_order: questionOrder++,
-      max_score: 12.5,
-    });
-  }
-
-  // Task 3: Long response
-  const longType = await QuestionType.findOne({ where: { code: 'WRITING_LONG' } });
-  const longQuestions = await Question.findAll({
-    where: { question_type_id: longType.id },
-    limit: 1,
-  });
-
-  if (longQuestions.length > 0) {
-    await ExamSectionQuestion.create({
-      exam_section_id: section.id,
-      question_id: longQuestions[0].id,
-      question_order: questionOrder++,
-      max_score: 12.5,
-    });
-  }
-
-  // Task 4: Essay
-  const essayType = await QuestionType.findOne({ where: { code: 'WRITING_ESSAY' } });
-  const essayQuestions = await Question.findAll({
-    where: { question_type_id: essayType.id },
-    limit: 1,
-  });
-
-  if (essayQuestions.length > 0) {
-    await ExamSectionQuestion.create({
-      exam_section_id: section.id,
-      question_id: essayQuestions[0].id,
-      question_order: questionOrder++,
-      max_score: 12.5,
-    });
-  }
-
-  console.log(`[Seed]   - Writing section: 4 tasks x 12.5 = 50 điểm (AI scoring)`);
+  console.log(`[Seed]   - ${sectionTitle}: 1 task x 12.5 = 12.5 điểm (${durationMinutes} minutes)`);
 }
 
 // ========================================

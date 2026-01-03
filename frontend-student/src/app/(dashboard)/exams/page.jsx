@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useReducer } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Container,
@@ -36,6 +36,28 @@ import { api } from '@/services/api';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import Breadcrumb from '@/components/common/Breadcrumb';
 
+const filtersReducer = (state, action) => {
+  switch (action.type) {
+    case 'SET_SEARCH':
+      return { ...state, search: action.payload };
+    case 'SET_APTIS_TYPE':
+      return { ...state, aptis_type: action.payload };
+    case 'SET_SKILL':
+      return { ...state, skill: action.payload };
+    case 'SET_SORT':
+      return { ...state, sort: action.payload };
+    case 'RESET':
+      return {
+        aptis_type: '',
+        skill: '',
+        sort: 'created_at',
+        search: '',
+      };
+    default:
+      return state;
+  }
+};
+
 export default function ExamsPage() {
   const router = useRouter();
   
@@ -44,11 +66,11 @@ export default function ExamsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // State for filters
+  // State for filters using useReducer to avoid object reference changes
   const [searchInput, setSearchInput] = useState('');
   const [aptisTypes, setAptisTypes] = useState([]);
   const [skillTypes, setSkillTypes] = useState([]);
-  const [filters, setFilters] = useState({
+  const [filters, dispatchFilters] = useReducer(filtersReducer, {
     aptis_type: '',
     skill: '',
     sort: 'created_at',
@@ -89,7 +111,9 @@ export default function ExamsPage() {
     fetchFilterOptions();
   }, []);
 
-  // Fetch exams
+  // Fetch exams - optimize dependencies by creating filter string
+  const filterString = JSON.stringify(filters);
+  
   useEffect(() => {
     const fetchExamsData = async () => {
       try {
@@ -130,60 +154,67 @@ export default function ExamsPage() {
     };
 
     fetchExamsData();
-  }, [filters, page]);
+  }, [filterString, page, pagination.limit]);
 
-  const handleSearch = (e) => {
+  const handleSearch = useCallback((e) => {
     e.preventDefault();
-    setFilters({ ...filters, search: searchInput });
+    dispatchFilters({ type: 'SET_SEARCH', payload: searchInput });
     setPage(1);
-  };
+  }, [searchInput]);
 
-  const handleFilterChange = (field, value) => {
-    setFilters({ ...filters, [field]: value });
+  const handleFilterChange = useCallback((field, value) => {
+    switch (field) {
+      case 'aptis_type':
+        dispatchFilters({ type: 'SET_APTIS_TYPE', payload: value });
+        break;
+      case 'skill':
+        dispatchFilters({ type: 'SET_SKILL', payload: value });
+        break;
+      case 'sort':
+        dispatchFilters({ type: 'SET_SORT', payload: value });
+        break;
+      default:
+        break;
+    }
     setPage(1);
-  };
+  }, []);
 
-  const handleClearFilters = () => {
+  const handleClearFilters = useCallback(() => {
     setSearchInput('');
-    setFilters({
-      aptis_type: '',
-      skill: '',
-      sort: 'created_at',
-      search: '',
-    });
+    dispatchFilters({ type: 'RESET' });
     setPage(1);
-  };
+  }, []);
 
   const hasActiveFilters = filters.search || filters.aptis_type || filters.skill;
 
-  const handlePageChange = (event, newPage) => {
+  const handlePageChange = useCallback((event, newPage) => {
     setPage(newPage);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  }, []);
 
-  const handleStartExam = (examId) => {
+  const handleStartExam = useCallback((examId) => {
     router.push(`/exams/${examId}`);
-  };
+  }, [router]);
 
-  const getDifficultyColor = (difficulty) => {
+  const getDifficultyColor = useCallback((difficulty) => {
     switch (difficulty?.toLowerCase()) {
       case 'easy': return 'success';
       case 'medium': return 'warning';
       case 'hard': return 'error';
       default: return 'default';
     }
-  };
+  }, []);
 
-  const getDifficultyLabel = (difficulty) => {
+  const getDifficultyLabel = useCallback((difficulty) => {
     const labels = {
       'easy': 'Dễ',
       'medium': 'Trung bình',
       'hard': 'Khó',
     };
     return labels[difficulty?.toLowerCase()] || difficulty || 'Not specified';
-  };
+  }, []);
 
-  const formatDuration = (minutes) => {
+  const formatDuration = useCallback((minutes) => {
     if (!minutes) return 'Không xác định';
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
@@ -192,7 +223,7 @@ export default function ExamsPage() {
       return `${hours}h ${mins}m`;
     }
     return `${mins}m`;
-  };
+  }, []);
 
   if (isLoading && exams.length === 0) {
     return <LoadingSpinner message="Đang tải bài thi..." />;
@@ -259,7 +290,7 @@ export default function ExamsPage() {
                       onChange={(e) => handleFilterChange('aptis_type', e.target.value)}
                     >
                       <MenuItem value="">Tất cả</MenuItem>
-                      {Array.isArray(aptisTypes) && aptisTypes.map((type) => (
+                      {aptisTypes?.map((type) => (
                         <MenuItem key={type.id} value={type.id}>
                           {type.name}
                         </MenuItem>
@@ -277,7 +308,7 @@ export default function ExamsPage() {
                       onChange={(e) => handleFilterChange('skill', e.target.value)}
                     >
                       <MenuItem value="">Tất cả</MenuItem>
-                      {Array.isArray(skillTypes) && skillTypes.map((skill) => (
+                      {skillTypes?.map((skill) => (
                         <MenuItem key={skill.id} value={skill.id}>
                           {skill.name}
                         </MenuItem>

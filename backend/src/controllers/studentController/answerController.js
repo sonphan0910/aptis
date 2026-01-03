@@ -23,6 +23,11 @@ exports.saveAnswer = async (req, res, next) => {
       req.body;
     const studentId = req.user.userId;
 
+    // Reject incomplete saves (no answer_type = audio answer trying to save via wrong endpoint)
+    if (!answer_type || (!selected_option_id && !answer_json && !text_answer && !audio_url)) {
+      throw new BadRequestError('Audio answers must use /answers/audio endpoint');
+    }
+
     // Verify attempt belongs to student
     const attempt = await ExamAttempt.findOne({
       where: { id: attemptId, student_id: studentId },
@@ -110,7 +115,7 @@ exports.saveAnswer = async (req, res, next) => {
 
     // Parse answer_data based on answer_type for component consumption
     if (updatedAnswer.answer_type === 'option' && updatedAnswer.selected_option_id) {
-      answerData.answer_data = { selected_option: updatedAnswer.selected_option_id };
+      answerData.answer_data = { selected_option_id: updatedAnswer.selected_option_id };
     } else if (updatedAnswer.answer_type === 'json' && updatedAnswer.answer_json) {
       try {
         const parsed = JSON.parse(updatedAnswer.answer_json);
@@ -119,7 +124,7 @@ exports.saveAnswer = async (req, res, next) => {
         answerData.answer_data = updatedAnswer.answer_json;
       }
     } else if (updatedAnswer.answer_type === 'text' && updatedAnswer.text_answer) {
-      answerData.answer_data = { text: updatedAnswer.text_answer };
+      answerData.answer_data = { text_answer: updatedAnswer.text_answer };
     } else if (updatedAnswer.answer_type === 'audio' && updatedAnswer.audio_url) {
       answerData.answer_data = { audio_url: updatedAnswer.audio_url };
     }
@@ -139,50 +144,138 @@ exports.saveAnswer = async (req, res, next) => {
  */
 exports.uploadAudioAnswer = async (req, res, next) => {
   try {
+    console.log('[uploadAudioAnswer] ========== START ==========');
     const { attemptId } = req.params;
-    const { question_id } = req.body;
+    const { question_id, duration } = req.body;
     const studentId = req.user.userId;
 
+    console.log('[uploadAudioAnswer] Request info:');
+    console.log('[uploadAudioAnswer] - attemptId:', attemptId);
+    console.log('[uploadAudioAnswer] - question_id:', question_id);
+    console.log('[uploadAudioAnswer] - duration:', duration);
+    console.log('[uploadAudioAnswer] - studentId:', studentId);
+    console.log('[uploadAudioAnswer] - file exists:', !!req.file);
+    if (req.file) {
+      console.log('[uploadAudioAnswer] - filename:', req.file.filename);
+      console.log('[uploadAudioAnswer] - originalname:', req.file.originalname);
+      console.log('[uploadAudioAnswer] - size:', req.file.size, 'bytes');
+      console.log('[uploadAudioAnswer] - mimetype:', req.file.mimetype);
+      console.log('[uploadAudioAnswer] - path:', req.file.path);
+    }
+
+    // Validate basic inputs
+    if (!attemptId) {
+      console.error('[uploadAudioAnswer] ❌ Missing attemptId');
+      throw new BadRequestError('Attempt ID is required');
+    }
+
+    if (!question_id) {
+      console.error('[uploadAudioAnswer] ❌ Missing question_id');
+      throw new BadRequestError('Question ID is required');
+    }
+
     if (!req.file) {
+      console.error('[uploadAudioAnswer] ❌ No audio file uploaded');
       throw new BadRequestError('No audio file uploaded');
     }
 
-    // Verify attempt
+    // Verify attempt belongs to student
+    console.log('[uploadAudioAnswer] 🔍 Verifying attempt...');
     const attempt = await ExamAttempt.findOne({
       where: { id: attemptId, student_id: studentId },
     });
 
-    if (!attempt || attempt.status !== 'in_progress') {
-      throw new BadRequestError('Invalid attempt');
+    if (!attempt) {
+      console.error('[uploadAudioAnswer] ❌ Attempt not found or does not belong to student');
+      throw new NotFoundError('Attempt not found');
     }
 
+    if (attempt.status !== 'in_progress') {
+      console.error('[uploadAudioAnswer] ❌ Invalid attempt status:', attempt.status);
+      throw new BadRequestError('Attempt is not in progress. Cannot upload answer.');
+    }
+
+    console.log('[uploadAudioAnswer] ✓ Attempt verified, status:', attempt.status);
+
     // Validate audio file
-    SpeechToTextService.validateAudioFile(req.file);
+    console.log('[uploadAudioAnswer] 🔍 Validating audio file...');
+    try {
+      SpeechToTextService.validateAudioFile(req.file);
+    } catch (validationError) {
+      console.error('[uploadAudioAnswer] ❌ Audio validation failed:', validationError.message);
+      throw validationError;
+    }
+    console.log('[uploadAudioAnswer] ✓ Audio file validation passed');
 
     // Upload audio
-    const audioInfo = await SpeechToTextService.uploadAudioFile(req.file);
+    console.log('[uploadAudioAnswer] 📤 Processing audio file...');
+    let audioInfo;
+    try {
+      audioInfo = await SpeechToTextService.uploadAudioFile(req.file);
+    } catch (uploadError) {
+      console.error('[uploadAudioAnswer] ❌ Audio upload failed:', uploadError.message);
+      throw new BadRequestError('Failed to process audio file: ' + uploadError.message);
+    }
+    console.log('[uploadAudioAnswer] ✓ Audio processed successfully');
+    console.log('[uploadAudioAnswer] - url:', audioInfo.url);
+    console.log('[uploadAudioAnswer] - duration:', audioInfo.duration);
+    console.log('[uploadAudioAnswer] - size:', audioInfo.size);
 
-    // Find and update answer
+    // Verify answer exists
+    console.log('[uploadAudioAnswer] 🔍 Finding answer record...');
     const answer = await AttemptAnswer.findOne({
-      where: { attempt_id: attemptId, question_id },
+      where: { 
+        attempt_id: attemptId, 
+        question_id: question_id 
+      },
     });
 
     if (!answer) {
-      throw new NotFoundError('Answer not found');
+      console.error('[uploadAudioAnswer] ❌ Answer not found for question:', question_id);
+      // Clean up uploaded file if answer not found
+      try {
+        await SpeechToTextService.deleteAudioFile(audioInfo.path);
+      } catch (deleteError) {
+        console.warn('[uploadAudioAnswer] ⚠️ Failed to clean up file:', deleteError.message);
+      }
+      throw new NotFoundError('Answer record not found for this question');
     }
 
-    await answer.update({
-      answer_type: 'audio',
-      audio_url: audioInfo.url,
-      answered_at: new Date(),
-    });
+    console.log('[uploadAudioAnswer] ✓ Answer found, id:', answer.id);
+
+    // Update answer with audio
+    console.log('[uploadAudioAnswer] 💾 Updating answer record with audio...');
+    try {
+      await answer.update({
+        answer_type: 'audio',
+        audio_url: audioInfo.url,
+        answered_at: new Date(),
+      });
+      console.log('[uploadAudioAnswer] ✓ Answer updated successfully');
+    } catch (updateError) {
+      console.error('[uploadAudioAnswer] ❌ Failed to update answer:', updateError.message);
+      // Clean up uploaded file if update fails
+      try {
+        await SpeechToTextService.deleteAudioFile(audioInfo.path);
+      } catch (deleteError) {
+        console.warn('[uploadAudioAnswer] ⚠️ Failed to clean up file:', deleteError.message);
+      }
+      throw new BadRequestError('Failed to save answer: ' + updateError.message);
+    }
+
+    console.log('[uploadAudioAnswer] ========== SUCCESS ==========\n');
 
     return successResponse(res, 'Audio answer uploaded successfully', {
       answerId: answer.id,
       audio_url: audioInfo.url,
-      duration: audioInfo.duration,
+      duration: audioInfo.duration || duration,
+      fileSize: audioInfo.size,
     });
   } catch (error) {
+    console.error('[uploadAudioAnswer] ========== ERROR ==========');
+    console.error('[uploadAudioAnswer] ❌ Error:', error.message);
+    console.error('[uploadAudioAnswer] Stack:', error.stack);
+    console.error('[uploadAudioAnswer] ========== END ERROR ==========\n');
     next(error);
   }
 };

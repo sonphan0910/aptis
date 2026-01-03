@@ -13,8 +13,8 @@ import {
 export default function RadarChart({ skillScores }) {
   // Transform skill scores into chart data with safety checks
   const data = skillScores.map(skill => {
-    const maxScore = skill.maxScore ?? skill.max_score ?? 1;
-    const score = skill.score ?? 0;
+    const maxScore = Number(skill.maxScore ?? skill.max_score ?? 1);
+    const score = Number(skill.score ?? 0);
     const percentage = maxScore > 0 ? (score / maxScore) * 100 : 0;
     
     return {

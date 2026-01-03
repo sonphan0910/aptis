@@ -8,6 +8,12 @@ const { ValidationError } = require('../utils/errors');
  */
 const validate = (schema, source = 'body') => {
   return (req, res, next) => {
+    // Guard against undefined schema
+    if (!schema) {
+      console.warn(`[Validation] Schema is undefined for ${req.path}`);
+      return next();
+    }
+
     const dataToValidate = req[source];
 
     console.log(`[Validation] ${req.path} - source: ${source}, data:`, dataToValidate);
@@ -43,7 +49,7 @@ const authSchemas = {
     password: Joi.string().min(6).required(),
     full_name: Joi.string().min(2).max(255).required(),
     phone: Joi.string()
-      .pattern(/^[0-9]{10,15}$/)
+      .pattern(/^[\+]?[\s\-\(\)]*([0-9][\s\-\(\)]*){10,15}$/)
       .optional(),
     role: Joi.string().valid('student', 'teacher').optional().default('student'),
   }),
@@ -68,6 +74,10 @@ const authSchemas = {
     currentPassword: Joi.string().required(),
     newPassword: Joi.string().min(6).required(),
   }),
+
+  refreshToken: Joi.object({
+    refreshToken: Joi.string().required(),
+  }),
 };
 
 const userSchemas = {
@@ -76,7 +86,7 @@ const userSchemas = {
     full_name: Joi.string().min(2).max(255).required(),
     role: Joi.string().valid('admin', 'teacher', 'student').required(),
     phone: Joi.string()
-      .pattern(/^[0-9]{10,15}$/)
+      .pattern(/^[\+]?[\s\-\(\)]*([0-9][\s\-\(\)]*){10,15}$/)
       .optional(),
     status: Joi.string().valid('active', 'inactive').optional().default('active'),
   }),
@@ -84,7 +94,7 @@ const userSchemas = {
   updateUser: Joi.object({
     full_name: Joi.string().min(2).max(255).optional(),
     phone: Joi.string()
-      .pattern(/^[0-9]{10,15}$/)
+      .pattern(/^[\+]?[\s\-\(\)]*([0-9][\s\-\(\)]*){10,15}$/)
       .optional(),
     status: Joi.string().valid('active', 'inactive', 'banned').optional(),
   }),
@@ -92,7 +102,7 @@ const userSchemas = {
   updateProfile: Joi.object({
     full_name: Joi.string().min(2).max(255).optional(),
     phone: Joi.string()
-      .pattern(/^[0-9]{10,15}$/)
+      .pattern(/^[\+]?[\s\-\(\)]*([0-9][\s\-\(\)]*){10,15}$/)
       .optional(),
   }),
 };
@@ -174,7 +184,7 @@ const criteriaSchemas = {
     question_type_id: Joi.number().integer().positive().required(),
     criteria_name: Joi.string().min(2).max(255).required(),
     weight: Joi.number().positive().max(100).optional().default(1.0),
-    description: Joi.string().optional(),
+    description: Joi.string().min(1).required(),
     rubric_prompt: Joi.string().required(),
     max_score: Joi.number().positive().required(),
   }),
@@ -182,7 +192,7 @@ const criteriaSchemas = {
   updateCriteria: Joi.object({
     criteria_name: Joi.string().min(2).max(255).optional(),
     weight: Joi.number().positive().max(100).optional(),
-    description: Joi.string().optional(),
+    description: Joi.string().min(1).required(),
     rubric_prompt: Joi.string().optional(),
     max_score: Joi.number().positive().optional(),
   }),

@@ -28,7 +28,6 @@ import {
 } from '@mui/material';
 import {
   Menu,
-  Pause,
   ExitToApp,
   NavigateBefore,
   NavigateNext,
@@ -38,20 +37,13 @@ import {
   RadioButtonUnchecked,
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
-import { 
-  startNewAttempt, 
-  loadAttempt,
-  loadQuestions, 
-  saveAnswer, 
-  submitAttempt,
-  updateTimer,
-  updateLocalAnswer 
-} from '@/store/slices/attemptSlice';
+import { submitAttempt, updateTimer } from '@/store/slices/attemptSlice';
 import LoadingSpinner from '@/components/common/LoadingSpinner';
 import QuestionDisplay from '@/components/exam-taking/QuestionDisplay';
 import ExamTimer from '@/components/exam-taking/ExamTimer';
 import ExamModeDialog from '@/components/exam-taking/ExamModeDialog';
 import attemptService from '@/services/attemptService';
+import { useExamState } from '@/hooks/useExamState';
 
 console.log('[TakeExamPage] Imports loaded:', {
   LoadingSpinner: !!LoadingSpinner,
@@ -62,156 +54,84 @@ console.log('[TakeExamPage] Imports loaded:', {
 });
 
 export default function TakeExamPage() {
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [exitDialogOpen, setExitDialogOpen] = useState(false);
-  const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
-  const [pauseDialogOpen, setPauseDialogOpen] = useState(false);
-  const [modeDialogOpen, setModeDialogOpen] = useState(false);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [availableSkills, setAvailableSkills] = useState([]);
-  const [hasInitialized, setHasInitialized] = useState(false);
-  
   const { examId } = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
   const dispatch = useDispatch();
-  const timerRef = useRef(null);
   
   const attemptId = searchParams.get('attemptId');
   const attemptType = searchParams.get('type') || 'full_exam';
   const selectedSkill = searchParams.get('skill');
   
-  const { 
-    currentAttempt, 
-    questions, 
-    answers, 
-    loading, 
-    error,
-    timeRemaining,
-    timerInitialized,
-    autoSaveStatus 
-  } = useSelector(state => state.attempts);
-  
   const { user } = useSelector(state => state.auth);
 
-  const handleStartExam = useCallback(async ({ attemptType, selectedSkill }) => {
-    console.log('[TakeExamPage] !!!!! handleStartExam called !!!!');
-    console.log('[TakeExamPage] Starting exam with mode:', { attemptType, selectedSkill });
-    
-    setModeDialogOpen(false);
-    
-    console.log('[TakeExamPage] Dispatching startNewAttempt with:', {
-      exam_id: parseInt(examId, 10),
-      attempt_type: attemptType,
-      selected_skill: selectedSkill
-    });
-    
-    try {
-      const action = await dispatch(startNewAttempt({
-        exam_id: parseInt(examId, 10),
-        attempt_type: attemptType,
-        selected_skill: selectedSkill
-      })).unwrap();
-      
-      console.log('[TakeExamPage] Attempt created successfully:', action);
-      
-      // Load questions after attempt is created
-      const attemptId = action.data?.id || action.id;
-      if (attemptId) {
-        console.log('[TakeExamPage] Loading questions for attempt:', attemptId);
-        await dispatch(loadQuestions({
-          attemptId,
-          offset: 0,
-          limit: 50 // Load all questions at once for now
-        })).unwrap();
-        console.log('[TakeExamPage] Questions loaded successfully');
-      }
-    } catch (error) {
-      console.error('[TakeExamPage] Error starting exam:', error);
-    }
-  }, [examId, dispatch]);
+  // Use custom hook for state management
+  const {
+    drawerOpen, setDrawerOpen,
+    exitDialogOpen, setExitDialogOpen,
+    submitDialogOpen, setSubmitDialogOpen,
+    modeDialogOpen, setModeDialogOpen,
+    currentQuestionIndex, setCurrentQuestionIndex,
+    hideHeader,
+    availableSkills, setAvailableSkills,
+    selectedSkillFilter, setSelectedSkillFilter,
+    isMicrophoneTestActive,
+    microphoneTestCompleted,
+    isNavigationDisabled,
+    currentAttempt, questions, answers, loading, error,
+    timeRemaining, timerInitialized, autoSaveStatus,
+    handleStartExam,
+    handleAnswerChange,
+    handleNextQuestion,
+    handlePreviousQuestion,
+    handleQuestionNavigation,
+    handleHideHeader,
+    startMicrophoneTest,
+    completeMicrophoneTest,
+    getQuestionStatus,
+    getProgressPercentage
+  } = useExamState(examId, attemptId, attemptType, selectedSkill);
 
-  // Initialize attempt
-  useEffect(() => {
-    console.log('[TakeExamPage] useEffect triggered with:', { 
-      examId, 
-      currentAttempt: !!currentAttempt, 
-      attemptId, 
-      attemptType, 
-      selectedSkill,
-      hasInitialized,
-      modeDialogOpen
-    });
-    
-    // Only initialize once
-    if (hasInitialized) {
-      console.log('[TakeExamPage] Already initialized, skipping');
-      return;
-    }
-    
-    if (!examId) return;
-    
-    setHasInitialized(true);
-    
-    if (attemptId) {
-      console.log('[TakeExamPage] Loading existing attempt:', attemptId);
-      // Continue existing attempt
-      dispatch(loadAttempt(attemptId));
-    } else if (attemptType) {
-      // Auto-start if attemptType is provided in URL
-      console.log('[TakeExamPage] Auto-starting with params from URL:', { attemptType, selectedSkill });
-      handleStartExam({ attemptType, selectedSkill: selectedSkill || null });
-    } else {
-      // Show mode selection dialog for new attempts without params
-      console.log('[TakeExamPage] No params, showing mode selection dialog');
-      setModeDialogOpen(true);
-      // Load available skills for single_skill mode
-      loadAvailableSkills();
-    }
-  }, [examId, attemptId, attemptType, dispatch, hasInitialized, currentAttempt, selectedSkill, handleStartExam]);
+  const timerRef = useRef(null);
 
-  // Load questions when attempt is ready
-  useEffect(() => {
-    const shouldLoadQuestions = 
-      currentAttempt && 
-      currentAttempt.id && 
-      questions.length === 0 && 
-      !loading;
-    
-    if (shouldLoadQuestions) {
-      console.log('[TakeExamPage] Attempt ready, loading questions for attempt:', currentAttempt.id);
-      dispatch(loadQuestions({
-        attemptId: currentAttempt.id,
-        offset: 0,
-        limit: 50
-      }));
-    }
-  }, [currentAttempt, questions.length, loading, dispatch]);
-
-  // Timer management
+  // Timer management - update timer every second
   useEffect(() => {
     if (currentAttempt && timeRemaining > 0) {
       timerRef.current = setInterval(() => {
         dispatch(updateTimer());
       }, 1000);
-      
       return () => {
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-        }
+        if (timerRef.current) clearInterval(timerRef.current);
       };
     }
   }, [currentAttempt, timeRemaining, dispatch]);
 
   // Auto-submit when time runs out
   useEffect(() => {
-    // Only auto-submit if we have a valid attempt and timer was properly initialized and has run out
     if (timeRemaining <= 0 && currentAttempt && timerInitialized) {
-      console.log('[TakeExamPage] Time up, auto-submitting attempt:', currentAttempt.id);
+      console.log('[TakeExamPage] Time up, auto-submitting');
       handleTimeUp();
     }
   }, [timeRemaining, currentAttempt, timerInitialized]);
 
+  // Debug: Log current question structure (MUST BE BEFORE CONDITIONAL RETURNS)
+  const currentQuestion = questions[currentQuestionIndex];
+  useEffect(() => {
+    if (currentQuestion) {
+      console.log('[TakeExamPage] Current question structure:', {
+        id: currentQuestion.id,
+        questionType: currentQuestion.questionType?.code,
+        hasMediaUrl: !!currentQuestion.media_url,
+        media_url: currentQuestion.media_url,
+        hasOptions: !!currentQuestion.options,
+        optionsCount: currentQuestion.options?.length,
+        hasItems: !!currentQuestion.items,
+        itemsCount: currentQuestion.items?.length
+      });
+    }
+  }, [currentQuestion]);
+
+  // Handle time up - submit attempt and redirect
   const handleTimeUp = async () => {
     if (currentAttempt) {
       await dispatch(submitAttempt(currentAttempt.id));
@@ -219,81 +139,7 @@ export default function TakeExamPage() {
     }
   };
 
-  const handleAnswerChange = (questionId, answer) => {
-    console.log('[handleAnswerChange] Question:', questionId, 'Answer:', answer);
-    
-    // Find question to determine type
-    const question = questions.find(q => q.id === questionId);
-    if (!question) {
-      console.error('[handleAnswerChange] Question not found:', questionId);
-      return;
-    }
-
-    // STEP 1: Optimistic update - update local state immediately for instant UI feedback
-    dispatch(updateLocalAnswer({ 
-      questionId, 
-      answerData: answer 
-    }));
-
-    // STEP 2: Format payload for API
-    const payload = {
-      attempt_id: currentAttempt.id,
-      question_id: questionId,
-    };
-
-    // Detect answer type and format accordingly
-    if (answer.selected_option !== undefined) {
-      // MCQ answer
-      payload.answer_type = 'option';
-      payload.selected_option_id = parseInt(answer.selected_option);
-    } else if (answer.matches !== undefined) {
-      // Matching answer (object mapping item IDs to option IDs)
-      payload.answer_type = 'json';
-      payload.answer_json = JSON.stringify(answer.matches);
-    } else if (answer.gap_answers !== undefined) {
-      // Gap filling answer (array of strings)
-      payload.answer_type = 'json';
-      payload.answer_json = JSON.stringify(answer.gap_answers);
-    } else if (answer.text !== undefined) {
-      // Text answer (Writing, etc.)
-      payload.answer_type = 'text';
-      payload.text_answer = answer.text;
-    } else if (answer.audio_url !== undefined) {
-      // Audio answer (Speaking)
-      payload.answer_type = 'audio';
-      payload.audio_url = answer.audio_url;
-    } else if (typeof answer === 'object') {
-      // Complex answer (Ordering, etc.)
-      payload.answer_type = 'json';
-      payload.answer_json = JSON.stringify(answer);
-    } else {
-      console.error('[handleAnswerChange] Unknown answer format:', answer);
-      return;
-    }
-
-    console.log('[handleAnswerChange] Formatted payload:', payload);
-    
-    // STEP 3: Save to API (will update state again with server response)
-    dispatch(saveAnswer(payload));
-  };
-
-  const handleNextQuestion = () => {
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-    }
-  };
-
-  const handlePreviousQuestion = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(currentQuestionIndex - 1);
-    }
-  };
-
-  const handleQuestionNavigation = (index) => {
-    setCurrentQuestionIndex(index);
-    setDrawerOpen(false);
-  };
-
+  // Handle submit - called from submit dialog
   const handleSubmit = async () => {
     if (currentAttempt) {
       await dispatch(submitAttempt(currentAttempt.id));
@@ -302,94 +148,9 @@ export default function TakeExamPage() {
     setSubmitDialogOpen(false);
   };
 
+  // Handle exit - go back to dashboard
   const handleExit = () => {
     router.push('/dashboard');
-  };
-
-  const handlePause = () => {
-    // Implementation for pause functionality
-    setPauseDialogOpen(true);
-  };
-
-  const getQuestionStatus = (questionId) => {
-    const answer = answers.find(a => a.question_id === questionId);
-    
-    console.log('[getQuestionStatus] Checking question:', {
-      questionId,
-      hasAnswer: !!answer,
-      answerId: answer?.id,
-      answerType: answer?.answer_type,
-      hasAnswerData: !!answer?.answer_data,
-      answeredAt: answer?.answered_at,
-      isModified: answer?.isModified
-    });
-
-    // Check if answer exists (including optimistic updates)
-    if (answer) {
-      // If has answer_data (optimistic or saved), mark as answered
-      if (answer.answer_data) {
-        // Additional validation: check if answer_data has actual content
-        const hasContent = 
-          (answer.answer_data.selected_option) ||
-          (answer.answer_data.matches && Object.keys(answer.answer_data.matches).length > 0) ||
-          (answer.answer_data.gap_answers && answer.answer_data.gap_answers.some(a => a && a.trim())) ||
-          (answer.answer_data.text && answer.answer_data.text.trim()) ||
-          (answer.answer_data.audio_url) ||
-          (answer.answer_data.ordered_items);
-        
-        if (hasContent) {
-          return 'answered';
-        }
-      }
-      
-      // Fallback: check answered_at
-      if (answer.answered_at) {
-        // Verify answer actually has content based on type
-        if (answer.answer_type === 'option' && answer.selected_option_id) {
-          return 'answered';
-        } else if (answer.answer_type === 'json' && answer.answer_json) {
-          return 'answered';
-        } else if (answer.answer_type === 'text' && answer.text_answer) {
-          return 'answered';
-        } else if (answer.answer_type === 'audio' && answer.audio_url) {
-          return 'answered';
-        }
-      }
-    }
-    
-    return 'unanswered';
-  };
-
-  const getQuestionTypeLabel = (questionType) => {
-    const questionTypeMap = {
-      'GV_MCQ': 'Multiple Choice',
-      'GV_GAP_FILL': 'Gap Filling',
-      'GV_MATCHING': 'Matching',
-      'READING_MCQ': 'Multiple Choice',
-      'READING_TRUE_FALSE': 'True/False',
-      'READING_MATCHING': 'Matching Headings',
-      'READING_SHORT_ANSWER': 'Short Answer',
-      'LISTENING_MCQ': 'Multiple Choice',
-      'LISTENING_GAP_FILL': 'Gap Filling',
-      'LISTENING_MATCHING': 'Matching',
-      'LISTENING_NOTE_COMPLETION': 'Note Completion',
-      'WRITING_SHORT': 'Short Writing',
-      'WRITING_LONG': 'Long Writing',
-      'WRITING_EMAIL': 'Email Writing',
-      'WRITING_ESSAY': 'Essay Writing',
-      'SPEAKING_INTRO': 'Personal Introduction',
-      'SPEAKING_DESCRIPTION': 'Picture Description',
-      'SPEAKING_COMPARISON': 'Comparison',
-      'SPEAKING_DISCUSSION': 'Topic Discussion',
-    };
-    return questionTypeMap[questionType] || questionType;
-  };
-
-  const getProgressPercentage = () => {
-    const answeredCount = questions.filter(q => 
-      getQuestionStatus(q.id) === 'answered'
-    ).length;
-    return (answeredCount / questions.length) * 100;
   };
 
   console.log('[TakeExamPage] Render state:', { 
@@ -403,7 +164,9 @@ export default function TakeExamPage() {
     answersLength: answers.length,
     firstQuestion: questions[0]?.id,
     firstQuestionType: questions[0]?.questionType?.code,
-    firstQuestionContent: questions[0]?.content?.substring(0, 50)
+    firstQuestionContent: questions[0]?.content?.substring(0, 50),
+    microphoneTestCompleted, // Debug này
+    currentQuestionType: questions[currentQuestionIndex]?.questionType?.code
   });
 
   // Check if we need to extract questions again from current attempt
@@ -433,6 +196,12 @@ export default function TakeExamPage() {
       
       // Ensure component re-renders after skills are loaded
       setAvailableSkills(skillsArray);
+      
+      // Set first skill as default filter for full exam
+      if (skillsArray.length > 0 && attemptType === 'full_exam') {
+        setSelectedSkillFilter(skillsArray[0].id);
+      }
+      
       console.log('[TakeExamPage] Skills set successfully:', skillsArray.length);
       
       // Force dialog to show after skills are loaded if no attempt exists
@@ -452,6 +221,12 @@ export default function TakeExamPage() {
         { id: 5, skill_type_name: 'Speaking', description: 'Speaking and pronunciation practice' }
       ];
       setAvailableSkills(fallbackSkills);
+      
+      // Set first skill as default filter for full exam
+      if (attemptType === 'full_exam') {
+        setSelectedSkillFilter(fallbackSkills[0].id);
+      }
+      
       console.log('[TakeExamPage] Fallback skills set:', fallbackSkills.length);
       
       // Also force dialog open with fallback skills
@@ -460,6 +235,52 @@ export default function TakeExamPage() {
         setModeDialogOpen(true);
       }
     }
+  };
+
+  // Helper function to group questions by skill
+  const groupQuestionsBySkill = () => {
+    const grouped = {};
+    questions.forEach(q => {
+      const skillId = q.skill_type_id || 'unknown';
+      if (!grouped[skillId]) {
+        grouped[skillId] = [];
+      }
+      grouped[skillId].push(q);
+    });
+    return grouped;
+  };
+
+  // Helper function to group questions by section
+  const groupQuestionsBySection = (skillQuestions) => {
+    const grouped = {};
+    skillQuestions.forEach(q => {
+      const sectionId = q.section_id || 'general';
+      const sectionName = q.section?.section_name || q.section_name || 'General';
+      if (!grouped[sectionId]) {
+        grouped[sectionId] = {
+          name: sectionName,
+          questions: []
+        };
+      }
+      grouped[sectionId].questions.push(q);
+    });
+    return grouped;
+  };
+
+  // Get filtered questions based on skill selection
+  const getFilteredQuestions = () => {
+    if (attemptType === 'full_exam' && selectedSkillFilter) {
+      return questions.filter(q => q.skill_type_id === selectedSkillFilter);
+    }
+    return questions;
+  };
+
+  // Get current skill info
+  const getCurrentSkillInfo = () => {
+    if (attemptType === 'full_exam' && selectedSkillFilter) {
+      return availableSkills.find(s => s.id === selectedSkillFilter);
+    }
+    return null;
   };
 
   if (loading) return <LoadingSpinner />;
@@ -554,74 +375,82 @@ export default function TakeExamPage() {
     );
   }
 
-  const currentQuestion = questions[currentQuestionIndex];
   const currentAnswer = answers.find(a => a.question_id === currentQuestion.id);
 
   return (
     <Box sx={{ height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column' }}>
-      {/* Top AppBar */}
-      <AppBar position="static" color="default" elevation={1}>
-        <Toolbar>
-          <IconButton 
-            edge="start" 
-            onClick={() => setDrawerOpen(true)}
-            sx={{ mr: 2 }}
-          >
-            <GridView />
-          </IconButton>
-          
-          <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography variant="h6" noWrap>
-              {currentAttempt.exam.title}
-            </Typography>
-            <Chip 
-              label={`${currentQuestionIndex + 1}/${questions.length}`} 
-              size="small" 
-              variant="outlined"
-            />
-            {/* Save status indicator */}
-            {autoSaveStatus === 'saving' && (
+      {/* Top AppBar - Hidden during preparation */}
+      {!hideHeader && (
+        <AppBar position="static" color="default" elevation={1}>
+          <Toolbar>
+            <IconButton 
+              edge="start" 
+              onClick={() => setDrawerOpen(true)}
+              sx={{ mr: 2 }}
+            >
+              <GridView />
+            </IconButton>
+            
+            <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography variant="h6" noWrap>
+                {currentAttempt.exam.title}
+              </Typography>
+              
+              {/* Show current skill for full exam */}
+              {attemptType === 'full_exam' && getCurrentSkillInfo() && (
+                <Chip
+                  label={`📚 ${getCurrentSkillInfo().skill_type_name}`}
+                  size="small"
+                  color="primary"
+                  variant="outlined"
+                />
+              )}
+              
               <Chip 
-                label="Đang lưu..." 
+                label={`${currentQuestionIndex + 1}/${questions.length}`} 
                 size="small" 
-                color="info"
                 variant="outlined"
               />
-            )}
-            {autoSaveStatus === 'saved' && (
-              <Chip 
-                label="✓ Đã lưu" 
-                size="small" 
-                color="success"
-                variant="filled"
-              />
-            )}
-          </Box>
+              {/* Save status indicator */}
+              {autoSaveStatus === 'saving' && (
+                <Chip 
+                  label="Đang lưu..." 
+                  size="small" 
+                  color="info"
+                  variant="outlined"
+                />
+              )}
+              {autoSaveStatus === 'saved' && (
+                <Chip 
+                  label="✓ Đã lưu" 
+                  size="small" 
+                  color="success"
+                  variant="filled"
+                />
+              )}
+            </Box>
+            
+            <ExamTimer timeRemaining={timeRemaining} />
+            
+            <IconButton onClick={() => setExitDialogOpen(true)} sx={{ ml: 1 }}>
+              <ExitToApp />
+            </IconButton>
+          </Toolbar>
           
-          <ExamTimer timeRemaining={timeRemaining} />
-          
-          <IconButton onClick={handlePause} sx={{ ml: 1 }}>
-            <Pause />
-          </IconButton>
-          
-          <IconButton onClick={() => setExitDialogOpen(true)} sx={{ ml: 1 }}>
-            <ExitToApp />
-          </IconButton>
-        </Toolbar>
-        
-        {/* Progress Bar */}
-        <LinearProgress 
-          variant="determinate" 
-          value={getProgressPercentage()} 
-          sx={{ height: 4 }}
-        />
-      </AppBar>
+          {/* Progress Bar */}
+          <LinearProgress 
+            variant="determinate" 
+            value={getProgressPercentage()} 
+            sx={{ height: 4 }}
+          />
+        </AppBar>
+      )}
 
       {/* Main Content */}
-      <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 2 }}>
-          <Card sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 2, minHeight: 0 }}>
+          <Card sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
               <QuestionDisplay
                 question={currentQuestion}
                 answer={currentAnswer}
@@ -629,6 +458,11 @@ export default function TakeExamPage() {
                 questionNumber={currentQuestionIndex + 1}
                 totalQuestions={questions.length}
                 attemptId={currentAttempt?.id}
+                onMoveToNextQuestion={handleNextQuestion}
+                onHideHeader={handleHideHeader}
+                microphoneTestCompleted={microphoneTestCompleted}
+                onStartMicrophoneTest={startMicrophoneTest}
+                onCompleteMicrophoneTest={completeMicrophoneTest}
               />
             </CardContent>
           </Card>
@@ -639,7 +473,11 @@ export default function TakeExamPage() {
               variant="outlined"
               startIcon={<NavigateBefore />}
               onClick={handlePreviousQuestion}
-              disabled={currentQuestionIndex === 0}
+              disabled={
+                currentQuestionIndex === 0 || 
+                isNavigationDisabled || 
+                (currentQuestion?.questionType?.code?.includes('SPEAKING'))
+              }
             >
               Câu trước
             </Button>
@@ -650,6 +488,7 @@ export default function TakeExamPage() {
                   variant="contained"
                   color="primary"
                   onClick={() => setSubmitDialogOpen(true)}
+                  disabled={isNavigationDisabled}
                 >
                   Nộp bài
                 </Button>
@@ -658,6 +497,7 @@ export default function TakeExamPage() {
                   variant="contained"
                   endIcon={<NavigateNext />}
                   onClick={handleNextQuestion}
+                  disabled={isNavigationDisabled}
                 >
                   Câu tiếp
                 </Button>
@@ -667,63 +507,154 @@ export default function TakeExamPage() {
         </Box>
       </Box>
 
-      {/* Question Navigation Drawer - Grid View */}
+      {/* Question Navigation Drawer - Grid View with Skill Filtering */}
       <Drawer
         anchor="left"
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
       >
-        <Box sx={{ width: 380, p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <Typography variant="h6" gutterBottom sx={{ mb: 2 }}>
+        <Box sx={{ width: 420, p: 2, display: 'flex', flexDirection: 'column', height: '100%' }}>
+          {/* Title and Skill Info */}
+          <Typography variant="h6" gutterBottom sx={{ mb: 1 }}>
             Danh sách câu hỏi
           </Typography>
           
+          {/* Skill Tabs for Full Exam Mode */}
+          {attemptType === 'full_exam' && availableSkills.length > 0 && (
+            <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <Typography variant="subtitle2" fontWeight="bold" color="textSecondary">
+                Chọn kỹ năng:
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                {availableSkills.map(skill => (
+                  <Button
+                    key={skill.id}
+                    variant={selectedSkillFilter === skill.id ? 'contained' : 'outlined'}
+                    size="small"
+                    onClick={() => {
+                      setSelectedSkillFilter(skill.id);
+                      setCurrentQuestionIndex(0);
+                    }}
+                    sx={{
+                      textTransform: 'none',
+                      fontSize: '0.85rem',
+                    }}
+                  >
+                    {skill.skill_type_name}
+                  </Button>
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          {/* Questions Grid - Grouped by Section */}
           <Box sx={{ flex: 1, overflow: 'auto', mb: 2 }}>
-            <Grid container spacing={1}>
-              {questions.map((question, index) => {
-                const status = getQuestionStatus(question.id);
-                const isActive = index === currentQuestionIndex;
-                const isAnswered = status === 'answered';
-                
-                return (
-                  <Grid item xs={3} key={question.id}>
-                    <Paper
-                      onClick={() => handleQuestionNavigation(index)}
-                      sx={{
-                        p: 1.5,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                        minHeight: 60,
-                        backgroundColor: isActive ? 'primary.main' : isAnswered ? 'success.main' : 'grey.100',
-                        color: isActive || isAnswered ? 'white' : 'text.primary',
-                        border: isActive ? '2px solid' : '1px solid',
-                        borderColor: isActive ? 'primary.dark' : 'grey.300',
-                        borderRadius: 1,
-                        transition: 'all 0.3s ease',
-                        '&:hover': {
-                          boxShadow: 2,
-                          transform: 'scale(1.05)',
-                        }
-                      }}
-                    >
-                      <Box sx={{ textAlign: 'center', width: '100%' }}>
-                        <Typography variant="body2" fontWeight="bold">
-                          {index + 1}
-                        </Typography>
-                        {isAnswered && (
-                          <CheckCircle sx={{ fontSize: 16, mt: 0.5 }} />
-                        )}
-                        {!isAnswered && (
-                          <RadioButtonUnchecked sx={{ fontSize: 16, mt: 0.5, opacity: 0.5 }} />
-                        )}
-                      </Box>
+            {(() => {
+              const filteredQuestions = getFilteredQuestions();
+              const skillInfo = getCurrentSkillInfo();
+              const groupedBySection = groupQuestionsBySection(filteredQuestions);
+              
+              return (
+                <Box>
+                  {/* Current Skill/Section Header */}
+                  {attemptType === 'full_exam' && skillInfo && (
+                    <Paper sx={{ p: 2, mb: 2, backgroundColor: 'primary.light' }}>
+                      <Typography variant="subtitle1" fontWeight="bold" color="primary.dark">
+                        📚 {skillInfo.skill_type_name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {filteredQuestions.length} câu hỏi
+                      </Typography>
                     </Paper>
-                  </Grid>
-                );
-              })}
-            </Grid>
+                  )}
+
+                  {/* Questions by Section */}
+                  {Object.entries(groupedBySection).map(([sectionId, sectionData]) => (
+                    <Box key={sectionId} sx={{ mb: 3 }}>
+                      {/* Section Header */}
+                      <Box sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box
+                          sx={{
+                            width: 4,
+                            height: 24,
+                            backgroundColor: 'primary.main',
+                            borderRadius: 1,
+                          }}
+                        />
+                        <Typography variant="subtitle2" fontWeight="bold">
+                          {sectionData.name}
+                        </Typography>
+                        <Chip
+                          label={sectionData.questions.length}
+                          size="small"
+                          variant="outlined"
+                        />
+                      </Box>
+
+                      {/* Section Questions Grid */}
+                      <Grid container spacing={1}>
+                        {sectionData.questions.map((question, idx) => {
+                          const globalIndex = questions.findIndex(q => q.id === question.id);
+                          const status = getQuestionStatus(question.id);
+                          const isActive = globalIndex === currentQuestionIndex;
+                          const isAnswered = status === 'answered';
+                          
+                          // Check if navigation should be disabled for this question
+                          const currentQuestion = questions[currentQuestionIndex];
+                          const isNavigationDisabledForQuestion = 
+                            currentQuestion?.questionType?.code?.includes('SPEAKING') && 
+                            globalIndex < currentQuestionIndex;
+                          
+                          return (
+                            <Grid item xs={3} key={question.id}>
+                              <Paper
+                                onClick={() => {
+                                  if (!isNavigationDisabledForQuestion) {
+                                    handleQuestionNavigation(globalIndex);
+                                    setDrawerOpen(false);
+                                  }
+                                }}
+                                sx={{
+                                  p: 1.5,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: isNavigationDisabledForQuestion ? 'not-allowed' : 'pointer',
+                                  minHeight: 60,
+                                  backgroundColor: isActive ? 'primary.main' : isAnswered ? 'success.main' : 'grey.100',
+                                  color: isActive || isAnswered ? 'white' : 'text.primary',
+                                  border: isActive ? '2px solid' : '1px solid',
+                                  borderColor: isActive ? 'primary.dark' : 'grey.300',
+                                  borderRadius: 1,
+                                  transition: 'all 0.3s ease',
+                                  opacity: isNavigationDisabledForQuestion ? 0.6 : 1,
+                                  '&:hover': isNavigationDisabledForQuestion ? {} : {
+                                    boxShadow: 2,
+                                    transform: 'scale(1.05)',
+                                  }
+                                }}
+                              >
+                                <Box sx={{ textAlign: 'center', width: '100%' }}>
+                                  <Typography variant="body2" fontWeight="bold">
+                                    {globalIndex + 1}
+                                  </Typography>
+                                  {isAnswered && (
+                                    <CheckCircle sx={{ fontSize: 16, mt: 0.5 }} />
+                                  )}
+                                  {!isAnswered && (
+                                    <RadioButtonUnchecked sx={{ fontSize: 16, mt: 0.5, opacity: 0.5 }} />
+                                  )}
+                                </Box>
+                              </Paper>
+                            </Grid>
+                          );
+                        })}
+                      </Grid>
+                    </Box>
+                  ))}
+                </Box>
+              );
+            })()}
           </Box>
 
           {/* Legend */}
@@ -731,7 +662,7 @@ export default function TakeExamPage() {
             <Typography variant="subtitle2" gutterBottom fontWeight="bold">
               Chú thích:
             </Typography>
-            <Box sx={{ display: 'flex', gap: 2, mt: 1 }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Box sx={{ width: 30, height: 30, backgroundColor: 'success.main', borderRadius: 0.5 }} />
                 <Typography variant="caption">Đã làm</Typography>
@@ -792,21 +723,6 @@ export default function TakeExamPage() {
           <Button onClick={() => setSubmitDialogOpen(false)}>Hủy</Button>
           <Button onClick={handleSubmit} color="primary" variant="contained">
             Nộp bài
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Pause Dialog */}
-      <Dialog open={pauseDialogOpen} onClose={() => setPauseDialogOpen(false)}>
-        <DialogTitle>Tạm dừng bài thi</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Bài thi đã được tạm dừng. Thời gian vẫn tiếp tục trôi.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setPauseDialogOpen(false)} color="primary">
-            Tiếp tục
           </Button>
         </DialogActions>
       </Dialog>

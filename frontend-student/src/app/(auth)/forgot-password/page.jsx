@@ -51,9 +51,9 @@ export default function ForgotPasswordPage() {
     const errors = {};
     
     if (!formData.email.trim()) {
-      errors.email = 'Email is required';
+      errors.email = 'Email là bắt buộc';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      errors.email = 'Please enter a valid email address';
+      errors.email = 'Vui lòng nhập địa chỉ email hợp lệ';
     }
 
     setValidationErrors(errors);
@@ -74,7 +74,7 @@ export default function ForgotPasswordPage() {
       await authService.forgotPassword(formData.email);
       setSuccess(true);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to send reset email. Please try again.');
+      setError(err.response?.data?.message || 'Không thể gửi mật khẩu mới. Vui lòng thử lại.');
     } finally {
       setIsLoading(false);
     }
@@ -97,14 +97,14 @@ export default function ForgotPasswordPage() {
             <CardContent sx={{ p: 4, textAlign: 'center' }}>
               <CheckCircle sx={{ fontSize: 64, color: 'success.main', mb: 2 }} />
               <Typography variant="h4" component="h1" gutterBottom>
-                Check Your Email
+                Kiểm tra Email của bạn
               </Typography>
               <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
-                We&apos;ve sent a password reset link to <strong>{formData.email}</strong>
+                Chúng tôi đã gửi mật khẩu mới tới <strong>{formData.email}</strong>
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-                Please check your email and follow the instructions to reset your password. 
-                If you don&apos;t see the email, check your spam folder.
+                Vui lòng kiểm tra email của bạn và sử dụng mật khẩu mới để đăng nhập. 
+                Nếu không thấy email, hãy kiểm tra thư mục spam.
               </Typography>
               
               <Button
@@ -112,7 +112,7 @@ export default function ForgotPasswordPage() {
                 onClick={() => router.push('/login')}
                 sx={{ mr: 2 }}
               >
-                Back to Login
+                Quay lại Đăng nhập
               </Button>
               
               <Button
@@ -122,7 +122,7 @@ export default function ForgotPasswordPage() {
                   setFormData({ email: '' });
                 }}
               >
-                Send Another Email
+                Gửi Email khác
               </Button>
             </CardContent>
           </Card>
@@ -149,10 +149,10 @@ export default function ForgotPasswordPage() {
             <Box sx={{ textAlign: 'center', mb: 3 }}>
               <School sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
               <Typography variant="h4" component="h1" gutterBottom>
-                Forgot Password?
+                Quên mật khẩu?
               </Typography>
               <Typography variant="body1" color="text.secondary">
-                No worries! Enter your email and we&apos;ll send you reset instructions.
+                Không sao! Nhập email của bạn và chúng tôi sẽ gửi mật khẩu mới cho bạn.
               </Typography>
             </Box>
 
@@ -169,7 +169,7 @@ export default function ForgotPasswordPage() {
                 fullWidth
                 id="email"
                 name="email"
-                label="Email Address"
+                label="Địa chỉ Email"
                 type="email"
                 value={formData.email}
                 onChange={handleChange}
@@ -195,7 +195,7 @@ export default function ForgotPasswordPage() {
                 {isLoading ? (
                   <CircularProgress size={24} color="inherit" />
                 ) : (
-                  'Send Reset Instructions'
+                  'Gửi mật khẩu mới'
                 )}
               </Button>
             </Box>
@@ -203,9 +203,9 @@ export default function ForgotPasswordPage() {
             {/* Back to Login */}
             <Box sx={{ textAlign: 'center' }}>
               <Typography variant="body2" color="text.secondary">
-                Remember your password?{' '}
+                Nhớ mật khẩu của bạn?{' '}
                 <Link href="/login" variant="body2" sx={{ textDecoration: 'none' }}>
-                  Back to Sign In
+                  Quay lại Đăng nhập
                 </Link>
               </Typography>
             </Box>

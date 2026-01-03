@@ -16,7 +16,10 @@ import {
 import { ArrowBack, Save, Grade } from '@mui/icons-material';
 import WritingReview from '@/components/teacher/submissions/WritingReview';
 import SpeakingReview from '@/components/teacher/submissions/SpeakingReview';
-import { fetchSubmissionDetail, submitReview } from '@/store/slices/submissionSlice';
+import { 
+  fetchSubmissionDetail, 
+  submitAttemptReview 
+} from '@/store/slices/submissionSlice';
 import { showNotification } from '@/store/slices/uiSlice';
 
 export default function SubmissionDetailPage() {
@@ -25,7 +28,7 @@ export default function SubmissionDetailPage() {
   const dispatch = useDispatch();
   
   const attemptId = params.attemptId;
-  const { currentSubmission, loading } = useSelector(state => state.submission);
+  const { currentSubmission, submissionDetails, isLoading } = useSelector(state => state.submission);
   
   const [activeTab, setActiveTab] = useState(0);
   const [reviewData, setReviewData] = useState({
@@ -54,12 +57,12 @@ export default function SubmissionDetailPage() {
   const handleReviewSubmit = async () => {
     setSaving(true);
     try {
-      const result = await dispatch(submitReview({
+      const result = await dispatch(submitAttemptReview({
         attemptId,
-        ...reviewData
+        reviewData
       }));
       
-      if (submitReview.fulfilled.match(result)) {
+      if (submitAttemptReview.fulfilled.match(result)) {
         dispatch(showNotification({
           message: 'Gửi đánh giá thành công!',
           type: 'success'
@@ -76,7 +79,7 @@ export default function SubmissionDetailPage() {
     }
   };
 
-  if (loading || !currentSubmission) {
+  if (isLoading || !submissionDetails) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
         <CircularProgress />
@@ -84,7 +87,8 @@ export default function SubmissionDetailPage() {
     );
   }
 
-  const { skill, student_name, exam_title, question_text } = currentSubmission;
+  const { skill, student, exam, answers } = submissionDetails;
+  const answer = answers && answers.length > 0 ? answers[0] : null;
 
   return (
     <Box>
@@ -102,7 +106,7 @@ export default function SubmissionDetailPage() {
               Xem xét bài làm
             </Typography>
             <Typography variant="subtitle1" color="text.secondary">
-              {student_name} - {exam_title} ({skill})
+              {student?.full_name} - {exam?.title} ({skill})
             </Typography>
           </Box>
         </Box>
@@ -121,13 +125,13 @@ export default function SubmissionDetailPage() {
         <CardContent>
           {skill === 'writing' ? (
             <WritingReview
-              submission={currentSubmission}
+              answer={answer}
               reviewData={reviewData}
               onReviewChange={setReviewData}
             />
           ) : (
             <SpeakingReview
-              submission={currentSubmission}
+              answer={answer}
               reviewData={reviewData}
               onReviewChange={setReviewData}
             />

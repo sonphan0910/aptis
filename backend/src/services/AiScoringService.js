@@ -1,3 +1,4 @@
+const path = require('path');
 const { getGroqModel, GROQ_CONFIG } = require('../config/ai');
 const {
   AttemptAnswer,
@@ -68,14 +69,21 @@ class AiScoringService {
     await this.createAnswerAiFeedbacks(answerId, result.criteriaScores);
 
     // Update answer with AI score and feedback
+    // CRITICAL: Ensure AI score doesn't exceed answer.max_score
+    const finalScore = Math.min(result.totalScore, answer.max_score);
+    
+    if (finalScore !== result.totalScore) {
+      console.warn(`[scoreWriting] ⚠️  AI score capped: ${result.totalScore} -> ${finalScore} (max: ${answer.max_score})`);
+    }
+    
     await answer.update({
-      score: result.totalScore,
+      score: finalScore,
       ai_feedback: result.overallFeedback,
       ai_graded_at: new Date(),
     });
 
     console.log(
-      `[scoreWriting] Answer ${answerId} scored successfully: ${result.totalScore}/${result.totalMaxScore}`
+      `[scoreWriting] Answer ${answerId} scored successfully: ${finalScore}/${answer.max_score} (AI calculated: ${result.totalScore}/${result.totalMaxScore})`
     );
 
     return result;
@@ -116,7 +124,7 @@ class AiScoringService {
         ? path.join(require('../config/storage').STORAGE_CONFIG.basePath, answer.audio_url.replace('/uploads', ''))
         : answer.audio_url;
       
-      const transcription = await SpeechToTextService.convertAudioToText(audioPath, 'vi');
+      const transcription = await SpeechToTextService.convertAudioToText(audioPath, 'en-US');
       
       // Update answer with transcription
       await answer.update({ transcribed_text: transcription });
@@ -156,14 +164,21 @@ class AiScoringService {
     await this.createAnswerAiFeedbacks(answerId, result.criteriaScores);
 
     // Update answer
+    // CRITICAL: Ensure AI score doesn't exceed answer.max_score
+    const finalScore = Math.min(result.totalScore, answer.max_score);
+    
+    if (finalScore !== result.totalScore) {
+      console.warn(`[scoreSpeaking] ⚠️  AI score capped: ${result.totalScore} -> ${finalScore} (max: ${answer.max_score})`);
+    }
+    
     await answer.update({
-      score: result.totalScore,
+      score: finalScore,
       ai_feedback: result.overallFeedback,
       ai_graded_at: new Date(),
     });
 
     console.log(
-      `[scoreSpeaking] Answer ${answerId} scored successfully: ${result.totalScore}/${result.totalMaxScore}`
+      `[scoreSpeaking] Answer ${answerId} scored successfully: ${finalScore}/${answer.max_score} (AI calculated: ${result.totalScore}/${result.totalMaxScore})`
     );
 
     return result;

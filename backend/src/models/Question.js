@@ -36,6 +36,12 @@ const Question = sequelize.define(
     media_url: {
       type: DataTypes.STRING(500),
       allowNull: true,
+      comment: 'Primary audio/image URL'
+    },
+    additional_media: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      comment: 'Additional media files for complex questions (JSON array of {type, url, description})'
     },
     duration_seconds: {
       type: DataTypes.INTEGER,

@@ -32,11 +32,11 @@ import SubmissionFilters from '@/components/teacher/submissions/SubmissionFilter
 export default function SubmissionsPage() {
   const router = useRouter();
   const dispatch = useDispatch();
-  const { submissions, isLoading: loading, pagination } = useSelector(state => state.submissions);
+  const { submissions, isLoading, pagination } = useSelector(state => state.submission || {});
   
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
-    skill: '',
+    answer_type: '', // 'text' for writing, 'audio' for speaking
     exam_id: '',
     status: '',
     date_range: { start: null, end: null }
@@ -49,8 +49,9 @@ export default function SubmissionsPage() {
   const handleFetchSubmissions = (page = 1) => {
     dispatch(fetchSubmissions({
       page,
-      search: searchTerm,
-      needs_review: true, // Chỉ hiển thị bài cần xem xét
+      limit: 20,
+      needs_review: 'true', // Chỉ hiển thị bài cần xem xét
+      answer_type: filters.answer_type,
       ...filters
     }));
   };
@@ -59,12 +60,12 @@ export default function SubmissionsPage() {
     router.push(`/teacher/submissions/${attemptId}`);
   };
 
-  const getStatusChip = (status, aiScore, finalScore) => {
-    if (status === 'completed' && finalScore !== null) {
+  const getStatusChip = (row) => {
+    if (row.final_score !== null && !row.needs_review) {
       return <Chip label="Đã xem xét" size="small" color="success" icon={<CheckCircle />} />;
     }
-    if (status === 'graded' && aiScore !== null) {
-      return <Chip label="Ghi đè điểm" size="small" color="warning" icon={<Warning />} />;
+    if (row.score !== null && row.needs_review) {
+      return <Chip label="Cần xem xét" size="small" color="warning" icon={<Warning />} />;
     }
     return <Chip label="Chờ xem xét" size="small" color="default" icon={<Schedule />} />;
   };
@@ -75,15 +76,18 @@ export default function SubmissionsPage() {
       label: 'Học viên',
       render: (row) => (
         <Box display="flex" alignItems="center" gap={1}>
-          <Avatar sx={{ width: 32, height: 32 }}>
-            {row.student_name?.charAt(0)}
+          <Avatar 
+            src={row.attempt?.student?.avatar_url}
+            sx={{ width: 32, height: 32 }}
+          >
+            {row.attempt?.student?.full_name?.charAt(0)}
           </Avatar>
           <Box>
             <Typography variant="body2" fontWeight="bold">
-              {row.student_name}
+              {row.attempt?.student?.full_name}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              {row.student_email}
+              {row.attempt?.student?.email}
             </Typography>
           </Box>
         </Box>
@@ -95,41 +99,48 @@ export default function SubmissionsPage() {
       render: (row) => (
         <Box>
           <Typography variant="body2" fontWeight="bold">
-            {row.exam_title}
+            {row.attempt?.exam?.title}
           </Typography>
-          <Typography variant="caption" color="text.secondary">
-            Phần: {row.section_title}
-          </Typography>
+          {row.attempt?.exam?.sections && row.attempt.exam.sections[0] && (
+            <Typography variant="caption" color="text.secondary">
+              {row.attempt.exam.sections[0].skillType?.name}
+            </Typography>
+          )}
         </Box>
       )
     },
     {
       id: 'skill',
       label: 'Kỹ năng',
-      render: (row) => (
-        <Chip 
-          label={row.skill} 
-          size="small" 
-          variant="filled"
-          color={row.skill === 'writing' ? 'primary' : 'secondary'}
-        />
-      )
+      render: (row) => {
+        const skill = row.answer_type === 'audio' ? 'Speaking' : 'Writing';
+        return (
+          <Chip 
+            label={skill} 
+            size="small" 
+            variant="filled"
+            color={row.answer_type === 'text' ? 'primary' : 'secondary'}
+          />
+        );
+      }
     },
     {
       id: 'submitted_at',
       label: 'Ngày nộp',
-      render: (row) => new Date(row.submitted_at).toLocaleDateString('vi-VN')
+      render: (row) => row.answered_at 
+        ? new Date(row.answered_at).toLocaleDateString('vi-VN')
+        : '-'
     },
     {
       id: 'ai_score',
       label: 'Điểm AI',
       align: 'center',
-      render: (row) => row.ai_score ? `${row.ai_score}/${row.max_score}` : '-'
+      render: (row) => row.score ? `${row.score}` : '-'
     },
     {
       id: 'status',
       label: 'Trạng thái',
-      render: (row) => getStatusChip(row.status, row.ai_score, row.final_score)
+      render: (row) => getStatusChip(row)
     },
     {
       id: 'actions',
@@ -161,10 +172,10 @@ export default function SubmissionsPage() {
       />
 
       <DataTable
-        data={submissions}
+        data={submissions || []}
         columns={columns}
-        loading={loading}
-        pagination={pagination}
+        loading={isLoading}
+        pagination={pagination || { page: 1, limit: 20, total: 0, totalPages: 0 }}
         onPageChange={handleFetchSubmissions}
       />
     </Box>

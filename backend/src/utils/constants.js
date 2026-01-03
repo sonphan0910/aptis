@@ -119,6 +119,7 @@ const WHISPER_CONFIG = {
   DEVICE: process.env.WHISPER_DEVICE || 'cpu',
   TIMEOUT: 120000, // 120 seconds
   LANGUAGE: 'en',
+  SAMPLING_RATE: 16000, // Whisper standard sampling rate
 };
 
 // AI Scoring configuration

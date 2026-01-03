@@ -114,13 +114,34 @@ exports.startAttempt = async (req, res, next) => {
         section_status: 'not_started',
       });
 
-      // Create attempt answers (empty)
+      // Create attempt answers (empty) - use findOrCreate to avoid duplicates
       for (const esq of section.questions) {
-        await AttemptAnswer.create({
-          attempt_id: attempt.id,
-          question_id: esq.question_id,
-          answer_type: 'text', // Default, will be updated when answered
-          max_score: esq.max_score,
+        // Auto-detect answer_type based on question type code
+        const questionTypeCode = esq.question.questionType.code.toLowerCase();
+        let defaultAnswerType = 'text';
+        
+        if (questionTypeCode.includes('mcq') || 
+            questionTypeCode.includes('true_false') || 
+            questionTypeCode.includes('multiple_choice')) {
+          defaultAnswerType = 'option';
+        } else if (questionTypeCode.includes('speaking')) {
+          defaultAnswerType = 'audio';
+        } else if (questionTypeCode.includes('matching') || 
+                   questionTypeCode.includes('ordering') ||
+                   questionTypeCode.includes('gap_filling')) {
+          defaultAnswerType = 'json';
+        }
+        // else: writing, reading short answer, etc. = 'text'
+        
+        await AttemptAnswer.findOrCreate({
+          where: {
+            attempt_id: attempt.id,
+            question_id: esq.question_id,
+          },
+          defaults: {
+            answer_type: defaultAnswerType,
+            max_score: esq.max_score,
+          },
         });
       }
     }
@@ -378,7 +399,7 @@ exports.submitAttempt = async (req, res, next) => {
 exports.getAttemptQuestions = async (req, res, next) => {
   try {
     const { attemptId } = req.params;
-    const { section_id, offset = 0, limit = 20 } = req.query;
+    const { section_id, offset = 0, limit = 999 } = req.query;
     const studentId = req.user.userId;
 
     console.log('[getAttemptQuestions] Request:', { attemptId, section_id, offset, limit });
@@ -426,6 +447,7 @@ exports.getAttemptQuestions = async (req, res, next) => {
         {
           model: Question,
           as: 'question',
+          attributes: ['id', 'question_type_id', 'aptis_type_id', 'difficulty', 'content', 'media_url', 'duration_seconds', 'status'],
           include: [
             { 
               model: QuestionItem, 
@@ -461,11 +483,16 @@ exports.getAttemptQuestions = async (req, res, next) => {
     const formattedAnswers = answers.map(answer => {
       const answerJson = answer.toJSON();
       
+      // Log media_url for debugging
+      if (answerJson.question?.media_url) {
+        console.log('[getAttemptQuestions] Q' + answerJson.question.id + ' has media_url:', answerJson.question.media_url);
+      }
+      
       // Create answer_data structure based on answer_type
       let answer_data = null;
       
       if (answer.answer_type === 'option' && answer.selected_option_id) {
-        answer_data = { selected_option: answer.selected_option_id };
+        answer_data = { selected_option_id: answer.selected_option_id };
       } else if (answer.answer_type === 'json' && answer.answer_json) {
         try {
           answer_data = JSON.parse(answer.answer_json);
@@ -473,9 +500,14 @@ exports.getAttemptQuestions = async (req, res, next) => {
           answer_data = answer.answer_json;
         }
       } else if (answer.answer_type === 'text' && answer.text_answer) {
-        answer_data = { text: answer.text_answer };
+        answer_data = { text_answer: answer.text_answer };
       } else if (answer.answer_type === 'audio' && answer.audio_url) {
-        answer_data = { audio_url: answer.audio_url };
+        // For audio answers, just mark as completed - don't need to load audio file
+        answer_data = { 
+          audio_url: answer.audio_url,
+          completed: true,
+          transcribed_text: answer.transcribed_text || null
+        };
       }
       
       return {

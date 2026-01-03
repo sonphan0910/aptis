@@ -1,4 +1,4 @@
-const { AptisType, SkillType, QuestionType, Exam, ExamSection, sequelize } = require('../models');
+const { AptisType, SkillType, QuestionType, Question, Exam, ExamSection, sequelize } = require('../models');
 const { Op } = require('sequelize');
 
 /**
@@ -81,6 +81,40 @@ exports.getQuestionTypes = async (req, res, next) => {
       success: true,
       data: questionTypes,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get all Writing questions for testing dynamic content
+ */
+exports.getWritingQuestions = async (req, res, next) => {
+  try {
+    const writingQuestions = await Question.findAll({
+      include: [
+        {
+          model: QuestionType,
+          as: 'questionType',
+          where: {
+            code: {
+              [Op.like]: 'WRITING_%'
+            }
+          },
+          attributes: ['code', 'question_type_name', 'scoring_method']
+        }
+      ],
+      attributes: ['id', 'difficulty', 'content', 'status'],
+      where: {
+        status: 'active'
+      },
+      order: [
+        [{ model: QuestionType, as: 'questionType' }, 'code', 'ASC'],
+        ['id', 'ASC']
+      ]
+    });
+
+    res.json(writingQuestions);
   } catch (error) {
     next(error);
   }

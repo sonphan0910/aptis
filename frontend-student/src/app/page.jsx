@@ -1,30 +1,23 @@
 'use client';
 
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
 export default function HomePage() {
+  const router = useRouter();
+
   useEffect(() => {
     // Check if user is logged in
     const token = localStorage.getItem('token');
     
     if (token) {
       // Redirect to dashboard if logged in
-      redirect('/home');
+      router.push('/home');
     } else {
       // Redirect to login if not logged in
-      redirect('/login');
+      router.push('/login');
     }
-  }, []);
+  }, [router]);
 
-  return (
-    <div style={{ 
-      display: 'flex', 
-      justifyContent: 'center', 
-      alignItems: 'center', 
-      height: '100vh' 
-    }}>
-      <div className="spinner" />
-    </div>
-  );
+  return null;
 }

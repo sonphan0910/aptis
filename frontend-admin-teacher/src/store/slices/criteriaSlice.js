@@ -49,10 +49,19 @@ export const createCriteria = createAsyncThunk(
   'criteria/createCriteria',
   async (criteriaData, { rejectWithValue }) => {
     try {
+      console.log('[Redux] createCriteria thunk - submitting data:', criteriaData);
       const response = await criteriaApi.createCriteria(criteriaData);
+      console.log('[Redux] Criteria created successfully:', response);
       return response;
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to create criteria');
+      console.error('[Redux] Failed to create criteria:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        message: error.response?.data?.message || error.message,
+        errorData: error.response?.data
+      });
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to create criteria';
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -61,10 +70,14 @@ export const updateCriteria = createAsyncThunk(
   'criteria/updateCriteria',
   async ({ id, criteriaData }, { rejectWithValue }) => {
     try {
+      console.log('Updating criteria with id:', id, 'data:', criteriaData);
       const response = await criteriaApi.updateCriteria(id, criteriaData);
+      console.log('Criteria updated successfully:', response);
       return response;
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to update criteria');
+      console.error('Failed to update criteria:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to update criteria';
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -73,10 +86,14 @@ export const deleteCriteria = createAsyncThunk(
   'criteria/deleteCriteria',
   async (id, { rejectWithValue }) => {
     try {
+      console.log('Deleting criteria with id:', id);
       await criteriaApi.deleteCriteria(id);
+      console.log('Criteria deleted successfully');
       return id;
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to delete criteria');
+      console.error('Failed to delete criteria:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to delete criteria';
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -219,8 +236,10 @@ const criteriaSlice = createSlice({
       })
       .addCase(fetchCriteriaById.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.currentCriteria = action.payload;
+        // action.payload is { success: true, data: {...} }
+        state.currentCriteria = action.payload.data || action.payload;
         state.error = null;
+        console.log('[Redux] fetchCriteriaById fulfilled, currentCriteria:', state.currentCriteria);
       })
       .addCase(fetchCriteriaById.rejected, (state, action) => {
         state.isLoading = false;

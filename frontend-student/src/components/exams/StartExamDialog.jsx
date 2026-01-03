@@ -82,25 +82,14 @@ export default function StartExamDialog({ open, onClose, exam, onStart }) {
               value="full_exam"
               control={<Radio />}
               label={
-                <Box>
+                <Box mb={2}>
                   <Typography variant="body1" fontWeight="medium">
                     Làm toàn bộ bài thi
                   </Typography>
                   <Typography variant="body2" color="textSecondary">
                     Hoàn thành tất cả các phần thi ({exam.sections?.length || 0} kỹ năng)
                   </Typography>
-                  <Box display="flex" gap={1} mt={1}>
-                    <Chip 
-                      size="small" 
-                      icon={<AccessTime fontSize="small" />} 
-                      label={`${totalDuration} phút`}
-                    />
-                    <Chip 
-                      size="small" 
-                      icon={<Quiz fontSize="small" />} 
-                      label={`${totalQuestions} câu`}
-                    />
-                  </Box>
+            
                 </Box>
               }
             />

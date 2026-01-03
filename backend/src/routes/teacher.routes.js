@@ -118,6 +118,17 @@ router.put(
 
 router.post('/exams/:examId/publish', authMiddleware, isTeacherOrAdmin, examController.publishExam);
 
+router.post('/exams/:examId/unpublish', authMiddleware, isTeacherOrAdmin, examController.unpublishExam);
+
+router.get('/exams/:examId', authMiddleware, isTeacherOrAdmin, examController.getExamById);
+
+router.delete(
+  '/exams/:examId/sections/:sectionId',
+  authMiddleware,
+  isTeacherOrAdmin,
+  examController.removeSection,
+);
+
 router.get('/exams', authMiddleware, isTeacherOrAdmin, apiLimiter, examController.getMyExams);
 
 // AI Criteria routes
@@ -135,6 +146,27 @@ router.get(
   isTeacherOrAdmin,
   apiLimiter,
   criteriaController.getCriteriaList,
+);
+
+router.get(
+  '/criteria/question-types',
+  authMiddleware,
+  isTeacherOrAdmin,
+  criteriaController.getQuestionTypesForCriteria,
+);
+
+// Individual criteria route (must come AFTER specific routes like /question-types)
+router.get(
+  '/criteria/:criteriaId',
+  authMiddleware,
+  isTeacherOrAdmin,
+  criteriaController.getCriteriaById,
+);
+
+// Public endpoint for testing (remove in production)
+router.get(
+  '/criteria/question-types/public',
+  criteriaController.getQuestionTypesForCriteria,
 );
 
 router.put(
@@ -188,6 +220,43 @@ router.get(
   isTeacherOrAdmin,
   apiLimiter,
   reviewController.getReviewsByExam,
+);
+
+// Submission review routes
+router.get(
+  '/submissions',
+  authMiddleware,
+  isTeacherOrAdmin,
+  apiLimiter,
+  reviewController.getSubmissions,
+);
+
+router.get(
+  '/submissions/:attemptId',
+  authMiddleware,
+  isTeacherOrAdmin,
+  reviewController.getSubmissionDetail,
+);
+
+router.put(
+  '/answers/:answerId/review',
+  authMiddleware,
+  isTeacherOrAdmin,
+  reviewController.submitAnswerReview,
+);
+
+router.put(
+  '/answers/:answerId/score',
+  authMiddleware,
+  isTeacherOrAdmin,
+  reviewController.updateAnswerScore,
+);
+
+router.post(
+  '/attempts/:attemptId/review',
+  authMiddleware,
+  isTeacherOrAdmin,
+  reviewController.submitAttemptReview,
 );
 
 // Report routes

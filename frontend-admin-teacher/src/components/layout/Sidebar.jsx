@@ -10,8 +10,6 @@ import {
   ListItemText,
   Divider,
   Typography,
-  Collapse,
-  IconButton,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -21,17 +19,10 @@ import {
   Grading as GradingIcon,
   Assessment as AssessmentIcon,
   Rule as RuleIcon,
-  ExpandLess,
-  ExpandMore,
-  Close as CloseIcon,
   QuestionAnswer,
-  Create,
-  LibraryBooks,
   BarChart,
-  TrendingUp,
-  Analytics,
 } from '@mui/icons-material';
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { ROUTES } from '@/config/app.config';
 
@@ -46,35 +37,21 @@ const teacherMenuItems = [
     title: 'Quản lý câu hỏi',
     icon: QuizIcon,
     path: ROUTES.TEACHER.QUESTIONS.LIST,
-    children: [
-      { title: 'Danh sách câu hỏi', icon: QuestionAnswer, path: ROUTES.TEACHER.QUESTIONS.LIST },
-      { title: 'Tạo câu hỏi mới', icon: Create, path: ROUTES.TEACHER.QUESTIONS.CREATE },
-    ],
   },
   {
     title: 'Quản lý bài thi',
     icon: AssignmentIcon,
     path: ROUTES.TEACHER.EXAMS.LIST,
-    children: [
-      { title: 'Danh sách bài thi', icon: AssignmentIcon, path: ROUTES.TEACHER.EXAMS.LIST },
-      { title: 'Tạo bài thi mới', icon: Create, path: ROUTES.TEACHER.EXAMS.CREATE },
-    ],
   },
   {
     title: 'Chấm bài',
     icon: GradingIcon,
     path: ROUTES.TEACHER.SUBMISSIONS.LIST,
-    children: [
-      { title: 'Danh sách bài làm', icon: GradingIcon, path: ROUTES.TEACHER.SUBMISSIONS.LIST },
-    ],
   },
   {
     title: 'Báo cáo & Thống kê',
     icon: AssessmentIcon,
     path: ROUTES.TEACHER.REPORTS.LIST,
-    children: [
-      { title: 'Báo cáo học viên', icon: BarChart, path: ROUTES.TEACHER.REPORTS.LIST },
-    ],
   },
   {
     title: 'Tiêu chí đánh giá',
@@ -94,44 +71,26 @@ const adminMenuItems = [
     title: 'Quản lý câu hỏi',
     icon: QuizIcon,
     path: ROUTES.TEACHER.QUESTIONS.LIST,
-    children: [
-      { title: 'Danh sách câu hỏi', icon: QuestionAnswer, path: ROUTES.TEACHER.QUESTIONS.LIST },
-      { title: 'Tạo câu hỏi mới', icon: Create, path: ROUTES.TEACHER.QUESTIONS.CREATE },
-    ],
   },
   {
     title: 'Quản lý bài thi',
     icon: AssignmentIcon,
     path: ROUTES.TEACHER.EXAMS.LIST,
-    children: [
-      { title: 'Danh sách bài thi', icon: AssignmentIcon, path: ROUTES.TEACHER.EXAMS.LIST },
-      { title: 'Tạo bài thi mới', icon: Create, path: ROUTES.TEACHER.EXAMS.CREATE },
-    ],
   },
   {
     title: 'Quản lý người dùng',
     icon: PeopleIcon,
     path: ROUTES.ADMIN.USERS.LIST,
-    children: [
-      { title: 'Danh sách người dùng', icon: PeopleIcon, path: ROUTES.ADMIN.USERS.LIST },
-    ],
   },
   {
     title: 'Chấm bài',
     icon: GradingIcon,
     path: ROUTES.TEACHER.SUBMISSIONS.LIST,
-    children: [
-      { title: 'Danh sách bài làm', icon: GradingIcon, path: ROUTES.TEACHER.SUBMISSIONS.LIST },
-    ],
   },
   {
     title: 'Báo cáo & Thống kê',
     icon: AssessmentIcon,
     path: ROUTES.TEACHER.REPORTS.LIST,
-    children: [
-      { title: 'Báo cáo tổng quan', icon: BarChart, path: ROUTES.TEACHER.REPORTS.LIST },
-      { title: 'Phân tích xu hướng', icon: TrendingUp, path: ROUTES.TEACHER.REPORTS.LIST },
-    ],
   },
   {
     title: 'Tiêu chí đánh giá',
@@ -147,52 +106,26 @@ export default function Sidebar({ onClose, currentPath }) {
   const menuItems = useMemo(() => {
     return userRole === 'admin' ? adminMenuItems : teacherMenuItems;
   }, [userRole]);
+  
   const router = useRouter();
-  const [expandedItems, setExpandedItems] = useState({});
 
   const handleItemClick = (item) => {
-    if (item.children) {
-      // Toggle expanded state for items with children
-      setExpandedItems(prev => ({
-        ...prev,
-        [item.title]: !prev[item.title]
-      }));
-    } else {
-      // Navigate for items without children
-      router.push(item.path);
-      if (onClose) {
-        onClose();
-      }
-    }
-  };
-
-  const handleChildClick = (childItem) => {
-    router.push(childItem.path);
-    if (onClose) {
-      onClose();
-    }
+    router.push(item.path);
   };
 
   const isActive = (path) => {
     return currentPath === path || currentPath.startsWith(path + '/');
   };
 
-  const isParentActive = (item) => {
-    if (item.children) {
-      return item.children.some(child => isActive(child.path));
-    }
-    return isActive(item.path);
-  };
-
   return (
-    <Box sx={{ height: '100%', bgcolor: 'background.paper' }}>
+    <Box sx={{ height: '100%', bgcolor: 'background.paper', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
       <Box
         sx={{
           p: 2,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          justifyContent: 'flex-start',
           borderBottom: 1,
           borderColor: 'divider',
         }}
@@ -200,21 +133,16 @@ export default function Sidebar({ onClose, currentPath }) {
         <Typography variant="h6" fontWeight="bold" color="primary">
           APTIS Admin
         </Typography>
-        {onClose && (
-          <IconButton onClick={onClose} size="small">
-            <CloseIcon />
-          </IconButton>
-        )}
       </Box>
 
       {/* Navigation Menu */}
-      <List sx={{ pt: 1 }}>
+      <List sx={{ pt: 1, flex: 1 }}>
         {menuItems.map((item, index) => (
           <Box key={item.title}>
             <ListItem disablePadding>
               <ListItemButton
                 onClick={() => handleItemClick(item)}
-                selected={isParentActive(item)}
+                selected={isActive(item.path)}
                 sx={{
                   mx: 1,
                   borderRadius: 1,
@@ -234,53 +162,11 @@ export default function Sidebar({ onClose, currentPath }) {
                   primary={item.title}
                   primaryTypographyProps={{
                     fontSize: '0.9rem',
-                    fontWeight: isParentActive(item) ? 600 : 400,
+                    fontWeight: isActive(item.path) ? 600 : 400,
                   }}
                 />
-                {item.children && (
-                  expandedItems[item.title] ? <ExpandLess /> : <ExpandMore />
-                )}
               </ListItemButton>
             </ListItem>
-
-            {/* Sub-menu items */}
-            {item.children && (
-              <Collapse in={expandedItems[item.title]} timeout="auto" unmountOnExit>
-                <List component="div" disablePadding>
-                  {item.children.map((childItem) => (
-                    <ListItem key={childItem.title} disablePadding>
-                      <ListItemButton
-                        onClick={() => handleChildClick(childItem)}
-                        selected={isActive(childItem.path)}
-                        sx={{
-                          pl: 4,
-                          mx: 1,
-                          borderRadius: 1,
-                          '&.Mui-selected': {
-                            bgcolor: 'primary.light',
-                            color: 'primary.contrastText',
-                            '& .MuiListItemIcon-root': {
-                              color: 'primary.contrastText',
-                            },
-                          },
-                        }}
-                      >
-                        <ListItemIcon sx={{ minWidth: 36 }}>
-                          <childItem.icon fontSize="small" />
-                        </ListItemIcon>
-                        <ListItemText 
-                          primary={childItem.title}
-                          primaryTypographyProps={{
-                            fontSize: '0.85rem',
-                            fontWeight: isActive(childItem.path) ? 600 : 400,
-                          }}
-                        />
-                      </ListItemButton>
-                    </ListItem>
-                  ))}
-                </List>
-              </Collapse>
-            )}
 
             {/* Divider after main sections */}
             {index === 0 && <Divider sx={{ my: 1, mx: 2 }} />}
@@ -291,10 +177,6 @@ export default function Sidebar({ onClose, currentPath }) {
       {/* Footer */}
       <Box
         sx={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
           p: 2,
           borderTop: 1,
           borderColor: 'divider',

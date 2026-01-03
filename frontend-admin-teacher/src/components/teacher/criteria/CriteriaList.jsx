@@ -9,36 +9,31 @@ import {
   CardContent,
   TextField,
   InputAdornment,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   IconButton,
-  Chip
+  Chip,
+  Button,
+  Grid,
+  Tooltip
 } from '@mui/material';
 import {
   Search,
   Edit,
   Delete,
-  Visibility
+  Visibility,
+  Clear
 } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import { fetchCriteria, deleteCriteria } from '@/store/slices/criteriaSlice';
 import DataTable from '@/components/shared/DataTable';
 import CriteriaPreview from './CriteriaPreview';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
-import { DEFAULT_APTIS_TYPES, DEFAULT_QUESTION_TYPES } from '@/constants/filterOptions';
 
 export default function CriteriaList() {
   const router = useRouter();
   const dispatch = useDispatch();
   const { criteria, loading, pagination } = useSelector(state => state.criteria);
-  
+
   const [searchTerm, setSearchTerm] = useState('');
-  const [filters, setFilters] = useState({
-    aptis_type: '',
-    question_type: ''
-  });
   const [selectedCriteria, setSelectedCriteria] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
@@ -53,17 +48,30 @@ export default function CriteriaList() {
     if (isMounted) {
       handleFetchCriteria(1);
     }
-  }, [searchTerm, filters, isMounted]);
+  }, [isMounted]);
 
   const handleFetchCriteria = (page = 1) => {
-    dispatch(fetchCriteria({
+    const params = {
       page,
-      limit: 10,
-      search: searchTerm,
-      aptis_type: filters.aptis_type || undefined,
-      question_type: filters.question_type || undefined
-    }));
+      limit: 50 // Get more items for frontend filtering
+    };
+
+    dispatch(fetchCriteria(params));
   };
+
+  // Frontend search filtering
+  const filteredCriteria = criteria.filter(item => {
+    if (!searchTerm) return true;
+    
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      item.criteria_name?.toLowerCase().includes(searchLower) ||
+      item.rubric_prompt?.toLowerCase().includes(searchLower) ||
+      item.description?.toLowerCase().includes(searchLower) ||
+      item.questionType?.question_type_name?.toLowerCase().includes(searchLower) ||
+      item.aptisType?.aptis_type_name?.toLowerCase().includes(searchLower)
+    );
+  });
 
   const handlePreview = (criteria) => {
     setSelectedCriteria(criteria);
@@ -71,7 +79,7 @@ export default function CriteriaList() {
   };
 
   const handleEdit = (criteriaId) => {
-    router.push(`/teacher/criteria/${criteriaId}/edit`);
+    router.push(`/teacher/criteria/${criteriaId}?edit=true`);
   };
 
   const handleDelete = (criteria) => {
@@ -100,88 +108,103 @@ export default function CriteriaList() {
             {row.criteria_name}
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            {row.rubric_prompt?.substring(0, 50)}...
+            {row.description ? `${row.description.substring(0, 60)}...` : 'Không có mô tả'}
           </Typography>
         </Box>
       )
     },
     {
-      id: 'questionType',
-      label: 'Loại câu hỏi',
-      render: (row) => {
-        const questionType = row.questionType || {};
-        return (
-          <Chip 
-            label={questionType.question_type_name || 'N/A'} 
-            size="small" 
-            variant="outlined"
-            color="primary"
-          />
-        );
-      }
+      id: 'details',
+      label: 'Chi tiết',
+      render: (row) => (
+        <Box>
+          <Box display="flex" gap={0.5} mb={0.5}>
+            <Chip
+              label={row.questionType?.question_type_name || 'N/A'} 
+              size="small" 
+              variant="outlined"
+              color="primary"
+            />
+            <Chip 
+              label={row.aptisType?.aptis_type_name || 'N/A'} 
+              size="small"
+              variant="outlined"
+              color="secondary"
+            />
+          </Box>
+        </Box>
+      )
     },
     {
-      id: 'aptisType',
-      label: 'Loại APTIS',
-      render: (row) => {
-        const aptisType = row.aptisType || {};
-        return (
-          <Chip 
-            label={aptisType.aptis_type_name || 'N/A'} 
-            size="small" 
-            variant="filled"
-            color="secondary"
-          />
-        );
-      }
-    },
-    {
-      id: 'weight',
-      label: 'Trọng số',
-      align: 'center',
-      render: (row) => row.weight || '-'
-    },
-    {
-      id: 'max_score',
-      label: 'Điểm tối đa',
-      align: 'center',
-      render: (row) => row.max_score || '-'
-    },
-    {
-      id: 'created_at',
-      label: 'Ngày tạo',
-      render: (row) => new Date(row.created_at).toLocaleDateString('vi-VN')
-    },
-    {
-      id: 'actions',
-      label: 'Hành động',
+      id: 'scoring',
+      label: 'Chấm điểm',
       align: 'center',
       render: (row) => (
         <Box>
-          <IconButton
-            size="small"
-            onClick={() => handlePreview(row)}
-            color="info"
-            title="Xem chi tiết"
-          >
-            <Visibility />
-          </IconButton>
-          <IconButton
-            size="small"
-            onClick={() => handleEdit(row.id)}
-            color="primary"
-            title="Chỉnh sửa"
-          >
-            <Edit />
-          </IconButton>
-          <IconButton
-            size="small"
-            onClick={() => handleDelete(row)}
-            color="error"
-            title="Xóa"
-          >
-            <Delete />
-          </IconButton>
+          <Typography variant="body2" fontWeight="bold">
+            Max: {row.max_score || 0}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Trọng số: {row.weight || 1}
+          </Typography>
+        </Box>
+      )
+    },
+    {
+      id: 'rubric_info',
+      label: 'Rubric',
+      render: (row) => (
+        <Box>
+          <Typography variant="caption" color="text.secondary">
+            {row.rubric_prompt ? `${row.rubric_prompt.substring(0, 40)}...` : 'Chưa có rubric'}
+          </Typography>
+        </Box>
+      )
+    },
+    {
+      id: 'created_info',
+      label: 'Thông tin tạo',
+      render: (row) => (
+        <Box>
+          <Typography variant="caption" color="text.secondary">
+            {new Date(row.created_at).toLocaleDateString('vi-VN')}
+          </Typography>
+        </Box>
+      )
+    },
+    {
+      id: 'actions',
+      label: 'Thao tác',
+      align: 'center',
+      render: (row) => (
+        <Box display="flex" gap={0.5}>
+          <Tooltip title="Xem chi tiết">
+            <IconButton
+              size="small"
+              onClick={() => handlePreview(row)}
+              color="info"
+            >
+              <Visibility />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Chỉnh sửa">
+            <IconButton
+              size="small"
+              onClick={() => handleEdit(row.id)}
+              color="primary"
+            >
+              <Edit />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Xóa">
+            <IconButton
+              size="small"
+              onClick={() => handleDelete(row)}
+              color="error"
+            >
+              <Delete />
+            </IconButton>
+          </Tooltip>
         </Box>
       )
     }
@@ -189,64 +212,51 @@ export default function CriteriaList() {
 
   return (
     <Box>
+      {/* Simple search bar */}
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Box display="flex" gap={2} flexWrap="wrap" alignItems="center">
-            <TextField
-              placeholder="Tìm kiếm tiêu chí..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              size="small"
-              sx={{ minWidth: 250 }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Search />
-                  </InputAdornment>
-                )
-              }}
-            />
-
-            <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel>Loại câu hỏi</InputLabel>
-              <Select
-                value={filters.question_type}
-                label="Loại câu hỏi"
-                onChange={(e) => setFilters(prev => ({ ...prev, question_type: e.target.value }))}
-              >
-                <MenuItem value="">Tất cả</MenuItem>
-                {DEFAULT_QUESTION_TYPES.map((type) => (
-                  <MenuItem key={type.value} value={type.value}>
-                    {type.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel>Loại APTIS</InputLabel>
-              <Select
-                value={filters.aptis_type}
-                label="Loại APTIS"
-                onChange={(e) => setFilters(prev => ({ ...prev, aptis_type: e.target.value }))}
-              >
-                <MenuItem value="">Tất cả</MenuItem>
-                {DEFAULT_APTIS_TYPES.map((type) => (
-                  <MenuItem key={type.value} value={type.value}>
-                    {type.label}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          </Box>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                placeholder="Tìm kiếm tiêu chí chấm điểm..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                size="small"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search />
+                    </InputAdornment>
+                  )
+                }}
+              />
+            </Grid>
+            {searchTerm && (
+              <Grid item>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => setSearchTerm('')}
+                  startIcon={<Clear />}
+                  color="error"
+                >
+                  Xóa tìm kiếm
+                </Button>
+              </Grid>
+            )}
+          </Grid>
         </CardContent>
       </Card>
 
       <DataTable
-        data={criteria}
+        data={filteredCriteria}
         columns={columns}
         loading={loading}
-        pagination={pagination}
+        pagination={{
+          ...pagination,
+          total: filteredCriteria.length
+        }}
         onPageChange={handleFetchCriteria}
       />
 
@@ -269,3 +279,4 @@ export default function CriteriaList() {
     </Box>
   );
 }
+

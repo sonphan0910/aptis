@@ -1,1 +1,106 @@
-'use client';\n\nimport { useState, useCallback, useRef, useEffect } from 'react';\n\nexport function useTimer(initialTime = 0, onTimeUp = null) {\n  const [timeRemaining, setTimeRemaining] = useState(initialTime);\n  const [isRunning, setIsRunning] = useState(false);\n  const [isPaused, setIsPaused] = useState(false);\n  const intervalRef = useRef(null);\n\n  const start = useCallback(() => {\n    if (!isRunning && !isPaused) {\n      setIsRunning(true);\n      intervalRef.current = setInterval(() => {\n        setTimeRemaining(prev => {\n          if (prev <= 1) {\n            setIsRunning(false);\n            if (onTimeUp) onTimeUp();\n            return 0;\n          }\n          return prev - 1;\n        });\n      }, 1000);\n    }\n  }, [isRunning, isPaused, onTimeUp]);\n\n  const pause = useCallback(() => {\n    if (isRunning) {\n      setIsPaused(true);\n      setIsRunning(false);\n      if (intervalRef.current) {\n        clearInterval(intervalRef.current);\n      }\n    }\n  }, [isRunning]);\n\n  const resume = useCallback(() => {\n    if (isPaused) {\n      setIsPaused(false);\n      start();\n    }\n  }, [isPaused, start]);\n\n  const stop = useCallback(() => {\n    setIsRunning(false);\n    setIsPaused(false);\n    if (intervalRef.current) {\n      clearInterval(intervalRef.current);\n    }\n  }, []);\n\n  const reset = useCallback((newTime = initialTime) => {\n    stop();\n    setTimeRemaining(newTime);\n  }, [initialTime, stop]);\n\n  useEffect(() => {\n    return () => {\n      if (intervalRef.current) {\n        clearInterval(intervalRef.current);\n      }\n    };\n  }, []);\n\n  const formatTime = useCallback((seconds) => {\n    const hours = Math.floor(seconds / 3600);\n    const minutes = Math.floor((seconds % 3600) / 60);\n    const secs = seconds % 60;\n    \n    if (hours > 0) {\n      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;\n    }\n    return `${minutes}:${secs.toString().padStart(2, '0')}`;\n  }, []);\n\n  return {\n    timeRemaining,\n    isRunning,\n    isPaused,\n    start,\n    pause,\n    resume,\n    stop,\n    reset,\n    formatTime: () => formatTime(timeRemaining)\n  };\n}"
+'use client';
+
+import { useState, useCallback, useRef, useEffect } from 'react';
+
+export function useTimer(initialTime = 0, onTimeUp = null) {
+  const [timeRemaining, setTimeRemaining] = useState(initialTime);
+  const [isRunning, setIsRunning] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const intervalRef = useRef(null);
+  const onTimeUpRef = useRef(onTimeUp);
+
+  // Keep onTimeUp ref updated
+  useEffect(() => {
+    onTimeUpRef.current = onTimeUp;
+  }, [onTimeUp]);
+
+  const start = useCallback(() => {
+    if (isRunning || isPaused) return;
+    
+    setIsRunning(true);
+    intervalRef.current = setInterval(() => {
+      setTimeRemaining(prev => {
+        if (prev <= 1) {
+          setIsRunning(false);
+          if (onTimeUpRef.current) onTimeUpRef.current();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, [isRunning, isPaused]);
+
+  const pause = useCallback(() => {
+    if (!isRunning) return;
+    
+    setIsPaused(true);
+    setIsRunning(false);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, [isRunning]);
+
+  const resume = useCallback(() => {
+    if (!isPaused) return;
+    
+    setIsPaused(false);
+    setIsRunning(true);
+    intervalRef.current = setInterval(() => {
+      setTimeRemaining(prev => {
+        if (prev <= 1) {
+          setIsRunning(false);
+          if (onTimeUpRef.current) onTimeUpRef.current();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, [isPaused]);
+
+  const stop = useCallback(() => {
+    setIsRunning(false);
+    setIsPaused(false);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
+
+  const reset = useCallback((newTime = initialTime) => {
+    stop();
+    setTimeRemaining(newTime);
+  }, [initialTime, stop]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, []);
+
+  const formatTime = useCallback((seconds) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  }, []);
+
+  return {
+    timeRemaining,
+    isRunning,
+    isPaused,
+    start,
+    pause,
+    resume,
+    stop,
+    reset,
+    formatTime: () => formatTime(timeRemaining)
+  };
+}

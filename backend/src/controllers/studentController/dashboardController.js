@@ -17,18 +17,31 @@ exports.getStats = async (req, res, next) => {
   try {
     const studentId = req.user.userId;
 
-    // Simple queries for basic stats
-    const totalAttempts = await ExamAttempt.count({
-      where: { student_id: studentId },
-    });
-
+    // Count only published exams that this student has attempted
     const totalExams = await ExamAttempt.count({
       where: { student_id: studentId },
       distinct: true,
       col: 'exam_id',
+      include: [{
+        model: Exam,
+        as: 'exam',
+        where: { status: 'published' },
+        attributes: [],
+      }],
     });
 
-    // Get completed attempts with scores for average calculation
+    // Count attempts on published exams only (for consistency with totalExams)
+    const totalAttempts = await ExamAttempt.count({
+      where: { student_id: studentId },
+      include: [{
+        model: Exam,
+        as: 'exam',
+        where: { status: 'published' },
+        attributes: [],
+      }],
+    });
+
+    // Get completed attempts with scores for average calculation (published exams only)
     const completedAttempts = await ExamAttempt.findAll({
       where: {
         student_id: studentId,
@@ -38,6 +51,7 @@ exports.getStats = async (req, res, next) => {
       include: [{
         model: Exam,
         as: 'exam',
+        where: { status: 'published' },
         attributes: ['total_score'],
       }],
       raw: true,
@@ -53,12 +67,14 @@ exports.getStats = async (req, res, next) => {
       averageScore = Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10;
     }
 
-    // Calculate study streak
+    // Calculate study streak (published exams only)
     let streak = 0;
     if (totalAttempts > 0) {
       const dailyAttempts = await sequelize.query(
-        `SELECT DATE(start_time) as date FROM exam_attempts 
-         WHERE student_id = ? GROUP BY DATE(start_time) 
+        `SELECT DATE(ea.start_time) as date FROM exam_attempts ea
+         INNER JOIN exams e ON ea.exam_id = e.id
+         WHERE ea.student_id = ? AND e.status = 'published'
+         GROUP BY DATE(ea.start_time) 
          ORDER BY date DESC LIMIT 30`,
         {
           replacements: [studentId],
@@ -83,11 +99,13 @@ exports.getStats = async (req, res, next) => {
       }
     }
 
-    // Calculate total time studied
+    // Calculate total time studied (published exams only)
     const timeData = await sequelize.query(
-      `SELECT SUM(TIMESTAMPDIFF(MINUTE, start_time, end_time)) as total_minutes 
-       FROM exam_attempts 
-       WHERE student_id = ? AND start_time IS NOT NULL AND end_time IS NOT NULL`,
+      `SELECT SUM(TIMESTAMPDIFF(MINUTE, ea.start_time, ea.end_time)) as total_minutes 
+       FROM exam_attempts ea
+       INNER JOIN exams e ON ea.exam_id = e.id
+       WHERE ea.student_id = ? AND e.status = 'published' 
+       AND ea.start_time IS NOT NULL AND ea.end_time IS NOT NULL`,
       {
         replacements: [studentId],
         type: sequelize.QueryTypes.SELECT,
@@ -98,7 +116,7 @@ exports.getStats = async (req, res, next) => {
     const totalHours = Math.floor(totalMinutes / 60);
     const totalTime = totalHours > 0 ? `${totalHours}h` : '0h';
 
-    // Get weakest skills - simplified query
+    // Get weakest skills (published exams only)
     let weakestSkills = [];
     try {
       const skillScores = await sequelize.query(
@@ -107,10 +125,11 @@ exports.getStats = async (req, res, next) => {
           ROUND(AVG(COALESCE(aa.final_score, aa.score, 0) / aa.max_score * 100), 1) as percentage
          FROM attempt_answers aa
          JOIN exam_attempts ea ON aa.attempt_id = ea.id
+         JOIN exams e ON ea.exam_id = e.id
          JOIN questions q ON aa.question_id = q.id
          JOIN question_types qt ON q.question_type_id = qt.id
          JOIN skill_types st ON qt.skill_type_id = st.id
-         WHERE ea.student_id = ? AND aa.max_score > 0
+         WHERE ea.student_id = ? AND e.status = 'published' AND aa.max_score > 0
          GROUP BY st.id, st.skill_type_name
          ORDER BY percentage ASC
          LIMIT 3`,
@@ -160,6 +179,7 @@ exports.getRecentAttempts = async (req, res, next) => {
         {
           model: Exam,
           as: 'exam',
+          where: { status: 'published' },
           attributes: ['id', 'title', 'total_score'],
         },
       ],

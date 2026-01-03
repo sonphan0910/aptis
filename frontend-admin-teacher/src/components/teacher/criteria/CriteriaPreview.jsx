@@ -10,77 +10,50 @@ import {
   Box,
   Typography,
   Chip,
-  Divider,
   Card,
   CardContent,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Paper,
-  Rating,
-  IconButton
+  IconButton,
+  Grid,
+  Alert
 } from '@mui/material';
-import { Close, School, Assignment, Star } from '@mui/icons-material';
+import { 
+  Close, 
+  School, 
+  Assignment, 
+  Star, 
+  Edit,
+  Info,
+  TrendingUp,
+  Rule
+} from '@mui/icons-material';
+import useCriteriaFilters from '@/hooks/useCriteriaFilters';
 
-export default function CriteriaPreview({ open, onClose, criteria }) {
+export default function CriteriaPreview({ open, onClose, criteria, onEdit }) {
+  const {
+    getAptisTypeLabel,
+    getQuestionTypeLabel, 
+    getSkillByQuestionType
+  } = useCriteriaFilters();
+  
   if (!criteria) return null;
-
-  const renderRubricLevel = (level) => (
-    <Card key={level.id} sx={{ mb: 2 }}>
-      <CardContent>
-        <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
-          <Typography variant="h6" color="primary">
-            Level {level.level_number}: {level.name}
-          </Typography>
-          <Box display="flex" alignItems="center" gap={1}>
-            <Rating value={level.level_number} max={criteria.max_score} readOnly size="small" />
-            <Typography variant="body2" color="text.secondary">
-              {level.level_number}/{criteria.max_score} điểm
-            </Typography>
-          </Box>
-        </Box>
-        <Typography variant="body2" color="text.secondary" paragraph>
-          {level.description}
-        </Typography>
-        {level.indicators && level.indicators.length > 0 && (
-          <Box>
-            <Typography variant="subtitle2" gutterBottom>
-              Chỉ báo đánh giá:
-            </Typography>
-            {level.indicators.map((indicator, index) => (
-              <Chip
-                key={index}
-                label={indicator}
-                variant="outlined"
-                size="small"
-                sx={{ mr: 0.5, mb: 0.5 }}
-              />
-            ))}
-          </Box>
-        )}
-      </CardContent>
-    </Card>
-  );
 
   return (
     <Dialog 
       open={open} 
       onClose={onClose} 
-      maxWidth="lg" 
+      maxWidth="md" 
       fullWidth
       PaperProps={{
-        sx: { minHeight: '60vh' }
+        sx: { minHeight: 'auto' }
       }}
     >
       <DialogTitle>
         <Box display="flex" alignItems="center" justifyContent="space-between">
           <Box display="flex" alignItems="center" gap={2}>
             <Assignment color="primary" />
-            <Typography variant="h5">
-              Preview Tiêu chí chấm điểm
+            <Typography variant="h6">
+              Chi tiết tiêu chí chấm điểm
             </Typography>
           </Box>
           <IconButton onClick={onClose} size="small">
@@ -90,120 +63,115 @@ export default function CriteriaPreview({ open, onClose, criteria }) {
       </DialogTitle>
 
       <DialogContent dividers>
-        <Box mb={3}>
-          <Typography variant="h6" gutterBottom>
-            {criteria.name}
-          </Typography>
-          <Typography variant="body2" color="text.secondary" paragraph>
-            {criteria.description}
-          </Typography>
-          
-          <Box display="flex" gap={2} mb={2}>
-            <Chip 
-              icon={<School />} 
-              label={`${criteria.question_type} - ${criteria.aptis_type}`} 
-              color="primary" 
-              variant="outlined" 
-            />
-            <Chip 
-              label={`Kỹ năng: ${criteria.skill}`} 
-              color="secondary" 
-              variant="outlined" 
-            />
-            <Chip 
-              icon={<Star />} 
-              label={`Điểm tối đa: ${criteria.max_score}`} 
-              color="warning" 
-              variant="outlined" 
-            />
-          </Box>
-        </Box>
-
-        <Divider sx={{ my: 2 }} />
-
-        <Typography variant="h6" gutterBottom>
-          Thang điểm chi tiết
-        </Typography>
-
-        {criteria.rubric_levels && criteria.rubric_levels.length > 0 ? (
-          <Box>
-            {criteria.rubric_levels
-              .sort((a, b) => b.level_number - a.level_number)
-              .map(renderRubricLevel)}
-          </Box>
-        ) : (
-          <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'grey.50' }}>
-            <Typography color="text.secondary">
-              Chưa có thang điểm chi tiết được định nghĩa
+        {/* Basic Information */}
+        <Card sx={{ mb: 2 }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom color="primary">
+              {criteria.criteria_name}
             </Typography>
-          </Paper>
-        )}
-
-        {criteria.guidelines && (
-          <>
-            <Divider sx={{ my: 3 }} />
-            <Typography variant="h6" gutterBottom>
-              Hướng dẫn chấm điểm
-            </Typography>
-            <Paper sx={{ p: 2, bgcolor: 'info.50' }}>
-              <Typography variant="body2" style={{ whiteSpace: 'pre-wrap' }}>
-                {criteria.guidelines}
+            
+            {criteria.description && (
+              <Typography variant="body2" color="text.secondary" paragraph>
+                {criteria.description}
               </Typography>
-            </Paper>
-          </>
-        )}
-
-        {criteria.examples && criteria.examples.length > 0 && (
-          <>
-            <Divider sx={{ my: 3 }} />
-            <Typography variant="h6" gutterBottom>
-              Ví dụ mẫu
+            )}
+            
+            {/* Classification Tags */}
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+              Phân loại:
             </Typography>
-            <TableContainer component={Paper} variant="outlined">
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Điểm</TableCell>
-                    <TableCell>Ví dụ câu trả lời</TableCell>
-                    <TableCell>Giải thích</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {criteria.examples.map((example, index) => (
-                    <TableRow key={index}>
-                      <TableCell>
-                        <Chip 
-                          label={example.score} 
-                          color={example.score >= criteria.max_score * 0.8 ? 'success' : 
-                                example.score >= criteria.max_score * 0.5 ? 'warning' : 'error'}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>{example.response}</TableCell>
-                      <TableCell>
-                        <Typography variant="caption" color="text.secondary">
-                          {example.explanation}
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </>
+            <Box display="flex" gap={1} flexWrap="wrap" mb={2}>
+              <Chip 
+                icon={<School />} 
+                label={getAptisTypeLabel(criteria.aptis_type_id)} 
+                color="primary" 
+                variant="outlined" 
+                size="small"
+              />
+              <Chip 
+                label={getSkillByQuestionType(criteria.question_type_id)} 
+                color="secondary" 
+                variant="outlined"
+                size="small"
+              />
+              <Chip 
+                label={getQuestionTypeLabel(criteria.question_type_id)} 
+                color="info" 
+                variant="outlined"
+                size="small"
+              />
+            </Box>
+
+            {/* Scoring Parameters */}
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
+              Thông số chấm điểm:
+            </Typography>
+            <Box display="flex" gap={1} flexWrap="wrap" mb={2}>
+              <Chip 
+                icon={<Star />} 
+                label={`Điểm tối đa: ${criteria.max_score}`} 
+                color="warning" 
+                variant="filled"
+                size="small"
+              />
+              <Chip 
+                icon={<TrendingUp />} 
+                label={`Trọng số: ${criteria.weight}`} 
+                color="success" 
+                variant="filled"
+                size="small"
+              />
+            </Box>
+
+            {/* Creation Date */}
+            <Typography variant="caption" color="text.secondary">
+              <strong>Ngày tạo:</strong> {new Date(criteria.created_at).toLocaleDateString('vi-VN')}
+            </Typography>
+          </CardContent>
+        </Card>
+
+        {/* Rubric Prompt */}
+        {criteria.rubric_prompt && (
+          <Card>
+            <CardContent>
+              <Typography variant="h6" gutterBottom color="primary" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Rule sx={{ fontSize: 20 }} />
+                Hướng dẫn AI
+              </Typography>
+              <Alert severity="info" sx={{ mb: 2 }} icon={<Info sx={{ fontSize: 16 }} />}>
+                <Typography variant="body2">
+                  Prompt được sử dụng để hướng dẫn AI đánh giá
+                </Typography>
+              </Alert>
+              <Paper sx={{ p: 2, bgcolor: 'grey.50', border: '1px solid', borderColor: 'grey.200' }}>
+                <Typography variant="body2" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                  {criteria.rubric_prompt}
+                </Typography>
+              </Paper>
+            </CardContent>
+          </Card>
         )}
       </DialogContent>
 
-      <DialogActions>
-        <Button onClick={onClose}>
+      <DialogActions sx={{ p: 2, gap: 1 }}>
+        <Button 
+          onClick={onClose}
+          variant="outlined"
+          size="small"
+        >
           Đóng
         </Button>
         <Button 
           variant="contained" 
           onClick={() => {
             onClose();
-            // Navigate to edit if needed
+            if (onEdit) {
+              onEdit();
+            }
           }}
+          startIcon={<Edit />}
+          color="primary"
+          size="small"
         >
           Chỉnh sửa
         </Button>

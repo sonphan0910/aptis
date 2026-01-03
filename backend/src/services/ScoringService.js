@@ -15,22 +15,38 @@ class ScoringService {
 
   /**
    * Score matching question
-   * answerJson format: { "item1_id": "option3_id", "item2_id": "option1_id", ... }
+   * answerJson format: { "matches": { "item1_id": "option3_id", "item2_id": "option1_id", ... } }
    * correctMapping format: { "item1_id": "correct_option_id", ... }
    */
   async scoreMatching(answerJson, correctMapping) {
     try {
-      const answer = typeof answerJson === 'string' ? JSON.parse(answerJson) : answerJson;
+      const parsed = typeof answerJson === 'string' ? JSON.parse(answerJson) : answerJson;
+      
+      // Handle both formats: direct matches object or wrapped in { matches: {...} }
+      const answer = parsed.matches || parsed;
 
       let correct = 0;
       const total = Object.keys(correctMapping).length;
 
+      // If no correct mapping found, return 0 score
+      if (total === 0) {
+        console.log('[ScoringService] No correct mapping found for matching question');
+        return { correct: 0, total: 1, percentage: 0 }; // Avoid division by zero
+      }
+
       for (const [itemId, selectedOptionId] of Object.entries(answer)) {
-        if (correctMapping[itemId] && correctMapping[itemId] === selectedOptionId) {
-          correct++;
+        if (selectedOptionId && correctMapping[itemId]) {
+          // Convert both to numbers for comparison (handle string/number mismatch)
+          const selectedId = parseInt(selectedOptionId);
+          const correctId = parseInt(correctMapping[itemId]);
+          
+          if (selectedId === correctId) {
+            correct++;
+          }
         }
       }
 
+      console.log('[ScoringService] Matching scoring:', { answer, correctMapping, correct, total });
       return { correct, total, percentage: (correct / total) * 100 };
     } catch (error) {
       throw new BadRequestError('Invalid answer JSON format for matching question');
@@ -39,12 +55,15 @@ class ScoringService {
 
   /**
    * Score gap filling question
-   * answer format: ["answer1", "answer2", "answer3"]
+   * answer format: { "gap_answers": ["answer1", "answer2", "answer3"] }
    * correctAnswers format: ["correct1", "correct2", "correct3"]
    */
-  async scoreGapFilling(answer, correctAnswers) {
+  async scoreGapFilling(answerJson, correctAnswers) {
     try {
-      const answerArray = Array.isArray(answer) ? answer : JSON.parse(answer);
+      const parsed = typeof answerJson === 'string' ? JSON.parse(answerJson) : answerJson;
+      
+      // Handle both formats: direct array or wrapped in { gap_answers: [...] }
+      const answerArray = parsed.gap_answers || parsed;
 
       let correct = 0;
       const total = correctAnswers.length;
@@ -58,6 +77,7 @@ class ScoringService {
         }
       }
 
+      console.log('[ScoringService] Gap filling scoring:', { answerArray, correctAnswers, correct, total });
       return { correct, total, percentage: (correct / total) * 100 };
     } catch (error) {
       throw new BadRequestError('Invalid answer format for gap filling question');
@@ -102,8 +122,8 @@ class ScoringService {
     const questionTypeCode = question.questionType.code;
     let score = 0;
 
-    // MCQ questions
-    if (questionTypeCode.includes('mcq')) {
+    // MCQ questions (including GV_MCQ, READING_MCQ, LISTENING_MCQ, etc.)
+    if (questionTypeCode.includes('MCQ') || questionTypeCode.includes('TRUE_FALSE')) {
       const correctOption = await QuestionOption.findOne({
         where: {
           question_id: question.id,
@@ -117,29 +137,23 @@ class ScoringService {
       );
 
       score = isCorrect ? answer.max_score : 0;
-    } else if (questionTypeCode === 'matching') {
-      // Get correct mapping from question_items
+    } else if (questionTypeCode.includes('MATCHING')) {
+      // Get correct mapping from question_items using correct_option_id field
       const items = await QuestionItem.findAll({
-        where: { question_id: question.id },
-        include: [
-          {
-            model: QuestionOption,
-            as: 'options',
-            where: { is_correct: true },
-          },
-        ],
+        where: { question_id: question.id }
       });
 
       const correctMapping = {};
       items.forEach((item) => {
-        if (item.options && item.options.length > 0) {
-          correctMapping[item.id] = item.options[0].id;
+        if (item.correct_option_id) {
+          correctMapping[item.id] = item.correct_option_id;
         }
       });
 
+      console.log('[ScoringService] Matching question', question.id, 'correct mapping:', correctMapping);
       const result = await this.scoreMatching(answer.answer_json, correctMapping);
-      score = (result.correct / result.total) * answer.max_score;
-    } else if (questionTypeCode === 'fill_blanks' || questionTypeCode === 'gap_filling') {
+      score = result.total > 0 ? (result.correct / result.total) * answer.max_score : 0;
+    } else if (questionTypeCode.includes('GAP_FILL') || questionTypeCode.includes('FILL')) {
       const items = await QuestionItem.findAll({
         where: { question_id: question.id },
         order: [['item_order', 'ASC']],
@@ -148,7 +162,7 @@ class ScoringService {
       const correctAnswers = items.map((item) => item.answer_text);
       const result = await this.scoreGapFilling(answer.answer_json, correctAnswers);
       score = (result.correct / result.total) * answer.max_score;
-    } else if (questionTypeCode === 'ordering') {
+    } else if (questionTypeCode.includes('ORDERING')) {
       const items = await QuestionItem.findAll({
         where: { question_id: question.id },
         order: [['item_order', 'ASC']],
@@ -159,7 +173,9 @@ class ScoringService {
       score = (result.correct / result.total) * answer.max_score;
     }
 
-    return Math.round(score * 100) / 100; // Round to 2 decimal places
+    // Ensure score never exceeds max_score
+    const finalScore = Math.min(score, answer.max_score);
+    return Math.round(finalScore * 100) / 100; // Round to 2 decimal places
   }
 
   /**
@@ -208,12 +224,23 @@ class ScoringService {
     }
 
     const score = await this.scoreAnswer(answer, answer.question);
+    
+    console.log(`[ScoringService] Auto-grading Q${answer.question_id}: calculated=${score}, max_score=${answer.max_score}`);
 
     if (score !== null) {
+      // Additional safeguard: ensure score doesn't exceed max_score
+      const finalScore = Math.min(score, answer.max_score);
+      
+      if (finalScore !== score) {
+        console.warn(`[ScoringService] ⚠️  Score capped: ${score} -> ${finalScore} (max: ${answer.max_score})`);
+      }
+      
       await answer.update({
-        score,
+        score: finalScore,
         auto_graded_at: new Date(),
       });
+      
+      return finalScore;
     }
 
     return score;

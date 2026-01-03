@@ -15,19 +15,14 @@ export default function WritingQuestion({ question, onAnswerChange }) {
   const [wordCount, setWordCount] = useState(0);
 
   useEffect(() => {
-    console.log('[WritingQuestion] useEffect triggered:', {
-      questionId: question.id,
-      hasAnswerData: !!question.answer_data,
-      textFromData: question.answer_data?.text?.substring(0, 50)
-    });
-
-    if (question.answer_data?.text) {
-      console.log('[WritingQuestion] Loading saved text');
-      setText(question.answer_data.text);
+    if (question.answer_data?.text_answer) {
+      setText(question.answer_data.text_answer);
+      console.log('[WritingQuestion] Initialized with existing text:', question.answer_data.text_answer.substring(0, 50));
     } else {
       setText('');
+      console.log('[WritingQuestion] No existing text, reset to empty');
     }
-  }, [question.id, question.answer_data?.text]); // Track specific value
+  }, [question.id, question.answer_data?.text_answer]); // Track specific value
 
   useEffect(() => {
     // Count words
@@ -40,7 +35,8 @@ export default function WritingQuestion({ question, onAnswerChange }) {
     setText(newText);
     
     onAnswerChange({
-      text: newText
+      answer_type: 'text',
+      text_answer: newText
     });
   };
 

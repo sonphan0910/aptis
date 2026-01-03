@@ -51,29 +51,41 @@ const aspectOptions = [
 ];
 
 export default function WritingReview({ 
-  submission,
-  criteria,
-  onScoreChange,
-  onFeedbackChange,
-  onSave,
+  answer,
+  reviewData,
+  onReviewChange,
   readonly = false 
 }) {
-  const [scores, setScores] = useState(submission?.scores || {});
-  const [feedback, setFeedback] = useState(submission?.feedback || '');
-  const [highlights, setHighlights] = useState(submission?.highlights || []);
+  const [scores, setScores] = useState(reviewData?.scores || {});
+  const [feedback, setFeedback] = useState(reviewData?.feedback || '');
+  const [highlights, setHighlights] = useState([]);
   const [selectedAspect, setSelectedAspect] = useState('');
   const textRef = useRef();
 
   const handleScoreChange = (aspect, score) => {
     const newScores = { ...scores, [aspect]: score };
     setScores(newScores);
-    onScoreChange?.(newScores);
+    
+    // Calculate total score and update parent
+    const scoreValues = Object.values(newScores);
+    const totalScore = scoreValues.length > 0 
+      ? scoreValues.reduce((sum, s) => sum + s, 0) / scoreValues.length 
+      : 0;
+    
+    onReviewChange?.({
+      ...reviewData,
+      scores: newScores,
+      final_score: totalScore
+    });
   };
 
   const handleFeedbackChange = (event) => {
     const newFeedback = event.target.value;
     setFeedback(newFeedback);
-    onFeedbackChange?.(newFeedback);
+    onReviewChange?.({
+      ...reviewData,
+      feedback: newFeedback
+    });
   };
 
   const addHighlight = (selectedText, type = 'error') => {
@@ -197,7 +209,7 @@ export default function WritingReview({
               userSelect: readonly ? 'none' : 'text'
             }}
           >
-            {submission?.content || 'Không có nội dung bài viết'}
+            {answer?.text_answer || 'Không có nội dung bài viết'}
           </Box>
 
           {highlights.length > 0 && (

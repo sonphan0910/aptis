@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Writing Dynamic Content</title>
+</head>
+<body>
+    <h1>Test Writing Dynamic Content from Backend</h1>
+    
+    <div id="results"></div>
+    
+    <script>
+        async function testWritingQuestions() {
+            try {
+                // Test API endpoint to get Writing questions
+                const response = await fetch('http://localhost:3001/api/public/questions/writing');
+                const questions = await response.json();
+                
+                const resultsDiv = document.getElementById('results');
+                
+                if (questions && questions.length > 0) {
+                    resultsDiv.innerHTML = `
+                        <h2>✅ Success! Found ${questions.length} Writing questions</h2>
+                        ${questions.map((q, index) => {
+                            let content;
+                            try {
+                                content = typeof q.content === 'string' ? JSON.parse(q.content) : q.content;
+                            } catch (error) {
+                                content = { error: 'Failed to parse content' };
+                            }
+                            
+                            return `
+                                <div style="border: 1px solid #ccc; margin: 10px 0; padding: 15px; border-radius: 5px;">
+                                    <h3>Question ${index + 1}: ${q.QuestionType?.question_type_name || 'Unknown'}</h3>
+                                    <p><strong>Difficulty:</strong> ${q.difficulty}</p>
+                                    <div style="background-color: #f5f5f5; padding: 10px; border-radius: 3px;">
+                                        <h4>Dynamic Content:</h4>
+                                        <pre>${JSON.stringify(content, null, 2)}</pre>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    `;
+                } else {
+                    resultsDiv.innerHTML = '<h2>❌ No Writing questions found</h2>';
+                }
+            } catch (error) {
+                document.getElementById('results').innerHTML = `
+                    <h2>❌ Error testing API</h2>
+                    <p>${error.message}</p>
+                    <p>Make sure backend server is running on port 3001</p>
+                `;
+            }
+        }
+        
+        // Test when page loads
+        window.onload = testWritingQuestions;
+    </script>
+</body>
+</html>

@@ -67,7 +67,8 @@ export default function ExamDetailPage() {
   };
 
   const handleStartExam = () => {
-    setStartDialogOpen(true);
+    // Redirect to take exam with full_exam mode
+    router.push(`/exams/${examId}/take?type=full_exam`);
   };
 
   const handleContinueExam = (attemptId) => {
@@ -149,34 +150,7 @@ export default function ExamDetailPage() {
             </Box>
           </Box>
 
-          <Grid container spacing={2} mb={2}>
-            <Grid item xs={6} sm={3}>
-              <Box display="flex" alignItems="center" gap={1}>
-                <AccessTime fontSize="small" color="action" />
-                <Typography variant="body2">
-                  {exam.duration_minutes} phút
-                </Typography>
-              </Box>
-            </Grid>
-            <Grid item xs={6} sm={3}>
-              <Box display="flex" alignItems="center" gap={1}>
-                <Quiz fontSize="small" color="action" />
-                <Typography variant="body2">
-                  {exam.totalQuestions} câu
-                </Typography>
-              </Box>
-            </Grid>
-            {bestScore && (
-              <Grid item xs={6} sm={3}>
-                <Box display="flex" alignItems="center" gap={1}>
-                  <Star fontSize="small" color="action" />
-                  <Typography variant="body2">
-                    Điểm tốt nhất: {bestScore}
-                  </Typography>
-                </Box>
-              </Grid>
-            )}
-          </Grid>
+         
 
           <Box display="flex" gap={1}>
             {hasActiveAttempt ? (

@@ -53,53 +53,36 @@ exports.getExams = async (req, res, next) => {
       orderBy = [['duration_minutes', 'ASC']];
     }
 
-    // Base includes
-    const includes = [
-      {
-        model: AptisType,
-        as: 'aptisType',
-        attributes: ['id', 'code', 'aptis_type_name'],
-      },
-      {
-        model: ExamSection,
-        as: 'sections',
-        attributes: ['id', 'skill_type_id'],
-        include: [
-          {
-            model: SkillType,
-            as: 'skillType',
-            attributes: ['id', 'code', 'skill_type_name'],
-          },
-        ],
-      },
-    ];
-
-    // If filtering by skill, add where clause to sections
+    // Step 1: Count and fetch exam IDs with skill filtering
+    // Use a simple query without includes to avoid LIMIT issues with JOINs
+    let skillWhere = {};
     if (skill) {
-      includes[1].required = true;
-      includes[1].where = { skill_type_id: parseInt(skill) };
+      // For skill filtering, need to use subquery approach
+      const examsWithSkill = await ExamSection.findAll({
+        where: { skill_type_id: parseInt(skill) },
+        attributes: ['exam_id'],
+        raw: true,
+      });
+      const examsWithSkillIds = [...new Set(examsWithSkill.map(es => es.exam_id))];
+      where.id = { [Op.in]: examsWithSkillIds };
     }
 
-    let { count, rows } = await Exam.findAndCountAll({
+    // Count total matching exams
+    const count = await Exam.count({ where });
+
+    // Fetch exam IDs with pagination
+    const examsData = await Exam.findAll({
       where,
-      include: includes,
-      attributes: [
-        'id',
-        'title',
-        'description',
-        'duration_minutes',
-        'total_score',
-        'created_at',
-      ],
+      attributes: ['id'],
+      order: orderBy,
       offset,
       limit: validLimit,
-      order: orderBy,
-      distinct: true,
-      subQuery: false,
+      raw: true,
     });
 
-    // Get exam IDs for additional queries
-    const examIds = rows.map(e => e.id);
+    const examIds = examsData.map(e => e.id);
+
+    console.log(`[getExams] Count: ${count}, Fetched IDs: ${examIds.length}, skill filter: ${skill || 'none'}`);
 
     // If no exams, return early
     if (examIds.length === 0) {
@@ -109,11 +92,49 @@ exports.getExams = async (req, res, next) => {
         pagination: {
           page: parseInt(page),
           limit: validLimit,
-          total: 0,
-          totalPages: 0,
+          total: count,
+          totalPages: Math.ceil(count / validLimit),
         },
       });
     }
+
+    // Step 2: Fetch full exam details with sections
+    const rows = await Exam.findAll({
+      where: { id: { [Op.in]: examIds } },
+      include: [
+        {
+          model: AptisType,
+          as: 'aptisType',
+          attributes: ['id', 'code', 'aptis_type_name'],
+        },
+        {
+          model: ExamSection,
+          as: 'sections',
+          attributes: ['id', 'skill_type_id'],
+          include: [
+            {
+              model: SkillType,
+              as: 'skillType',
+              attributes: ['id', 'code', 'skill_type_name'],
+            },
+          ],
+        },
+      ],
+      attributes: [
+        'id',
+        'title',
+        'description',
+        'duration_minutes',
+        'total_score',
+        'created_at',
+      ],
+      order: orderBy,
+    });
+
+    // Reorder results to match the pagination order
+    const rowsMap = {};
+    rows.forEach(r => rowsMap[r.id] = r);
+    const orderedRows = examIds.map(id => rowsMap[id]).filter(Boolean);
 
     // Get all exam section questions with their question details
     const examSectionQuestions = await ExamSectionQuestion.findAll({
@@ -165,7 +186,7 @@ exports.getExams = async (req, res, next) => {
     });
 
     // Transform response
-    const transformed = rows.map(exam => ({
+    const transformed = orderedRows.map(exam => ({
       id: exam.id,
       title: exam.title,
       description: exam.description,
@@ -188,7 +209,7 @@ exports.getExams = async (req, res, next) => {
       pagination: {
         page: parseInt(page),
         limit: validLimit,
-        total: transformed.length,
+        total: count,  // Use count from findAndCountAll, not transformed.length
         totalPages,
       },
     });

@@ -32,13 +32,26 @@ apiClient.interceptors.request.use(
   (config) => {
     const token = authService.getToken();
     
+    console.log(`[API Request] ${config.method.toUpperCase()} ${config.url}`, {
+      hasToken: !!token,
+      tokenPreview: token ? `${token.substring(0, 30)}...` : 'NO TOKEN',
+      headers: config.headers
+    });
+    
     if (token && !config.url.includes('/auth/login') && !config.url.includes('/auth/refresh')) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('[API Request] Authorization header added:', `Bearer ${token.substring(0, 30)}...`);
+    } else if (!token) {
+      console.log('[API Request] WARNING: No token available for request!');
+    } else {
+      console.log('[API Request] Skipping auth header for auth endpoint');
     }
     
+    console.log('[API Request] Final headers:', config.headers);
     return config;
   },
   (error) => {
+    console.error('[API Request] Error in request interceptor:', error);
     return Promise.reject(error);
   }
 );
@@ -46,12 +59,20 @@ apiClient.interceptors.request.use(
 // Response interceptor to handle token refresh
 apiClient.interceptors.response.use(
   (response) => {
+    console.log(`[API Response] ${response.status} ${response.config.method.toUpperCase()} ${response.config.url}`);
     return response;
   },
   async (error) => {
     const originalRequest = error.config;
     
+    console.error(`[API Error] ${error.response?.status || 'NO_STATUS'} ${originalRequest?.method?.toUpperCase()} ${originalRequest?.url}`, {
+      message: error.response?.data?.message || error.message,
+      errorDetails: error.response?.data
+    });
+    
     if (error.response?.status === 401 && !originalRequest._retry) {
+      console.log('[API] Attempting token refresh...');
+      
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -67,6 +88,7 @@ apiClient.interceptors.response.use(
       isRefreshing = true;
       
       const refreshToken = authService.getRefreshToken();
+      console.log('[API] Refresh token available:', !!refreshToken);
       
       if (refreshToken) {
         try {
@@ -84,6 +106,7 @@ apiClient.interceptors.response.use(
           return apiClient(originalRequest);
           
         } catch (refreshError) {
+          console.error('[API] Token refresh failed:', refreshError.response?.data || refreshError.message);
           authService.clearTokens();
           processQueue(refreshError, null);
           

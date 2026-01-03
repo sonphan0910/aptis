@@ -1,12 +1,12 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import attemptService from '@/services/attemptService';
+import { getAssetUrl } from '@/services/api';
 
 // Async thunks
 export const startNewAttempt = createAsyncThunk(
   'attempts/startNewAttempt',
   async ({ exam_id, attempt_type, selected_skill }, { rejectWithValue }) => {
-    console.log('[startNewAttempt] THUNK CALLED with params:', { exam_id, attempt_type, selected_skill });
-    
+
     try {
       const payload = {
         exam_id,
@@ -20,17 +20,10 @@ export const startNewAttempt = createAsyncThunk(
         payload.selected_skill_id = null;
       }
       
-      console.log('[startNewAttempt] Sending payload to API:', payload);
-      console.log('[startNewAttempt] attemptService:', !!attemptService);
-      console.log('[startNewAttempt] attemptService.startAttempt:', !!attemptService.startAttempt);
-      
       const response = await attemptService.startAttempt(payload);
-      console.log('[startNewAttempt] API Response received:', response);
-      return response.data;
+      // Extract the inner data object from the response
+      return response.data.data || response.data;
     } catch (error) {
-      console.error('[startNewAttempt] Error details:', error);
-      console.error('[startNewAttempt] Error response:', error.response?.data);
-      console.error('[startNewAttempt] Error message:', error.message);
       return rejectWithValue(error.response?.data?.message || 'Lỗi khi bắt đầu bài thi');
     }
   }
@@ -50,17 +43,14 @@ export const loadAttempt = createAsyncThunk(
 
 export const loadQuestions = createAsyncThunk(
   'attempts/loadQuestions',
-  async ({ attemptId, sectionId, offset = 0, limit = 20 }, { rejectWithValue }) => {
-    console.log('[loadQuestions] Loading questions:', { attemptId, sectionId, offset, limit });
+  async ({ attemptId, sectionId, offset = 0, limit = 999 }, { rejectWithValue }) => {
     try {
       const params = { offset, limit };
       if (sectionId) params.section_id = sectionId;
       
       const response = await attemptService.getAttemptQuestions(attemptId, params);
-      console.log('[loadQuestions] Loaded:', response.data);
       return response.data;
     } catch (error) {
-      console.error('[loadQuestions] Error:', error);
       return rejectWithValue(error.response?.data?.message || 'Lỗi khi tải câu hỏi');
     }
   }
@@ -71,11 +61,9 @@ export const saveAnswer = createAsyncThunk(
   async (answerPayload, { rejectWithValue }) => {
     try {
       // answerPayload should already be in correct format from page
-      console.log('[saveAnswer] Saving answer:', answerPayload);
       const response = await attemptService.saveAnswer(answerPayload);
       return response.data;
     } catch (error) {
-      console.error('[saveAnswer] Error:', error.response?.data);
       return rejectWithValue(error.response?.data?.message || 'Lỗi khi lưu câu trả lời');
     }
   }
@@ -203,32 +191,52 @@ const attemptSlice = createSlice({
       state.autoSaveStatus = action.payload;
     },
     updateLocalAnswer: (state, action) => {
-      const { questionId, answerData } = action.payload;
-      console.log('[updateLocalAnswer] Optimistic update:', { questionId, answerData });
+      const { questionId, answer } = action.payload;
+      console.log('[updateLocalAnswer] Updating Q' + questionId + ':', answer);
       
-      const existingAnswer = state.answers.find(a => a.question_id === questionId);
-      if (existingAnswer) {
-        existingAnswer.answer_data = answerData;
-        existingAnswer.isModified = true;
-        existingAnswer.lastModified = new Date().toISOString();
-        // Mark as answered for immediate UI feedback
-        existingAnswer.answered_at = existingAnswer.answered_at || new Date().toISOString();
-      } else {
-        state.answers.push({
+      const existingIndex = state.answers.findIndex(a => a.question_id === questionId);
+      if (existingIndex >= 0) {
+        // Update existing answer - preserve important fields
+        const existingAnswer = state.answers[existingIndex];
+        
+        // CRITICAL: For audio answers, don't overwrite if existing has audio data
+        if (existingAnswer.answer_type === 'audio' && existingAnswer.audio_url && 
+            answer.answer_type !== 'audio') {
+          console.warn('[updateLocalAnswer] Preventing overwrite of audio answer with:', answer);
+          return;
+        }
+        
+        state.answers[existingIndex] = {
+          ...existingAnswer, // Keep existing data like id, attempt_id, etc.
+          ...answer,         // Apply new answer data
           question_id: questionId,
-          answer_data: answerData,
           isModified: true,
           lastModified: new Date().toISOString(),
-          answered_at: new Date().toISOString()
-        });
+          answered_at: existingAnswer.answered_at || answer.answered_at || new Date().toISOString()
+        };
+        console.log('[updateLocalAnswer] Updated existing answer:', state.answers[existingIndex]);
+      } else {
+        // Add new answer
+        const newAnswer = {
+          question_id: questionId,
+          ...answer,
+          isModified: true,
+          lastModified: new Date().toISOString(),
+          answered_at: answer.answered_at || new Date().toISOString()
+        };
+        state.answers.push(newAnswer);
+        console.log('[updateLocalAnswer] Added new answer:', newAnswer);
       }
-      console.log('[updateLocalAnswer] Updated state, total answers:', state.answers.length);
     },
     markAnswerForReview: (state, action) => {
       const { questionId, forReview } = action.payload;
-      const existingAnswer = state.answers.find(a => a.question_id === questionId);
-      if (existingAnswer) {
-        existingAnswer.markedForReview = forReview;
+      const existingIndex = state.answers.findIndex(a => a.question_id === questionId);
+      
+      if (existingIndex >= 0) {
+        state.answers[existingIndex] = {
+          ...state.answers[existingIndex],
+          markedForReview: forReview
+        };
       } else {
         state.answers.push({
           question_id: questionId,
@@ -241,6 +249,8 @@ const attemptSlice = createSlice({
       state.currentAttempt = null;
       state.questions = [];
       state.answers = [];
+      state.questionsLoaded = false;
+      state.questionsLoading = false;
       state.currentQuestionIndex = 0;
       state.timeRemaining = 0;
       state.timerInitialized = false;
@@ -260,14 +270,13 @@ const attemptSlice = createSlice({
     builder
       // Start New Attempt
       .addCase(startNewAttempt.pending, (state) => {
-        console.log('[startNewAttempt.pending] Starting attempt...');
         state.loading = true;
         state.error = null;
       })
       .addCase(startNewAttempt.fulfilled, (state, action) => {
-        console.log('[startNewAttempt.fulfilled] Lightweight response received');
         state.loading = false;
-        state.currentAttempt = action.payload.data || action.payload;
+        state.error = null; // Clear error on successful start
+        state.currentAttempt = action.payload;
         state.isExamStarted = true;
         state.currentQuestionIndex = 0;
         
@@ -281,15 +290,9 @@ const attemptSlice = createSlice({
         state.timeRemaining = durationMinutes * 60;
         state.timerInitialized = true;
         
-        console.log('[startNewAttempt.fulfilled] Attempt created:', {
-          attemptId: state.currentAttempt.id,
-          duration: durationMinutes,
-          questionsCount: state.currentAttempt.questions_count,
-          loadUrl: state.currentAttempt.load_questions_url
-        });
+
       })
       .addCase(startNewAttempt.rejected, (state, action) => {
-        console.error('[startNewAttempt.rejected] Error:', action.payload);
         state.loading = false;
         state.error = action.payload;
       })
@@ -300,17 +303,13 @@ const attemptSlice = createSlice({
         state.error = null;
       })
       .addCase(loadAttempt.fulfilled, (state, action) => {
-        console.log('[loadAttempt.fulfilled] Response received:', action.payload);
         state.loading = false;
         state.currentAttempt = action.payload;
         if (action.payload.answers && action.payload.answers.length > 0) {
           state.answers = action.payload.answers;
           // Extract questions from answers
           state.questions = action.payload.answers.map(answer => answer.question).filter(Boolean);
-          console.log('[loadAttempt.fulfilled] Questions extracted:', state.questions.length);
-          console.log('[loadAttempt.fulfilled] Sample question:', state.questions[0]);
         } else {
-          console.warn('[loadAttempt.fulfilled] No answers found in response');
           state.questions = [];
           state.answers = [];
         }
@@ -321,8 +320,6 @@ const attemptSlice = createSlice({
           const totalSeconds = action.payload.exam.duration_minutes * 60;
           state.timeRemaining = Math.max(0, totalSeconds - elapsedSeconds);
           state.timerInitialized = true;
-          console.log('[loadAttempt.fulfilled] Timer set to:', state.timeRemaining, 'seconds for existing attempt');
-          console.log('[loadAttempt.fulfilled] Questions loaded:', state.questions.length);
         }
       })
       .addCase(loadAttempt.rejected, (state, action) => {
@@ -337,8 +334,6 @@ const attemptSlice = createSlice({
       .addCase(saveAnswer.fulfilled, (state, action) => {
         state.autoSaveStatus = 'saved';
         
-        console.log('[saveAnswer.fulfilled] Received response:', action.payload);
-        
         const answerIndex = state.answers.findIndex(a => a.question_id === action.payload.question_id);
         
         if (answerIndex >= 0) {
@@ -349,7 +344,6 @@ const attemptSlice = createSlice({
             isModified: false,
             lastSaved: new Date().toISOString()
           };
-          console.log('[saveAnswer.fulfilled] Updated answer at index', answerIndex, ':', state.answers[answerIndex]);
         } else {
           // Add new answer if not found
           state.answers.push({
@@ -357,15 +351,12 @@ const attemptSlice = createSlice({
             isModified: false,
             lastSaved: new Date().toISOString()
           });
-          console.log('[saveAnswer.fulfilled] Added new answer:', action.payload);
         }
         
-        console.log('[saveAnswer.fulfilled] Total answers in state:', state.answers.length);
       })
       .addCase(saveAnswer.rejected, (state, action) => {
         state.autoSaveStatus = 'error';
         state.error = action.payload;
-        console.error('[saveAnswer.rejected]', action.payload);
       })
 
       // Submit Attempt
@@ -386,36 +377,45 @@ const attemptSlice = createSlice({
       // Load Questions Progressively
       .addCase(loadQuestions.pending, (state) => {
         state.questionsLoading = true;
+        state.error = null; // Clear any previous errors when loading questions
       })
       .addCase(loadQuestions.fulfilled, (state, action) => {
         state.questionsLoading = false;
+        state.error = null; // Clear error on successful load
         
         // Extract questions and answers from response
         const { answers: newAnswers, pagination } = action.payload.data || action.payload;
         
-        console.log('[loadQuestions.fulfilled] Processing answers:', newAnswers?.length);
         
         if (newAnswers && newAnswers.length > 0) {
           newAnswers.forEach(answer => {
-            console.log('[loadQuestions.fulfilled] Processing answer:', {
-              id: answer.id,
-              question_id: answer.question_id,
-              answer_type: answer.answer_type,
-              has_answer_data: !!answer.answer_data,
-              answered_at: answer.answered_at
-            });
-
             if (answer.question) {
-              // Add question if not already in state
-              if (!state.questions.find(q => q.id === answer.question.id)) {
-                state.questions.push(answer.question);
+              // Convert media_url to full URL if present
+              const questionData = { ...answer.question };
+              if (questionData.media_url) {
+                questionData.media_url = getAssetUrl(questionData.media_url);
+                console.log('[loadQuestions] Q' + questionData.id + ' converted media_url to:', questionData.media_url);
+              }
+              
+              // CRITICAL: Merge answer_data into question for component consumption
+              const questionWithAnswerData = {
+                ...questionData,
+                answer_data: answer.answer_data
+              };
+              
+              // Add/update question with answer_data
+              const existingQuestionIndex = state.questions.findIndex(q => q.id === answer.question.id);
+              if (existingQuestionIndex >= 0) {
+                state.questions[existingQuestionIndex] = questionWithAnswerData;
+              } else {
+                state.questions.push(questionWithAnswerData);
               }
               
               // Add/update answer with full data
-              const existingIndex = state.answers.findIndex(a => a.question_id === answer.question_id);
-              if (existingIndex >= 0) {
-                state.answers[existingIndex] = {
-                  ...state.answers[existingIndex],
+              const existingAnswerIndex = state.answers.findIndex(a => a.question_id === answer.question_id);
+              if (existingAnswerIndex >= 0) {
+                state.answers[existingAnswerIndex] = {
+                  ...state.answers[existingAnswerIndex],
                   ...answer
                 };
               } else {
@@ -423,12 +423,7 @@ const attemptSlice = createSlice({
               }
             }
           });
-          
-          console.log('[loadQuestions.fulfilled] State after loading:', {
-            questionsCount: state.questions.length,
-            answersCount: state.answers.length,
-            sampleAnswer: state.answers[0]
-          });
+          console.log('[loadQuestions] Loaded questions with answer_data:', state.questions.length);
         }
         
         state.questionsLoaded = !pagination?.hasMore; // Mark as fully loaded if no more
@@ -436,7 +431,6 @@ const attemptSlice = createSlice({
       .addCase(loadQuestions.rejected, (state, action) => {
         state.questionsLoading = false;
         state.error = action.payload;
-        console.error('[loadQuestions.rejected]', action.payload);
       })
 
       // Fetch Attempt Results

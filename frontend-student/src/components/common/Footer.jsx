@@ -10,7 +10,6 @@ import {
   Phone,
   LocationOn,
 } from '@mui/icons-material';
-import NextLink from 'next/link';
 
 export default function Footer() {
   const currentYear = new Date().getFullYear();
@@ -35,11 +34,11 @@ export default function Footer() {
             </Typography>
             <Stack spacing={1}>
               <Link
-                component={NextLink}
-                href="/about"
+                href="#"
                 sx={{
                   color: '#999999',
                   textDecoration: 'none',
+                  cursor: 'pointer',
                   '&:hover': { color: '#64b5f6' },
                   transition: 'color 0.3s',
                 }}
@@ -47,11 +46,11 @@ export default function Footer() {
                 Giới thiệu
               </Link>
               <Link
-                component={NextLink}
-                href="/mission"
+                href="#"
                 sx={{
                   color: '#999999',
                   textDecoration: 'none',
+                  cursor: 'pointer',
                   '&:hover': { color: '#64b5f6' },
                   transition: 'color 0.3s',
                 }}
@@ -59,11 +58,11 @@ export default function Footer() {
                 Sứ mệnh & Tầm nhìn
               </Link>
               <Link
-                component={NextLink}
-                href="/team"
+                href="#"
                 sx={{
                   color: '#999999',
                   textDecoration: 'none',
+                  cursor: 'pointer',
                   '&:hover': { color: '#64b5f6' },
                   transition: 'color 0.3s',
                 }}
@@ -71,11 +70,11 @@ export default function Footer() {
                 Đội ngũ
               </Link>
               <Link
-                component={NextLink}
-                href="/partners"
+                href="#"
                 sx={{
                   color: '#999999',
                   textDecoration: 'none',
+                  cursor: 'pointer',
                   '&:hover': { color: '#64b5f6' },
                   transition: 'color 0.3s',
                 }}
@@ -92,11 +91,11 @@ export default function Footer() {
             </Typography>
             <Stack spacing={1}>
               <Link
-                component={NextLink}
-                href="/help"
+                href="#"
                 sx={{
                   color: '#999999',
                   textDecoration: 'none',
+                  cursor: 'pointer',
                   '&:hover': { color: '#64b5f6' },
                   transition: 'color 0.3s',
                 }}
@@ -104,11 +103,11 @@ export default function Footer() {
                 Trung tâm trợ giúp
               </Link>
               <Link
-                component={NextLink}
-                href="/faq"
+                href="#"
                 sx={{
                   color: '#999999',
                   textDecoration: 'none',
+                  cursor: 'pointer',
                   '&:hover': { color: '#64b5f6' },
                   transition: 'color 0.3s',
                 }}
@@ -116,11 +115,11 @@ export default function Footer() {
                 Câu hỏi thường gặp
               </Link>
               <Link
-                component={NextLink}
-                href="/contact"
+                href="#"
                 sx={{
                   color: '#999999',
                   textDecoration: 'none',
+                  cursor: 'pointer',
                   '&:hover': { color: '#64b5f6' },
                   transition: 'color 0.3s',
                 }}
@@ -128,11 +127,11 @@ export default function Footer() {
                 Liên hệ chúng tôi
               </Link>
               <Link
-                component={NextLink}
-                href="/feedback"
+                href="#"
                 sx={{
                   color: '#999999',
                   textDecoration: 'none',
+                  cursor: 'pointer',
                   '&:hover': { color: '#64b5f6' },
                   transition: 'color 0.3s',
                 }}
@@ -149,11 +148,11 @@ export default function Footer() {
             </Typography>
             <Stack spacing={1}>
               <Link
-                component={NextLink}
-                href="/privacy"
+                href="#"
                 sx={{
                   color: '#999999',
                   textDecoration: 'none',
+                  cursor: 'pointer',
                   '&:hover': { color: '#64b5f6' },
                   transition: 'color 0.3s',
                 }}
@@ -161,11 +160,11 @@ export default function Footer() {
                 Chính sách bảo mật
               </Link>
               <Link
-                component={NextLink}
-                href="/terms"
+                href="#"
                 sx={{
                   color: '#999999',
                   textDecoration: 'none',
+                  cursor: 'pointer',
                   '&:hover': { color: '#64b5f6' },
                   transition: 'color 0.3s',
                 }}
@@ -173,11 +172,11 @@ export default function Footer() {
                 Điều khoản sử dụng
               </Link>
               <Link
-                component={NextLink}
-                href="/cookies"
+                href="#"
                 sx={{
                   color: '#999999',
                   textDecoration: 'none',
+                  cursor: 'pointer',
                   '&:hover': { color: '#64b5f6' },
                   transition: 'color 0.3s',
                 }}
@@ -185,11 +184,11 @@ export default function Footer() {
                 Chính sách Cookie
               </Link>
               <Link
-                component={NextLink}
-                href="/accessibility"
+                href="#"
                 sx={{
                   color: '#999999',
                   textDecoration: 'none',
+                  cursor: 'pointer',
                   '&:hover': { color: '#64b5f6' },
                   transition: 'color 0.3s',
                 }}
@@ -266,8 +265,7 @@ export default function Footer() {
 
           <Box sx={{ display: 'flex', gap: 2 }}>
             <Link
-              href="https://facebook.com"
-              target="_blank"
+              href="#"
               rel="noopener noreferrer"
               sx={{
                 color: '#999999',
@@ -278,8 +276,7 @@ export default function Footer() {
               <Facebook />
             </Link>
             <Link
-              href="https://twitter.com"
-              target="_blank"
+              href="#"
               rel="noopener noreferrer"
               sx={{
                 color: '#999999',
@@ -290,8 +287,7 @@ export default function Footer() {
               <Twitter />
             </Link>
             <Link
-              href="https://linkedin.com"
-              target="_blank"
+              href="#"
               rel="noopener noreferrer"
               sx={{
                 color: '#999999',
@@ -302,8 +298,7 @@ export default function Footer() {
               <LinkedIn />
             </Link>
             <Link
-              href="https://instagram.com"
-              target="_blank"
+              href="#"
               rel="noopener noreferrer"
               sx={{
                 color: '#999999',

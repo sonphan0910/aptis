@@ -8,6 +8,12 @@ export const criteriaApi = {
     return response.data;
   },
 
+  // Get question types for criteria (Speaking & Writing only)
+  getQuestionTypesForCriteria: async () => {
+    const response = await apiClient.get(API_ENDPOINTS.TEACHER.CRITERIA.LIST + '/question-types');
+    return response.data;
+  },
+
   // Get a single criteria by ID
   getCriteriaById: async (id) => {
     const response = await apiClient.get(API_ENDPOINTS.TEACHER.CRITERIA.BY_ID(id));
@@ -16,8 +22,19 @@ export const criteriaApi = {
 
   // Create new criteria
   createCriteria: async (criteriaData) => {
-    const response = await apiClient.post(API_ENDPOINTS.TEACHER.CRITERIA.CREATE, criteriaData);
-    return response.data;
+    console.log('[CriteriaService] Calling createCriteria API with data:', criteriaData);
+    try {
+      const response = await apiClient.post(API_ENDPOINTS.TEACHER.CRITERIA.CREATE, criteriaData);
+      console.log('[CriteriaService] Post request successful:', response.status);
+      return response.data;
+    } catch (error) {
+      console.error('[CriteriaService] Post request failed:', {
+        status: error.response?.status,
+        message: error.response?.data?.message,
+        error: error.message
+      });
+      throw error;
+    }
   },
 
   // Update existing criteria

@@ -134,6 +134,58 @@ export const addQuestionToExam = createAsyncThunk(
   }
 );
 
+// Add section to exam
+export const addExamSection = createAsyncThunk(
+  'exams/addSection',
+  async ({ examId, sectionData }, { rejectWithValue }) => {
+    try {
+      const response = await examApi.addSection(examId, sectionData);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.message || 'Failed to add section to exam');
+    }
+  }
+);
+
+// Remove section from exam
+export const removeExamSection = createAsyncThunk(
+  'exams/removeSection',
+  async ({ examId, sectionId }, { rejectWithValue }) => {
+    try {
+      await examApi.removeSection(examId, sectionId);
+      return { examId, sectionId };
+    } catch (error) {
+      return rejectWithValue(error.message || 'Failed to remove section from exam');
+    }
+  }
+);
+
+// Add question to section
+export const addQuestionToSection = createAsyncThunk(
+  'exams/addQuestionToSection',
+  async ({ examId, sectionId, questionData }, { rejectWithValue }) => {
+    try {
+      const response = await examApi.addQuestionToSection(examId, sectionId, questionData);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.message || 'Failed to add question to section');
+    }
+  }
+);
+
+// Remove question from section
+export const removeQuestionFromSection = createAsyncThunk(
+  'exams/removeQuestionFromSection',
+  async ({ examId, sectionId, questionId }, { rejectWithValue }) => {
+    try {
+      await examApi.removeQuestionFromSection(examId, sectionId, questionId);
+      return { examId, sectionId, questionId };
+    } catch (error) {
+      return rejectWithValue(error.message || 'Failed to remove question from section');
+    }
+  }
+);
+
 export const removeQuestionFromExam = createAsyncThunk(
   'exams/removeQuestionFromExam',
   async ({ examId, questionId }, { rejectWithValue }) => {
@@ -423,6 +475,78 @@ const examSlice = createSlice({
         state.error = null;
       })
       .addCase(addQuestionToExam.rejected, (state, action) => {
+        state.error = action.payload;
+      });
+
+    // Section management
+    builder
+      .addCase(addExamSection.pending, (state) => {
+        state.error = null;
+      })
+      .addCase(addExamSection.fulfilled, (state, action) => {
+        if (state.currentExam) {
+          state.currentExam.sections = [...(state.currentExam.sections || []), action.payload.data];
+        }
+        state.error = null;
+      })
+      .addCase(addExamSection.rejected, (state, action) => {
+        state.error = action.payload;
+      })
+      
+      .addCase(removeExamSection.pending, (state) => {
+        state.error = null;
+      })
+      .addCase(removeExamSection.fulfilled, (state, action) => {
+        if (state.currentExam) {
+          state.currentExam.sections = state.currentExam.sections.filter(
+            section => section.id !== action.payload.sectionId
+          );
+        }
+        state.error = null;
+      })
+      .addCase(removeExamSection.rejected, (state, action) => {
+        state.error = action.payload;
+      })
+
+      .addCase(addQuestionToSection.pending, (state) => {
+        state.error = null;
+      })
+      .addCase(addQuestionToSection.fulfilled, (state, action) => {
+        if (state.currentExam?.sections) {
+          const sectionIndex = state.currentExam.sections.findIndex(
+            section => section.id === action.meta.arg.sectionId
+          );
+          if (sectionIndex !== -1) {
+            if (!state.currentExam.sections[sectionIndex].questions) {
+              state.currentExam.sections[sectionIndex].questions = [];
+            }
+            state.currentExam.sections[sectionIndex].questions.push(action.payload.data);
+          }
+        }
+        state.error = null;
+      })
+      .addCase(addQuestionToSection.rejected, (state, action) => {
+        state.error = action.payload;
+      })
+
+      .addCase(removeQuestionFromSection.pending, (state) => {
+        state.error = null;
+      })
+      .addCase(removeQuestionFromSection.fulfilled, (state, action) => {
+        if (state.currentExam?.sections) {
+          const sectionIndex = state.currentExam.sections.findIndex(
+            section => section.id === action.payload.sectionId
+          );
+          if (sectionIndex !== -1 && state.currentExam.sections[sectionIndex].questions) {
+            state.currentExam.sections[sectionIndex].questions = 
+              state.currentExam.sections[sectionIndex].questions.filter(
+                q => q.question_id !== action.payload.questionId
+              );
+          }
+        }
+        state.error = null;
+      })
+      .addCase(removeQuestionFromSection.rejected, (state, action) => {
         state.error = action.payload;
       });
 

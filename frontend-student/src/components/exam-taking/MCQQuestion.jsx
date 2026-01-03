@@ -15,42 +15,29 @@ export default function MCQQuestion({ question, onAnswerChange }) {
 
   // Initialize from answer_data when component mounts or answer changes
   useEffect(() => {
-    console.log('[MCQQuestion] useEffect triggered:', {
-      questionId: question.id,
-      hasAnswerData: !!question.answer_data,
-      selectedOptionFromData: question.answer_data?.selected_option,
-      currentSelected: selectedOption
-    });
-    
-    if (question.answer_data?.selected_option) {
-      const optionValue = String(question.answer_data.selected_option);
-      console.log('[MCQQuestion] Setting selected option:', optionValue);
+    if (question.answer_data?.selected_option_id) {
+      const optionValue = String(question.answer_data.selected_option_id);
       setSelectedOption(optionValue);
+      console.log('[MCQQuestion] Initialized with existing answer:', optionValue);
     } else {
       // Reset if no answer data
       setSelectedOption('');
+      console.log('[MCQQuestion] No existing answer, reset to empty');
     }
-  }, [question.id, question.answer_data?.selected_option]); // Track specific value, not whole object
+  }, [question.id, question.answer_data?.selected_option_id]); // Track specific value, not whole object
 
   const handleChange = (event) => {
     const value = event.target.value;
     setSelectedOption(value);
     
     onAnswerChange({
-      selected_option: value
+      answer_type: 'option',
+      selected_option_id: parseInt(value)
     });
   };
 
   const options = question.options || [];
   const isTrueFalse = question.questionType?.code === 'READING_TRUE_FALSE';
-
-  console.log('[MCQQuestion] Question data:', {
-    questionId: question.id,
-    questionType: question.questionType?.code,
-    isTrueFalse,
-    optionsCount: options.length,
-    sampleOption: options[0]
-  });
 
   return (
     <Box>

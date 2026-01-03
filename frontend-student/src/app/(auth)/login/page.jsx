@@ -31,6 +31,11 @@ export default function LoginPage() {
 
   const [validationErrors, setValidationErrors] = useState({});
 
+  // Show demo credentials
+  useEffect(() => {
+    console.log('Student: student1@aptis.local / password123');
+  }, []);
+
   // Redirect when authenticated
   useEffect(() => {
     if (isAuthenticated) {
@@ -56,15 +61,15 @@ export default function LoginPage() {
     const errors = {};
 
     if (!formData.email.trim()) {
-      errors.email = 'Email is required';
+      errors.email = 'Email là bắt buộc';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      errors.email = 'Please enter a valid email address';
+      errors.email = 'Vui lòng nhập địa chỉ email hợp lệ';
     }
 
     if (!formData.password.trim()) {
-      errors.password = 'Password is required';
+      errors.password = 'Mật khẩu là bắt buộc';
     } else if (formData.password.length < 6) {
-      errors.password = 'Password must be at least 6 characters';
+      errors.password = 'Mật khẩu phải có ít nhất 6 ký tự';
     }
 
     setValidationErrors(errors);
@@ -112,10 +117,10 @@ export default function LoginPage() {
             <Box sx={{ textAlign: 'center', mb: 3 }}>
               <School sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
               <Typography variant="h4" component="h1" gutterBottom>
-                Welcome Back
+                Chào mừng trở lại
               </Typography>
               <Typography variant="body1" color="text.secondary">
-                Sign in to your APTIS student account
+                Đăng nhập vào tài khoản học viên APTIS của bạn
               </Typography>
             </Box>
 
@@ -132,7 +137,7 @@ export default function LoginPage() {
                 fullWidth
                 id="email"
                 name="email"
-                label="Email Address"
+                label="Địa chỉ Email"
                 type="email"
                 value={formData.email}
                 onChange={handleChange}
@@ -152,7 +157,7 @@ export default function LoginPage() {
                 fullWidth
                 id="password"
                 name="password"
-                label="Password"
+                label="Mật khẩu"
                 type="password"
                 value={formData.password}
                 onChange={handleChange}
@@ -178,10 +183,10 @@ export default function LoginPage() {
                 {isLoading ? (
                   <>
                     <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />
-                    Signing in...
+                    Đang đăng nhập...
                   </>
                 ) : (
-                  'Sign In'
+                  'Đăng nhập'
                 )}
               </Button>
 
@@ -191,18 +196,31 @@ export default function LoginPage() {
                   variant="body2"
                   sx={{ textDecoration: 'none' }}
                 >
-                  Forgot your password?
+                  Quên mật khẩu?
                 </Link>
               </Box>
             </Box>
 
             <Divider sx={{ my: 3 }} />
 
+            {/* Demo Credentials */}
+            <Box sx={{ backgroundColor: '#f5f5f5', p: 2, borderRadius: 1, mb: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                Tài khoản Demo:
+              </Typography>
+              <Typography variant="body2">
+                Email: <strong>student1@aptis.local</strong>
+              </Typography>
+              <Typography variant="body2">
+                Mật khẩu: <strong>password123</strong>
+              </Typography>
+            </Box>
+
             <Box sx={{ textAlign: 'center' }}>
               <Typography variant="body2" color="text.secondary">
-                Don&apos;t have an account?{' '}
+                Chưa có tài khoản?{' '}
                 <Link href="/register" variant="body2" sx={{ textDecoration: 'none', fontWeight: 500 }}>
-                  Create one here
+                  Tạo tài khoản tại đây
                 </Link>
               </Typography>
             </Box>

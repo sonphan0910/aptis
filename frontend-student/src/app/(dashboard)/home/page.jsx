@@ -222,7 +222,7 @@ export default function HomePage() {
                         size="small"
                         onClick={() => router.push('/results')}
                       >
-                        Xem tất cả kết quả ({attemptsArray.length})
+                        Xem tất cả kết quả
                       </Button>
                     </Box>
                   )}

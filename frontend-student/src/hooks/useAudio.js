@@ -1,1 +1,170 @@
-'use client';\n\nimport { useState, useCallback, useRef } from 'react';\n\nexport function useAudio() {\n  const [isRecording, setIsRecording] = useState(false);\n  const [isPlaying, setIsPlaying] = useState(false);\n  const [audioBlob, setAudioBlob] = useState(null);\n  const [audioUrl, setAudioUrl] = useState('');\n  const [recordingTime, setRecordingTime] = useState(0);\n  const [error, setError] = useState(null);\n  \n  const mediaRecorderRef = useRef(null);\n  const audioRef = useRef(null);\n  const timerRef = useRef(null);\n\n  const startRecording = useCallback(async () => {\n    try {\n      setError(null);\n      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });\n      const mediaRecorder = new MediaRecorder(stream);\n      const chunks = [];\n      \n      mediaRecorder.ondataavailable = (event) => {\n        chunks.push(event.data);\n      };\n      \n      mediaRecorder.onstop = () => {\n        const blob = new Blob(chunks, { type: 'audio/webm' });\n        const url = URL.createObjectURL(blob);\n        setAudioBlob(blob);\n        setAudioUrl(url);\n        \n        // Stop all tracks\n        stream.getTracks().forEach(track => track.stop());\n      };\n      \n      mediaRecorderRef.current = mediaRecorder;\n      mediaRecorder.start();\n      setIsRecording(true);\n      setRecordingTime(0);\n      \n      // Start timer\n      timerRef.current = setInterval(() => {\n        setRecordingTime(prev => prev + 1);\n      }, 1000);\n      \n    } catch (err) {\n      console.error('Error accessing microphone:', err);\n      setError('Không thể truy cập microphone. Vui lòng kiểm tra quyền truy cập.');\n    }\n  }, []);\n  \n  const stopRecording = useCallback(() => {\n    if (mediaRecorderRef.current && isRecording) {\n      mediaRecorderRef.current.stop();\n      setIsRecording(false);\n      \n      if (timerRef.current) {\n        clearInterval(timerRef.current);\n      }\n    }\n  }, [isRecording]);\n  \n  const playAudio = useCallback(() => {\n    if (audioRef.current && audioUrl) {\n      audioRef.current.src = audioUrl;\n      audioRef.current.play().then(() => {\n        setIsPlaying(true);\n      }).catch(err => {\n        console.error('Error playing audio:', err);\n        setError('Không thể phát audio');\n      });\n    }\n  }, [audioUrl]);\n  \n  const pauseAudio = useCallback(() => {\n    if (audioRef.current) {\n      audioRef.current.pause();\n      setIsPlaying(false);\n    }\n  }, []);\n  \n  const stopAudio = useCallback(() => {\n    if (audioRef.current) {\n      audioRef.current.pause();\n      audioRef.current.currentTime = 0;\n      setIsPlaying(false);\n    }\n  }, []);\n  \n  const deleteRecording = useCallback(() => {\n    stopAudio();\n    setAudioBlob(null);\n    setAudioUrl('');\n    setRecordingTime(0);\n    setError(null);\n  }, [stopAudio]);\n\n  const formatTime = useCallback((seconds) => {\n    const mins = Math.floor(seconds / 60);\n    const secs = seconds % 60;\n    return `${mins}:${secs.toString().padStart(2, '0')}`;\n  }, []);\n\n  return {\n    isRecording,\n    isPlaying,\n    audioBlob,\n    audioUrl,\n    recordingTime,\n    error,\n    startRecording,\n    stopRecording,\n    playAudio,\n    pauseAudio,\n    stopAudio,\n    deleteRecording,\n    formatTime: () => formatTime(recordingTime),\n    audioRef\n  };\n}"
+'use client';
+import { useState, useCallback, useRef } from 'react';
+
+export function useAudio() {
+  const [isRecording, setIsRecording] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [audioBlob, setAudioBlob] = useState(null);
+  const [audioUrl, setAudioUrl] = useState('');
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [error, setError] = useState(null);
+  
+  const mediaRecorderRef = useRef(null);
+  const audioRef = useRef(null);
+  const timerRef = useRef(null);
+  const streamRef = useRef(null);
+
+  // Cleanup function
+  const cleanup = useCallback(() => {
+    // Stop recording if active
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+    }
+    
+    // Stop all tracks
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    
+    // Clear timer
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    
+    // Cleanup audio URL
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+    }
+  }, [isRecording, audioUrl]);
+
+  const startRecording = useCallback(async () => {
+    try {
+      setError(null);
+      
+      // Cleanup previous recording
+      cleanup();
+      
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      
+      const mediaRecorder = new MediaRecorder(stream);
+      const chunks = [];
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          chunks.push(event.data);
+        }
+      };
+      
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        const url = URL.createObjectURL(blob);
+        setAudioBlob(blob);
+        setAudioUrl(url);
+        
+        // Stop all tracks
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop());
+          streamRef.current = null;
+        }
+      };
+      
+      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+      
+      // Start timer
+      timerRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+      
+    } catch (err) {
+      console.error('Error accessing microphone:', err);
+      setError('Không thể truy cập microphone. Vui lòng kiểm tra quyền truy cập.');
+    }
+  }, [cleanup]);
+  
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+  }, [isRecording]);
+  
+  const playAudio = useCallback(() => {
+    if (audioRef.current && audioUrl) {
+      audioRef.current.src = audioUrl;
+      audioRef.current.play().then(() => {
+        setIsPlaying(true);
+      }).catch(err => {
+        console.error('Error playing audio:', err);
+        setError('Không thể phát audio');
+      });
+    }
+  }, [audioUrl]);
+  
+  const pauseAudio = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    }
+  }, []);
+  
+  const stopAudio = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      setIsPlaying(false);
+    }
+  }, []);
+  
+  const deleteRecording = useCallback(() => {
+    stopAudio();
+    
+    // Cleanup audio URL
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+    }
+    
+    setAudioBlob(null);
+    setAudioUrl('');
+    setRecordingTime(0);
+    setError(null);
+  }, [stopAudio, audioUrl]);
+
+  const formatTime = useCallback((seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return cleanup;
+  }, [cleanup]);
+
+  return {
+    isRecording,
+    isPlaying,
+    audioBlob,
+    audioUrl,
+    recordingTime,
+    error,
+    startRecording,
+    stopRecording,
+    playAudio,
+    pauseAudio,
+    stopAudio,
+    deleteRecording,
+    formatTime: () => formatTime(recordingTime),
+    audioRef
+  };
+}

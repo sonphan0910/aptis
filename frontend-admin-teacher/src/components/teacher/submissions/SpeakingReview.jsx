@@ -64,15 +64,14 @@ const speakingCriteria = [
 const timeMarkers = [];
 
 export default function SpeakingReview({ 
-  submission,
-  onScoreChange,
-  onFeedbackChange,
-  onSave,
+  answer,
+  reviewData,
+  onReviewChange,
   readonly = false 
 }) {
-  const [scores, setScores] = useState(submission?.scores || {});
-  const [feedback, setFeedback] = useState(submission?.feedback || '');
-  const [timeComments, setTimeComments] = useState(submission?.time_comments || []);
+  const [scores, setScores] = useState(reviewData?.scores || {});
+  const [feedback, setFeedback] = useState(reviewData?.feedback || '');
+  const [timeComments, setTimeComments] = useState([]);
   const [currentTime, setCurrentTime] = useState(0);
   const [newComment, setNewComment] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
@@ -80,13 +79,27 @@ export default function SpeakingReview({
   const handleScoreChange = (aspect, score) => {
     const newScores = { ...scores, [aspect]: score };
     setScores(newScores);
-    onScoreChange?.(newScores);
+    
+    // Calculate total score and update parent
+    const scoreValues = Object.values(newScores);
+    const totalScore = scoreValues.length > 0 
+      ? scoreValues.reduce((sum, s) => sum + s, 0) / scoreValues.length 
+      : 0;
+    
+    onReviewChange?.({
+      ...reviewData,
+      scores: newScores,
+      final_score: totalScore
+    });
   };
 
   const handleFeedbackChange = (event) => {
     const newFeedback = event.target.value;
     setFeedback(newFeedback);
-    onFeedbackChange?.(newFeedback);
+    onReviewChange?.({
+      ...reviewData,
+      feedback: newFeedback
+    });
   };
 
   const addTimeComment = () => {
@@ -167,7 +180,7 @@ export default function SpeakingReview({
           <Card sx={{ mb: 3 }}>
             <CardContent>
               <AudioPlayer
-                src={submission?.audio_url}
+                src={answer?.audio_url}
                 onTimeUpdate={setCurrentTime}
                 onPlay={() => setIsPlaying(true)}
                 onPause={() => setIsPlaying(false)}
@@ -178,9 +191,6 @@ export default function SpeakingReview({
                 <Timer fontSize="small" />
                 <Typography variant="body2">
                   Thời gian hiện tại: {formatTime(currentTime)}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Tổng thời gian: {formatTime(submission?.duration || 0)}
                 </Typography>
               </Box>
             </CardContent>

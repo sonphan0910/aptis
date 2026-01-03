@@ -27,7 +27,7 @@ import {
   UnpublishedOutlined
 } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
-import { fetchExams, deleteExam, publishExam } from '@/store/slices/examSlice';
+import { fetchExams, deleteExam, publishExam, unpublishExam } from '@/store/slices/examSlice';
 import { 
   DEFAULT_FILTER_OPTIONS,
   DEFAULT_APTIS_TYPES,
@@ -94,10 +94,11 @@ export default function ExamList({
   const handlePublish = async (exam) => {
     setPublishingExam(exam);
     try {
-      await dispatch(publishExam({
-        id: exam.id,
-        is_published: !exam.is_published
-      }));
+      if (exam.is_published) {
+        await dispatch(unpublishExam(exam.id));
+      } else {
+        await dispatch(publishExam(exam.id));
+      }
       handleFetchExams();
     } finally {
       setPublishingExam(null);
