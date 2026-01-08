@@ -68,9 +68,10 @@ export default function SubmissionFilters({
 
   const getActiveFiltersCount = () => {
     let count = 0;
-    if (filters.skill) count++;
+    if (filters.skill_type) count++;
     if (filters.exam_id) count++;
-    if (filters.status) count++;
+    if (filters.grading_status) count++;
+    if (filters.has_ai_feedback) count++;
     if (filters.student_id) count++;
     if (filters.date_range?.start || filters.date_range?.end) count++;
     if (filters.score_range?.min !== 0 || filters.score_range?.max !== 100) count++;
@@ -144,17 +145,49 @@ export default function SubmissionFilters({
             {/* Status Filter */}
             <Grid item xs={12} sm={6} md={3}>
               <FormControl fullWidth>
-                <InputLabel>Trạng thái</InputLabel>
+                <InputLabel>Trạng thái chấm điểm</InputLabel>
                 <Select
-                  value={filters.status || ''}
-                  label="Trạng thái"
-                  onChange={(e) => handleFilterChange('status', e.target.value)}
+                  value={filters.grading_status || ''}
+                  label="Trạng thái chấm điểm"
+                  onChange={(e) => handleFilterChange('grading_status', e.target.value)}
                 >
                   <MenuItem value="">Tất cả</MenuItem>
-                  <MenuItem value="pending">Chưa chấm điểm</MenuItem>
-                  <MenuItem value="in_review">Đang chấm điểm</MenuItem>
-                  <MenuItem value="completed">Đã hoàn thành</MenuItem>
-                  <MenuItem value="needs_review">Cần xem xét</MenuItem>
+                  <MenuItem value="ungraded">Chưa chấm điểm</MenuItem>
+                  <MenuItem value="ai_graded">AI đã chấm</MenuItem>
+                  <MenuItem value="manually_graded">Giáo viên đã chấm</MenuItem>
+                  <MenuItem value="needs_review">Cần xem xét lại</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+
+            {/* AI Feedback Filter */}
+            <Grid item xs={12} sm={6} md={3}>
+              <FormControl fullWidth>
+                <InputLabel>AI Feedback</InputLabel>
+                <Select
+                  value={filters.has_ai_feedback || ''}
+                  label="AI Feedback"
+                  onChange={(e) => handleFilterChange('has_ai_feedback', e.target.value)}
+                >
+                  <MenuItem value="">Tất cả</MenuItem>
+                  <MenuItem value="true">Có AI feedback</MenuItem>
+                  <MenuItem value="false">Không có AI feedback</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+
+            {/* Skill Type Filter */}
+            <Grid item xs={12} sm={6} md={3}>
+              <FormControl fullWidth>
+                <InputLabel>Kỹ năng</InputLabel>
+                <Select
+                  value={filters.skill_type || ''}
+                  label="Kỹ năng"
+                  onChange={(e) => handleFilterChange('skill_type', e.target.value)}
+                >
+                  <MenuItem value="">Tất cả</MenuItem>
+                  <MenuItem value="WRITING">Writing</MenuItem>
+                  <MenuItem value="SPEAKING">Speaking</MenuItem>
                 </Select>
               </FormControl>
             </Grid>

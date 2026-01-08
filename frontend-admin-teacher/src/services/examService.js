@@ -93,4 +93,16 @@ export const examApi = {
     );
     return response.data;
   },
+
+  // Get questions by skill type
+  getQuestionsBySkill: async (skillTypeId, limit = 100) => {
+    const response = await apiClient.get(API_ENDPOINTS.TEACHER.QUESTIONS.LIST, {
+      params: {
+        skill: skillTypeId,
+        limit: limit,
+        page: 1
+      }
+    });
+    return response.data;
+  },
 };

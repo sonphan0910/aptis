@@ -13,7 +13,28 @@ import {
 } from '@mui/material';
 import { Add, Delete } from '@mui/icons-material';
 
-export default function MCQForm({ content, onChange, skillType, questionType }) {
+export default function MCQForm({ content, onChange, skillType, questionType, aptisData, skillData, questionTypeData }) {
+  // Determine if this is a Listening MCQ
+  const isListeningMCQ = skillType?.code === 'LISTENING' || skillType === 'LISTENING';
+  
+  const [title, setTitle] = useState(() => {
+    try {
+      const parsed = typeof content === 'string' ? JSON.parse(content || '{}') : content;
+      return parsed.title || '';
+    } catch {
+      return '';
+    }
+  });
+
+  const [audioScript, setAudioScript] = useState(() => {
+    try {
+      const parsed = typeof content === 'string' ? JSON.parse(content || '{}') : content;
+      return parsed.audioScript || parsed.script || '';
+    } catch {
+      return '';
+    }
+  });
+
   const [questionText, setQuestionText] = useState(() => {
     try {
       const parsed = typeof content === 'string' ? JSON.parse(content || '{}') : content;
@@ -60,31 +81,47 @@ export default function MCQForm({ content, onChange, skillType, questionType }) 
     }
   });
 
-  const updateContent = (newQuestion, newPassage, newOptions, newExplanation) => {
+  // Update parent when data changes
+  useEffect(() => {
     const questionData = {
-      ...(newPassage && { passage: newPassage }),
-      question: newQuestion,
-      options: newOptions,
-      explanation: newExplanation
+      title,
+      question: questionText,
+      options,
+      explanation
     };
-    onChange(JSON.stringify(questionData));
+    
+    if (isListeningMCQ) {
+      questionData.audioScript = audioScript;
+    } else {
+      questionData.passage = passage;
+    }
+    
+    const jsonString = JSON.stringify(questionData);
+    if (jsonString !== content) {
+      onChange(jsonString);
+    }
+  }, [title, questionText, passage, audioScript, options, explanation, isListeningMCQ]);
+
+  const handleTitleChange = (value) => {
+    setTitle(value);
   };
 
   const handleQuestionChange = (value) => {
     setQuestionText(value);
-    updateContent(value, passage, options, explanation);
   };
 
   const handlePassageChange = (value) => {
     setPassage(value);
-    updateContent(questionText, value, options, explanation);
+  };
+
+  const handleAudioScriptChange = (value) => {
+    setAudioScript(value);
   };
 
   const handleOptionChange = (index, text) => {
     const newOptions = [...options];
     newOptions[index].text = text;
     setOptions(newOptions);
-    updateContent(questionText, passage, newOptions, explanation);
   };
 
   const handleCorrectAnswerChange = (optionId) => {
@@ -93,19 +130,16 @@ export default function MCQForm({ content, onChange, skillType, questionType }) 
       isCorrect: option.id === optionId
     }));
     setOptions(newOptions);
-    updateContent(questionText, passage, newOptions, explanation);
   };
 
   const handleExplanationChange = (value) => {
     setExplanation(value);
-    updateContent(questionText, passage, options, value);
   };
 
   const addOption = () => {
     const nextLetter = String.fromCharCode(65 + options.length);
     const newOptions = [...options, { id: nextLetter, text: '', isCorrect: false }];
     setOptions(newOptions);
-    updateContent(questionText, passage, newOptions, explanation);
   };
 
   const removeOption = (index) => {
@@ -117,17 +151,51 @@ export default function MCQForm({ content, onChange, skillType, questionType }) 
         id: String.fromCharCode(65 + i)
       }));
       setOptions(updatedOptions);
-      updateContent(questionText, passage, updatedOptions, explanation);
     }
   };
 
-  const needsPassage = skillType === 'READING';
+  const needsPassage = skillType === 'READING' || (skillType?.code === 'READING');
   const correctAnswer = options.find(opt => opt.isCorrect)?.id || '';
 
   return (
     <Box>
-      {/* Reading Passage (only for reading questions) */}
-      {needsPassage && (
+      <Typography variant="h6" gutterBottom>
+        {isListeningMCQ ? 'Listening - Multiple Choice' : 'Reading - Multiple Choice'}
+      </Typography>
+      <Typography variant="body2" color="text.secondary" mb={3}>
+        {isListeningMCQ ? 'Tạo câu hỏi trắc nghiệm Listening với audio script' : 'Tạo câu hỏi trắc nghiệm Reading với đoạn văn'}
+      </Typography>
+
+      {/* Title */}
+      <Box mb={3}>
+        <TextField
+          fullWidth
+          label="Tiêu đề câu hỏi"
+          value={title}
+          onChange={(e) => handleTitleChange(e.target.value)}
+          placeholder={isListeningMCQ ? "VD: Listen to the conversation and answer the question" : "VD: Read the passage and answer the question"}
+          helperText="Tiêu đề ngắn gọn mô tả nội dung câu hỏi"
+        />
+      </Box>
+
+      {/* Audio Script for Listening / Reading Passage for Reading */}
+      {isListeningMCQ ? (
+        <Box mb={3}>
+          <Typography variant="h6" gutterBottom>
+            Audio Script
+          </Typography>
+          <TextField
+            fullWidth
+            multiline
+            rows={8}
+            label="Nội dung audio script"
+            value={audioScript}
+            onChange={(e) => handleAudioScriptChange(e.target.value)}
+            placeholder="Speaker A: Hello, I'd like to book a table for tonight...&#10;Speaker B: Of course, how many people will be dining with us?&#10;Speaker A: Just two people, please..."
+            helperText="Script âm thanh mà học sinh sẽ nghe. Ghi rõ Speaker A, Speaker B nếu có đối thoại."
+          />
+        </Box>
+      ) : needsPassage && (
         <Box mb={3}>
           <Typography variant="h6" gutterBottom>
             Đoạn văn đọc
@@ -155,8 +223,9 @@ export default function MCQForm({ content, onChange, skillType, questionType }) 
           value={questionText}
           onChange={(e) => handleQuestionChange(e.target.value)}
           multiline
-          rows={3}
-          placeholder={needsPassage ? "Theo đoạn văn trên, ..." : "Hoàn thành câu sau: She ___ to work every day."}
+          rows={2}
+          placeholder={isListeningMCQ ? "What is the main topic of the conversation?" : needsPassage ? "Theo đoạn văn trên, ..." : "Hoàn thành câu sau: She ___ to work every day."}
+          helperText={isListeningMCQ ? "Câu hỏi về nội dung audio mà học sinh vừa nghe" : "Câu hỏi liên quan đến nội dung"}
         />
       </Box>
 
@@ -238,7 +307,7 @@ export default function MCQForm({ content, onChange, skillType, questionType }) 
           onChange={(e) => handleExplanationChange(e.target.value)}
           multiline
           rows={3}
-          placeholder="Giải thích tại sao đáp án này đúng..."
+          placeholder={isListeningMCQ ? "Giải thích tại sao đáp án này đúng dựa trên audio script..." : "Giải thích tại sao đáp án này đúng..."}
         />
       </Box>
     </Box>

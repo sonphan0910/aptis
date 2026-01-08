@@ -22,6 +22,8 @@ export default function DataTable({
   onPageChange,
   emptyMessage = 'Không có dữ liệu'
 }) {
+  // Ensure data is always an array
+  const safeData = Array.isArray(data) ? data : [];
   const handleChangePage = (event, newPage) => {
     if (onPageChange) {
       onPageChange(newPage + 1);
@@ -61,7 +63,7 @@ export default function DataTable({
             </TableRow>
           </TableHead>
           <TableBody>
-            {data.length === 0 ? (
+            {safeData.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={columns.length} align="center">
                   <Box py={4}>
@@ -72,7 +74,7 @@ export default function DataTable({
                 </TableCell>
               </TableRow>
             ) : (
-              data.map((row, index) => (
+              safeData.map((row, index) => (
                 <TableRow key={row.id || index}>
                   {columns.map((column) => (
                     <TableCell 

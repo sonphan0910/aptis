@@ -11,128 +11,174 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction
+  ListItemIcon,
+  Alert
 } from '@mui/material';
-import { Add, Delete, DragIndicator, ArrowUpward, ArrowDownward } from '@mui/icons-material';
+import { Add, Delete, DragIndicator } from '@mui/icons-material';
 
-export default function OrderingForm({ content = {}, onChange }) {
-  const [instruction, setInstruction] = useState(content.instruction || 'Sắp xếp các mục theo thứ tự đúng');
-  const [items, setItems] = useState(content.items || [
-    { id: 1, text: '', order: 1 },
-    { id: 2, text: '', order: 2 },
-    { id: 3, text: '', order: 3 },
-    { id: 4, text: '', order: 4 }
-  ]);
-  const [explanation, setExplanation] = useState(content.explanation || '');
+/**
+ * Form component for Reading Ordering questions
+ * Based on seed data structure from 05-seed-questions.js
+ */
+export default function OrderingForm({ content, onChange }) {
+  const [title, setTitle] = useState('');
+  const [passage, setPassage] = useState('');
+  const [sentences, setSentences] = useState(['', '', '', '']);
 
+  // Parse existing content if available
   useEffect(() => {
-    onChange({
-      instruction,
-      items,
-      correct_order: items.map(item => item.id),
-      explanation
-    });
-  }, [instruction, items, explanation]);
+    if (content) {
+      try {
+        const parsed = typeof content === 'string' ? JSON.parse(content) : content;
+        setTitle(parsed.title || '');
+        setPassage(parsed.passage || '');
+        setSentences(parsed.sentences || ['', '', '', '']);
+      } catch (error) {
+        // If content is not JSON, treat as passage
+        setPassage(content);
+      }
+    }
+  }, [content]);
 
-  const handleItemChange = (index, text) => {
-    const newItems = [...items];
-    newItems[index].text = text;
-    setItems(newItems);
-  };
-
-  const addItem = () => {
-    const newId = Math.max(...items.map(item => item.id)) + 1;
-    const newItem = {
-      id: newId,
-      text: '',
-      order: items.length + 1
+  // Update parent component when data changes
+  useEffect(() => {
+    const questionData = {
+      title,
+      passage,
+      sentences: sentences.filter(s => s.trim()),
+      correctOrder: sentences
+        .map((_, index) => index + 1)
+        .filter((_, index) => sentences[index].trim())
     };
-    setItems([...items, newItem]);
+    
+    const jsonString = JSON.stringify(questionData);
+    if (jsonString !== content) {
+      onChange(jsonString);
+    }
+  }, [title, passage, sentences]);
+
+  const handleSentenceChange = (index, text) => {
+    const newSentences = [...sentences];
+    newSentences[index] = text;
+    setSentences(newSentences);
   };
 
-  const removeItem = (index) => {
-    if (items.length > 2) {
-      const newItems = items.filter((_, i) => i !== index);
-      // Cập nhật lại order
-      const updatedItems = newItems.map((item, i) => ({
-        ...item,
-        order: i + 1
-      }));
-      setItems(updatedItems);
+  const addSentence = () => {
+    if (sentences.length < 8) {
+      setSentences([...sentences, '']);
     }
   };
 
-  const moveItem = (index, direction) => {
+  const removeSentence = (index) => {
+    if (sentences.length > 2) {
+      const newSentences = sentences.filter((_, i) => i !== index);
+      setSentences(newSentences);
+    }
+  };
+
+  const moveSentence = (index, direction) => {
     if (
       (direction === 'up' && index > 0) ||
-      (direction === 'down' && index < items.length - 1)
+      (direction === 'down' && index < sentences.length - 1)
     ) {
-      const newItems = [...items];
+      const newSentences = [...sentences];
       const targetIndex = direction === 'up' ? index - 1 : index + 1;
       
       // Hoán đổi vị trí
-      [newItems[index], newItems[targetIndex]] = [newItems[targetIndex], newItems[index]];
-      
-      // Cập nhật lại order
-      const updatedItems = newItems.map((item, i) => ({
-        ...item,
-        order: i + 1
-      }));
-      
-      setItems(updatedItems);
+      [newSentences[index], newSentences[targetIndex]] = [newSentences[targetIndex], newSentences[index]];
+      setSentences(newSentences);
     }
   };
 
   return (
     <Box>
+      <Typography variant="h6" gutterBottom>
+        Reading - Ordering
+      </Typography>
+      <Typography variant="body2" color="text.secondary" mb={3}>
+        Tạo câu hỏi sắp xếp câu theo thứ tự đúng
+      </Typography>
+
+      {/* Title */}
       <TextField
         fullWidth
-        label="Hướng dẫn"
-        value={instruction}
-        onChange={(e) => setInstruction(e.target.value)}
+        label="Tiêu đề câu hỏi"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
         sx={{ mb: 3 }}
+        placeholder="VD: Put the sentences in the correct order"
+        helperText="Tiêu đề ngắn gọn mô tả câu hỏi"
       />
 
-      <Typography variant="subtitle1" gutterBottom>
-        Các mục cần sắp xếp (thứ tự hiện tại là thứ tự đúng)
-      </Typography>
-      
+      {/* Passage */}
+      <TextField
+        fullWidth
+        multiline
+        rows={6}
+        label="Đoạn văn bối cảnh (tùy chọn)"
+        value={passage}
+        onChange={(e) => setPassage(e.target.value)}
+        sx={{ mb: 3 }}
+        placeholder="Nhập đoạn văn bối cảnh nếu cần..."
+        helperText="Đoạn văn giúp học sinh hiểu bối cảnh để sắp xếp câu"
+      />
+
+      {/* Sentences */}
+      <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Typography variant="h6">
+            Các câu cần sắp xếp ({sentences.filter(s => s.trim()).length} câu)
+          </Typography>
+          <Button
+            startIcon={<Add />}
+            onClick={addSentence}
+            variant="outlined"
+            size="small"
+            disabled={sentences.length >= 8}
+          >
+            Thêm câu
+          </Button>
+        </Box>
+        <Typography variant="body2" color="text.secondary" mb={3}>
+          Thứ tự hiện tại là thứ tự đúng. Sử dụng nút mũi tên để thay đổi thứ tự.
+        </Typography>
+
       <List>
-        {items.map((item, index) => (
-          <ListItem key={item.id} component={Paper} sx={{ mb: 1, p: 1 }}>
-            <DragIndicator sx={{ mr: 1, color: 'text.secondary' }} />
+        {sentences.map((sentence, index) => (
+          <ListItem key={index} component={Paper} sx={{ mb: 1, p: 2 }}>
+            <DragIndicator sx={{ mr: 2, color: 'text.secondary' }} />
             <Typography sx={{ minWidth: 30, fontWeight: 'bold' }}>
-              {item.order}.
+              {index + 1}.
             </Typography>
             <TextField
               fullWidth
-              placeholder={`Mục ${item.order}`}
-              value={item.text}
-              onChange={(e) => handleItemChange(index, e.target.value)}
+              placeholder={`Câu ${index + 1}`}
+              value={sentence}
+              onChange={(e) => handleSentenceChange(index, e.target.value)}
               size="small"
-              sx={{ mx: 1 }}
+              sx={{ mx: 2 }}
             />
             <ListItemSecondaryAction>
               <Box display="flex" gap={0.5}>
                 <IconButton
                   size="small"
-                  onClick={() => moveItem(index, 'up')}
+                  onClick={() => moveSentence(index, 'up')}
                   disabled={index === 0}
                 >
                   <ArrowUpward />
                 </IconButton>
                 <IconButton
                   size="small"
-                  onClick={() => moveItem(index, 'down')}
-                  disabled={index === items.length - 1}
+                  onClick={() => moveSentence(index, 'down')}
+                  disabled={index === sentences.length - 1}
                 >
                   <ArrowDownward />
                 </IconButton>
-                {items.length > 2 && (
+                {sentences.length > 2 && (
                   <IconButton
                     size="small"
                     color="error"
-                    onClick={() => removeItem(index)}
+                    onClick={() => removeSentence(index)}
                   >
                     <Delete />
                   </IconButton>
@@ -142,26 +188,31 @@ export default function OrderingForm({ content = {}, onChange }) {
           </ListItem>
         ))}
       </List>
+      </Paper>
 
-      <Button
-        startIcon={<Add />}
-        onClick={addItem}
-        variant="outlined"
-        sx={{ mb: 3 }}
-        disabled={items.length >= 8}
-      >
-        Thêm mục
-      </Button>
-
-      <TextField
-        fullWidth
-        label="Giải thích"
-        value={explanation}
-        onChange={(e) => setExplanation(e.target.value)}
-        multiline
-        rows={3}
-        placeholder="Giải thích về thứ tự đúng..."
-      />
+      {/* Preview */}
+      <Paper elevation={1} sx={{ p: 3, bgcolor: 'background.default' }}>
+        <Typography variant="h6" gutterBottom>
+          Xem trước câu hỏi
+        </Typography>
+        
+        <Typography variant="body1" sx={{ mb: 2 }}>
+          <strong>{title}</strong>
+        </Typography>
+        
+        {passage && (
+          <Typography variant="body2" sx={{ mb: 2, whiteSpace: 'pre-line' }}>
+            {passage.substring(0, 200)}{passage.length > 200 ? '...' : ''}
+          </Typography>
+        )}
+        
+        <Typography variant="body2" color="text.secondary">
+          • {sentences.filter(s => s.trim()).length} câu cần sắp xếp
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          • Thứ tự đúng: {sentences.map((s, i) => s.trim() ? i + 1 : null).filter(Boolean).join(' → ')}
+        </Typography>
+      </Paper>
     </Box>
   );
 }

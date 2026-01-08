@@ -119,6 +119,8 @@ exports.getQuestions = async (req, res, next) => {
     } = req.query;
     const { offset, limit: validLimit } = paginate(page, limit);
 
+    console.log('[getQuestions] Query params:', { page, limit, question_type, aptis_type, skill, difficulty, status, search });
+
     const where = {};
 
     if (question_type) {
@@ -160,7 +162,11 @@ exports.getQuestions = async (req, res, next) => {
       // Use sequelize to include and filter by related skill type
       include[0].where = { skill_type_id: skill };
       include[0].required = true; // INNER JOIN to enforce the filter
+      console.log('[getQuestions] Skill filter applied:', { skill });
     }
+
+    console.log('[getQuestions] Final where clause:', finalWhere);
+    console.log('[getQuestions] Include config:', JSON.stringify(include, null, 2));
 
     const { count, rows } = await Question.findAndCountAll({
       where: finalWhere,

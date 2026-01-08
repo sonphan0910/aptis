@@ -21,8 +21,7 @@ import {
   Save,
   Publish,
   UnpublishedOutlined,
-  Settings,
-  Quiz
+  Settings
 } from '@mui/icons-material';
 import ExamForm from '@/components/teacher/exams/ExamForm';
 import { 
@@ -39,7 +38,7 @@ export default function ExamDetailPage() {
   const params = useParams();
   
   const examId = params.examId;
-  const examState = useSelector(state => state.exam || {});
+  const examState = useSelector(state => state.exams || {});
   const { currentExam, isLoading, error } = examState;
   
   const [loading, setLoading] = useState(false);
@@ -61,16 +60,23 @@ export default function ExamDetailPage() {
         data: formData 
       }));
       
+      console.log('[ExamDetail] Update result:', result);
+      
       if (updateExam.fulfilled.match(result)) {
         dispatch(showNotification({
           message: 'Cập nhật bài thi thành công!',
           type: 'success'
         }));
         setIsEditing(false);
-        // Refresh exam data
-        dispatch(fetchExamById(examId));
+        // Don't refresh - the update already returned the data
+      } else {
+        dispatch(showNotification({
+          message: result.payload || 'Có lỗi xảy ra khi cập nhật bài thi',
+          type: 'error'
+        }));
       }
     } catch (error) {
+      console.error('[ExamDetail] Update error:', error);
       dispatch(showNotification({
         message: 'Có lỗi xảy ra khi cập nhật bài thi',
         type: 'error'
@@ -97,7 +103,8 @@ export default function ExamDetailPage() {
       }));
     } finally {
       setPublishLoading(false);
-  }
+    }
+  };
 
   // Loading skeleton
   if (isLoading && !currentExam) {
@@ -155,28 +162,23 @@ export default function ExamDetailPage() {
             variant="outlined"
             startIcon={<Settings />}
             onClick={() => router.push(`/teacher/exams/${examId}/manage`)}
+            disabled={isEditing}
           >
             Quản lý Sections
           </Button>
-          
-          <Button
-            variant="outlined"
-            startIcon={<Quiz />}
-            onClick={() => router.push(`/teacher/exams/${examId}/preview`)}
-          >
-            Xem trước
-          </Button>
 
-          <Button
-            variant={currentExam?.status === 'published' ? 'outlined' : 'contained'}
-            startIcon={currentExam?.status === 'published' ? <UnpublishedOutlined /> : <Publish />}
-            onClick={handlePublishToggle}
-            disabled={publishLoading}
-            color={currentExam?.status === 'published' ? 'default' : 'primary'}
-          >
-            {publishLoading ? 'Đang xử lý...' : 
-             currentExam?.status === 'published' ? 'Hủy xuất bản' : 'Xuất bản'}
-          </Button>
+          {!isEditing && (
+            <Button
+              variant={currentExam?.status === 'published' ? 'outlined' : 'contained'}
+              startIcon={currentExam?.status === 'published' ? <UnpublishedOutlined /> : <Publish />}
+              onClick={handlePublishToggle}
+              disabled={publishLoading}
+              color={currentExam?.status === 'published' ? 'default' : 'primary'}
+            >
+              {publishLoading ? 'Đang xử lý...' : 
+               currentExam?.status === 'published' ? 'Hủy xuất bản' : 'Xuất bản'}
+            </Button>
+          )}
         </Box>
       </Box>
 
@@ -228,32 +230,70 @@ export default function ExamDetailPage() {
       </Card>
 
       {/* Edit Form */}
-      <Card>
-        <CardContent>
-          <Box display="flex" alignItems="center" justifyContent="space-between" mb={2}>
-            <Typography variant="h6">
-              Thông tin cơ bản
-            </Typography>
-            <Button
-              variant="outlined"
-              startIcon={<Edit />}
-              onClick={() => setIsEditing(!isEditing)}
-              size="small"
-            >
-              {isEditing ? 'Hủy' : 'Chỉnh sửa'}
-            </Button>
-          </Box>
-          
-          <Divider sx={{ mb: 3 }} />
-          
-          {isEditing ? (
+      {isEditing ? (
+        <Card>
+          <CardContent>
+            <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
+              <Typography variant="h6" gutterBottom sx={{ mb: 0 }}>
+                Thông tin cơ bản
+              </Typography>
+              <Box display="flex" gap={1}>
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    setIsEditing(false);
+                  }}
+                  disabled={loading}
+                  size="small"
+                >
+                  Hủy
+                </Button>
+                <Button
+                  variant="contained"
+                  color="success"
+                  startIcon={<Save />}
+                  disabled={loading}
+                  onClick={() => {
+                    document.querySelector('form')?.requestSubmit();
+                  }}
+                  size="small"
+                >
+                  {loading ? 'Lưu...' : 'Lưu'}
+                </Button>
+              </Box>
+            </Box>
+            
+            <Divider sx={{ mb: 3 }} />
+            
             <ExamForm
               examData={currentExam}
               onSubmit={handleUpdate}
               loading={loading}
               isEditing={true}
             />
-          ) : (
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent>
+            <Box display="flex" alignItems="center" justifyContent="space-between" mb={3}>
+              <Typography variant="h6" gutterBottom sx={{ mb: 0 }}>
+                Thông tin cơ bản
+              </Typography>
+              <Box display="flex" gap={1}>
+                <Button
+                  variant="outlined"
+                  startIcon={<Edit />}
+                  onClick={() => setIsEditing(true)}
+                  size="small"
+                >
+                  Chỉnh sửa
+                </Button>
+              </Box>
+            </Box>
+            
+            <Divider sx={{ mb: 3 }} />
+            
             <Grid container spacing={3}>
               <Grid item xs={12}>
                 <Typography variant="body2" color="text.secondary">
@@ -293,10 +333,9 @@ export default function ExamDetailPage() {
                 </Typography>
               </Grid>
             </Grid>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </Box>
   );
-}
 }

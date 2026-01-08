@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSelector, useDispatch } from 'react-redux';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import PublicDataDebugger from '@/components/common/PublicDataDebugger';
 import { showNotification } from '@/store/slices/uiSlice';
 
 export default function DashboardLayoutPage({ children }) {
@@ -34,8 +35,11 @@ export default function DashboardLayoutPage({ children }) {
   }
 
   return (
-    <DashboardLayout>
-      {children}
-    </DashboardLayout>
+    <>
+      <DashboardLayout>
+        {children}
+      </DashboardLayout>
+      <PublicDataDebugger />
+    </>
   );
 }

@@ -129,6 +129,12 @@ const examSchemas = {
     instruction: Joi.string().optional(),
   }),
 
+  updateSection: Joi.object({
+    skill_type_id: Joi.number().integer().positive().optional(),
+    duration_minutes: Joi.number().integer().positive().optional(),
+    instruction: Joi.string().optional(),
+  }),
+
   addQuestion: Joi.object({
     question_id: Joi.number().integer().positive().required(),
     question_order: Joi.number().integer().positive().required(),

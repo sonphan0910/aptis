@@ -158,7 +158,8 @@ export const API_ENDPOINTS = {
   // Public endpoints
   PUBLIC: {
     APTIS_TYPES: '/public/aptis-types',
-    SKILL_TYPES: '/public/skill-types', 
+    SKILL_TYPES: '/public/skill-types',
+    QUESTION_TYPES: '/public/question-types', 
     PUBLISHED_EXAMS: '/public/exams',
   },
 };

@@ -12,36 +12,65 @@ import {
 } from '@mui/material';
 import { Add, Delete, Info } from '@mui/icons-material';
 
-export default function GapFillingForm({ content = {}, onChange }) {
-  const [text, setText] = useState(content.text || '');
-  const [options, setOptions] = useState(content.options || ['', '', '', '']);
-  const [correctAnswers, setCorrectAnswers] = useState(content.correct_answers || []);
-  const [explanation, setExplanation] = useState(content.explanation || '');
+/**
+ * GapFillingForm component for Reading and Listening Gap Filling questions
+ * Based on seed data structure from 05-seed-questions.js
+ */
+export default function GapFillingForm({ content, onChange }) {
+  const [passage, setPassage] = useState('');
+  const [options, setOptions] = useState(['well', 'only', 'really', 'under', 'much', 'food']);
+  const [correctAnswers, setCorrectAnswers] = useState(['well', 'only', 'really', 'under', 'much', 'food']);
+  const [prompt, setPrompt] = useState('Choose one word from the list for each gap. The first one is done for you.');
 
+  // Parse existing content if available
   useEffect(() => {
-    // Tự động tìm các chỗ trống trong văn bản
-    const gapMatches = text.match(/\[\d+\]/g) || [];
-    const gapNumbers = gapMatches.map(gap => parseInt(gap.match(/\d+/)[0]));
-    
-    // Cập nhật correctAnswers theo số chỗ trống
-    const newCorrectAnswers = [...correctAnswers];
-    gapNumbers.forEach(num => {
-      if (!newCorrectAnswers[num - 1]) {
-        newCorrectAnswers[num - 1] = '';
+    if (content) {
+      try {
+        const parsed = typeof content === 'string' ? JSON.parse(content) : content;
+        setPassage(parsed.passage || '');
+        setOptions(parsed.options || ['well', 'only', 'really', 'under', 'much', 'food']);
+        setCorrectAnswers(parsed.correctAnswers || ['well', 'only', 'really', 'under', 'much', 'food']);
+        setPrompt(parsed.prompt || 'Choose one word from the list for each gap. The first one is done for you.');
+      } catch (error) {
+        // If content is not JSON, treat as passage
+        setPassage(content);
       }
-    });
+    }
+  }, [content]);
+
+  // Update parent component when data changes
+  useEffect(() => {
+    const questionData = {
+      passage,
+      options,
+      correctAnswers,
+      prompt
+    };
     
-    if (JSON.stringify(newCorrectAnswers) !== JSON.stringify(correctAnswers)) {
+    const jsonString = JSON.stringify(questionData);
+    if (jsonString !== content) {
+      onChange(jsonString);
+    }
+  }, [passage, options, correctAnswers, prompt]);
+
+  // Auto-detect gaps in passage
+  const gapMatches = passage.match(/\[GAP\d+\]/g) || [];
+  const gapCount = gapMatches.length;
+
+  const addOption = () => {
+    setOptions([...options, '']);
+  };
+
+  const removeOption = (index) => {
+    if (options.length > 1) {
+      const newOptions = options.filter((_, i) => i !== index);
+      setOptions(newOptions);
+      
+      // Update correct answers accordingly
+      const newCorrectAnswers = correctAnswers.filter((_, i) => i !== index);
       setCorrectAnswers(newCorrectAnswers);
     }
-
-    onChange({
-      text,
-      options,
-      correct_answers: correctAnswers,
-      explanation
-    });
-  }, [text, options, correctAnswers, explanation]);
+  };
 
   const handleOptionChange = (index, value) => {
     const newOptions = [...options];
@@ -49,128 +78,150 @@ export default function GapFillingForm({ content = {}, onChange }) {
     setOptions(newOptions);
   };
 
-  const addOption = () => {
-    setOptions([...options, '']);
-  };
-
-  const removeOption = (index) => {
-    if (options.length > 2) {
-      const newOptions = options.filter((_, i) => i !== index);
-      setOptions(newOptions);
-    }
-  };
-
-  const handleCorrectAnswerChange = (gapIndex, value) => {
+  const handleCorrectAnswerChange = (index, value) => {
     const newCorrectAnswers = [...correctAnswers];
-    newCorrectAnswers[gapIndex] = value;
+    newCorrectAnswers[index] = value;
     setCorrectAnswers(newCorrectAnswers);
   };
 
-  // Tính toán các chỗ trống từ văn bản
-  const gapMatches = text.match(/\[\d+\]/g) || [];
-  const gapNumbers = gapMatches.map(gap => parseInt(gap.match(/\d+/)[0]));
-  const maxGapNumber = Math.max(...gapNumbers, 0);
-
   return (
     <Box>
-      <Alert severity="info" sx={{ mb: 2 }}>
-        <Typography variant="body2">
-          Sử dụng [1], [2], [3]... để đánh dấu chỗ trống trong văn bản
-        </Typography>
-      </Alert>
+      <Typography variant="h6" gutterBottom>
+        Gap Filling Question
+      </Typography>
+      <Typography variant="body2" color="text.secondary" mb={3}>
+        Tạo câu hỏi điền từ vào chỗ trống. Sử dụng [GAP1], [GAP2], [GAP3]... để đánh dấu chỗ trống.
+      </Typography>
 
+      {/* Prompt */}
       <TextField
         fullWidth
-        label="Văn bản có chỗ trống"
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        multiline
-        rows={4}
-        sx={{ mb: 2 }}
-        placeholder="Nhập văn bản của bạn và sử dụng [1], [2]... cho các chỗ trống"
-        required
+        label="Hướng dẫn"
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        placeholder="Choose one word from the list for each gap. The first one is done for you."
+        sx={{ mb: 3 }}
+        helperText="Hướng dẫn cho học sinh về cách làm bài"
       />
 
-      {gapNumbers.length > 0 && (
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="body2" color="text.secondary">
-            Đã phát hiện {gapNumbers.length} chỗ trống:
+      {/* Passage with gaps */}
+      <TextField
+        fullWidth
+        label="Đoạn văn có chỗ trống"
+        value={passage}
+        onChange={(e) => setPassage(e.target.value)}
+        multiline
+        rows={6}
+        sx={{ mb: 2 }}
+        placeholder="Dear Sam,\n\nI hope you're doing [GAP1]! I wanted to tell you about my recent trip to the park. It was [GAP2] a lovely day to be outside..."
+        helperText="Sử dụng [GAP1], [GAP2], [GAP3]... để đánh dấu chỗ trống"
+      />
+
+      {/* Gap count info */}
+      {gapCount > 0 && (
+        <Alert severity="info" sx={{ mb: 3 }}>
+          <Typography variant="body2">
+            Đã phát hiện {gapCount} chỗ trống: {gapMatches.join(', ')}
           </Typography>
-          <Box display="flex" flexWrap="wrap" gap={1} mt={1}>
-            {gapNumbers.map(num => (
-              <Chip key={num} label={`[${num}]`} size="small" color="primary" variant="outlined" />
-            ))}
-          </Box>
-        </Box>
+        </Alert>
       )}
 
-      <Typography variant="subtitle1" gutterBottom>
-        Các tuỳ chọn
-      </Typography>
-      
-      {options.map((option, index) => (
-        <Box key={index} display="flex" alignItems="center" gap={1} mb={1}>
-          <Typography sx={{ minWidth: 30 }}>
-            {String.fromCharCode(65 + index)}.
-          </Typography>
-          <TextField
-            fullWidth
-            placeholder={`Tuỳ chọn ${String.fromCharCode(65 + index)}`}
-            value={option}
-            onChange={(e) => handleOptionChange(index, e.target.value)}
-            size="small"
-          />
-          {options.length > 2 && (
+      {/* Options list */}
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h6" gutterBottom>
+          Danh sách từ để chọn ({options.length} từ)
+        </Typography>
+        <Typography variant="body2" color="text.secondary" mb={2}>
+          Danh sách các từ mà học sinh sẽ chọn để điền vào chỗ trống
+        </Typography>
+        
+        {options.map((option, index) => (
+          <Box key={index} display="flex" alignItems="center" gap={2} mb={1}>
+            <Typography sx={{ minWidth: 30 }}>
+              {index + 1}.
+            </Typography>
+            <TextField
+              fullWidth
+              placeholder={`Từ ${index + 1}`}
+              value={option}
+              onChange={(e) => handleOptionChange(index, e.target.value)}
+              size="small"
+            />
             <IconButton
               color="error"
               onClick={() => removeOption(index)}
               size="small"
+              disabled={options.length <= 2}
             >
               <Delete />
             </IconButton>
-          )}
-        </Box>
-      ))}
+          </Box>
+        ))}
 
-      <Button
-        startIcon={<Add />}
-        onClick={addOption}
-        variant="outlined"
-        sx={{ mb: 3 }}
-        disabled={options.length >= 8}
-      >
-        Thêm tuỳ chọn
-      </Button>
+        <Button
+          startIcon={<Add />}
+          onClick={addOption}
+          variant="outlined"
+          size="small"
+        >
+          Thêm từ
+        </Button>
+      </Box>
 
-      {maxGapNumber > 0 && (
+      {/* Correct answers */}
+      {gapCount > 0 && (
         <Box sx={{ mb: 3 }}>
-          <Typography variant="subtitle1" gutterBottom>
-            Đáp án đúng
+          <Typography variant="h6" gutterBottom>
+            Đáp án đúng cho từng chỗ trống
           </Typography>
-          {Array.from({ length: maxGapNumber }, (_, i) => i + 1).map(gapNum => (
-            <Box key={gapNum} display="flex" alignItems="center" gap={2} mb={1}>
-              <Typography sx={{ minWidth: 60 }}>Chỗ [{gapNum}]:</Typography>
+          
+          {Array.from({ length: gapCount }, (_, index) => (
+            <Box key={index} display="flex" alignItems="center" gap={2} mb={2}>
+              <Typography sx={{ minWidth: 80 }}>
+                [GAP{index + 1}]:
+              </Typography>
               <TextField
-                placeholder="Nhập đáp án đúng"
-                value={correctAnswers[gapNum - 1] || ''}
-                onChange={(e) => handleCorrectAnswerChange(gapNum - 1, e.target.value)}
+                select
+                value={correctAnswers[index] || ''}
+                onChange={(e) => handleCorrectAnswerChange(index, e.target.value)}
                 size="small"
-                sx={{ flexGrow: 1 }}
-              />
+                sx={{ minWidth: 200 }}
+                SelectProps={{
+                  native: true
+                }}
+              >
+                <option value="">-- Chọn đáp án --</option>
+                {options.map((option, optIndex) => (
+                  <option key={optIndex} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </TextField>
             </Box>
           ))}
         </Box>
       )}
 
-      <TextField
-        fullWidth
-        label="Giải thích"
-        value={explanation}
-        onChange={(e) => setExplanation(e.target.value)}
-        multiline
-        rows={3}
-        placeholder="Giải thích về các đáp án đúng..."
-      />
+      {/* Preview */}
+      {passage && gapCount > 0 && (
+        <Box sx={{ p: 3, bgcolor: 'background.default', borderRadius: 1 }}>
+          <Typography variant="h6" gutterBottom>
+            Xem trước
+          </Typography>
+          
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            <strong>Hướng dẫn:</strong> {prompt}
+          </Typography>
+          
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            <strong>Danh sách từ:</strong> {options.filter(o => o.trim()).join(', ')}
+          </Typography>
+          
+          <Typography variant="body2" sx={{ whiteSpace: 'pre-line' }}>
+            {passage}
+          </Typography>
+        </Box>
+      )}
     </Box>
   );
 }

@@ -13,10 +13,12 @@ import {
   Card,
   CardContent,
   FormHelperText,
-  Alert
+  Alert,
+  CircularProgress
 } from '@mui/material';
 import { useFormik } from 'formik';
 import * as yup from 'yup';
+import { usePublicData } from '@/hooks/usePublicData';
 
 // Validation schema
 const validationSchema = yup.object({
@@ -27,12 +29,7 @@ const validationSchema = yup.object({
 });
 
 const ExamForm = ({ examData, onSubmit, loading = false, isEditing = false }) => {
-  const [aptisTypes, setAptisTypes] = useState([
-    { id: 1, code: 'GENERAL', aptis_type_name: 'APTIS General' },
-    { id: 2, code: 'ADVANCED', aptis_type_name: 'APTIS Advanced' },
-    { id: 3, code: 'FOR_TEACHERS', aptis_type_name: 'APTIS for Teachers' },
-    { id: 4, code: 'FOR_TEENS', aptis_type_name: 'APTIS for Teens' }
-  ]);
+  const { aptisTypes, loading: publicDataLoading, error: publicDataError } = usePublicData();
 
   const formik = useFormik({
     initialValues: {
@@ -80,8 +77,21 @@ const ExamForm = ({ examData, onSubmit, loading = false, isEditing = false }) =>
         
         {isEditing && (
           <Alert severity="info" sx={{ mb: 3 }}>
-            Thay đổi sẽ được lưu khi bạn nhấn nút "Lưu" ở header.
+            Thay đổi sẽ được lưu khi bạn nhấn nút "Lưu".
           </Alert>
+        )}
+
+        {publicDataError && (
+          <Alert severity="warning" sx={{ mb: 3 }}>
+            Không thể tải dữ liệu cấu hình: {publicDataError}
+          </Alert>
+        )}
+
+        {publicDataLoading && (
+          <Box display="flex" justifyContent="center" py={2}>
+            <CircularProgress size={24} />
+            <Typography sx={{ ml: 1 }}>Đang tải dữ liệu...</Typography>
+          </Box>
         )}
         
         <form onSubmit={formik.handleSubmit}>
@@ -122,7 +132,7 @@ const ExamForm = ({ examData, onSubmit, loading = false, isEditing = false }) =>
               <FormControl 
                 fullWidth 
                 error={formik.touched.aptis_type_id && Boolean(formik.errors.aptis_type_id)}
-                disabled={loading}
+                disabled={loading || publicDataLoading}
               >
                 <InputLabel>Loại APTIS *</InputLabel>
                 <Select
@@ -132,11 +142,17 @@ const ExamForm = ({ examData, onSubmit, loading = false, isEditing = false }) =>
                   onBlur={formik.handleBlur}
                   label="Loại APTIS *"
                 >
-                  {aptisTypes.map((type) => (
-                    <MenuItem key={type.id} value={type.id}>
-                      {type.aptis_type_name}
+                  {aptisTypes && aptisTypes.length > 0 ? (
+                    aptisTypes.map((type) => (
+                      <MenuItem key={type.id} value={type.id}>
+                        {type.aptis_type_name || type.name || 'Unknown'}
+                      </MenuItem>
+                    ))
+                  ) : (
+                    <MenuItem value="" disabled>
+                      {publicDataLoading ? 'Đang tải...' : 'Không có dữ liệu'}
                     </MenuItem>
-                  ))}
+                  )}
                 </Select>
                 {formik.touched.aptis_type_id && formik.errors.aptis_type_id && (
                   <FormHelperText>{formik.errors.aptis_type_id}</FormHelperText>
@@ -159,110 +175,8 @@ const ExamForm = ({ examData, onSubmit, loading = false, isEditing = false }) =>
                 inputProps={{ min: 1, max: 600 }}
               />
             </Grid>
-
-            {/* Additional information for editing mode */}
-            {isEditing && examData && (
-              <>
-                <Grid item xs={12}>
-                  <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-                    <Typography variant="h6" gutterBottom>
-                      Thông tin bổ sung
-                    </Typography>
-                    <Grid container spacing={2}>
-                      <Grid item xs={6} sm={3}>
-                        <Typography variant="body2" color="text.secondary">
-                          Trạng thái
-                        </Typography>
-                        <Typography variant="body1" fontWeight={500}>
-                          {examData.status === 'published' ? 'Đã xuất bản' : 'Bản nháp'}
-                        </Typography>
-                      </Grid>
-                      
-                      <Grid item xs={6} sm={3}>
-                        <Typography variant="body2" color="text.secondary">
-                          Số phần thi
-                        </Typography>
-                        <Typography variant="body1" fontWeight={500}>
-                          {examData.sections?.length || 0}
-                        </Typography>
-                      </Grid>
-                      
-                      <Grid item xs={6} sm={3}>
-                        <Typography variant="body2" color="text.secondary">
-                          Tổng câu hỏi
-                        </Typography>
-                        <Typography variant="body1" fontWeight={500}>
-                          {examData.sections?.reduce((total, section) => 
-                            total + (section.questions?.length || 0), 0) || 0}
-                        </Typography>
-                      </Grid>
-                      
-                      <Grid item xs={6} sm={3}>
-                        <Typography variant="body2" color="text.secondary">
-                          Điểm tối đa
-                        </Typography>
-                        <Typography variant="body1" fontWeight={500}>
-                          {examData.total_score || 0}
-                        </Typography>
-                      </Grid>
-                      
-                      {examData.created_at && (
-                        <Grid item xs={6} sm={3}>
-                          <Typography variant="body2" color="text.secondary">
-                            Ngày tạo
-                          </Typography>
-                          <Typography variant="body1">
-                            {new Date(examData.created_at).toLocaleDateString('vi-VN')}
-                          </Typography>
-                        </Grid>
-                      )}
-                      
-                      {examData.published_at && (
-                        <Grid item xs={6} sm={3}>
-                          <Typography variant="body2" color="text.secondary">
-                            Ngày xuất bản
-                          </Typography>
-                          <Typography variant="body1">
-                            {new Date(examData.published_at).toLocaleDateString('vi-VN')}
-                          </Typography>
-                        </Grid>
-                      )}
-                    </Grid>
-                  </Box>
-                </Grid>
-              </>
-            )}
           </Grid>
-
-          {!isEditing && (
-            <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-              <Button
-                type="submit"
-                variant="contained"
-                disabled={loading || !formik.isValid}
-              >
-                {loading ? 'Đang lưu...' : 'Tiếp tục'}
-              </Button>
-            </Box>
-          )}
         </form>
-
-        {/* Form debugging info (development only) */}
-        {process.env.NODE_ENV === 'development' && (
-          <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
-            <Typography variant="caption" display="block">
-              Debug: Form dirty: {formik.dirty.toString()}, Valid: {formik.isValid.toString()}
-            </Typography>
-            <Typography variant="caption" display="block">
-              Values: {JSON.stringify(formik.values)}
-            </Typography>
-            {Object.keys(formik.errors).length > 0 && (
-              <Typography variant="caption" display="block" color="error">
-                Errors: {JSON.stringify(formik.errors)}
-              </Typography>
-            )}
-          </Box>
-        )}
       </CardContent>
     </Card>
   );

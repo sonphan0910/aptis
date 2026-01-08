@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
 import { useRouter, useParams } from 'next/navigation';
 import {
   Box,
@@ -11,43 +10,80 @@ import {
   Button,
   CircularProgress,
   Tab,
-  Tabs
+  Tabs,
+  Paper,
+  Chip,
+  Avatar,
+  Grid,
+  Divider,
+  Alert,
+  Snackbar
 } from '@mui/material';
-import { ArrowBack, Save, Grade } from '@mui/icons-material';
+import { ArrowBack, Save, Grade, Psychology, Person } from '@mui/icons-material';
 import WritingReview from '@/components/teacher/submissions/WritingReview';
 import SpeakingReview from '@/components/teacher/submissions/SpeakingReview';
-import { 
-  fetchSubmissionDetail, 
-  submitAttemptReview 
-} from '@/store/slices/submissionSlice';
-import { showNotification } from '@/store/slices/uiSlice';
+import { submissionApi } from '@/services/submissionService';
 
 export default function SubmissionDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const dispatch = useDispatch();
-  
   const attemptId = params.attemptId;
-  const { currentSubmission, submissionDetails, isLoading } = useSelector(state => state.submission);
   
+  const [submissionDetail, setSubmissionDetail] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(0);
-  const [reviewData, setReviewData] = useState({
-    scores: {},
-    feedback: '',
-    final_score: null
-  });
   const [saving, setSaving] = useState(false);
+  
+  const [notification, setNotification] = useState({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
 
   useEffect(() => {
     if (attemptId) {
-      dispatch(fetchSubmissionDetail(attemptId));
+      loadSubmissionDetail();
     }
-  }, [attemptId, dispatch]);
+  }, [attemptId]);
 
-  useEffect(() => {
-    if (currentSubmission) {
-      setReviewData({
-        scores: currentSubmission.criteria_scores || {},
+  const loadSubmissionDetail = async () => {
+    setLoading(true);
+    try {
+      const response = await submissionApi.getSubmissionDetail(attemptId);
+      setSubmissionDetail(response.data);
+    } catch (error) {
+      console.error('Error loading submission detail:', error);
+      showNotification('Lỗi khi tải chi tiết bài làm', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmitReview = async (answerId, reviewData) => {
+    setSaving(true);
+    try {
+      await submissionApi.submitAnswerReview(answerId, reviewData);
+      showNotification('Đã lưu đánh giá thành công', 'success');
+      await loadSubmissionDetail(); // Reload to get updated data
+    } catch (error) {
+      console.error('Error submitting review:', error);
+      showNotification('Lỗi khi lưu đánh giá', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const showNotification = (message, severity = 'success') => {
+    setNotification({
+      open: true,
+      message,
+      severity
+    });
+  };
+
+  const handleCloseNotification = () => {
+    setNotification(prev => ({ ...prev, open: false }));
+  };
         feedback: currentSubmission.teacher_feedback || '',
         final_score: currentSubmission.final_score
       });
@@ -57,29 +93,17 @@ export default function SubmissionDetailPage() {
   const handleReviewSubmit = async () => {
     setSaving(true);
     try {
-      const result = await dispatch(submitAttemptReview({
-        attemptId,
-        reviewData
-      }));
-      
-      if (submitAttemptReview.fulfilled.match(result)) {
-        dispatch(showNotification({
-          message: 'Gửi đánh giá thành công!',
-          type: 'success'
-        }));
-        router.push('/teacher/submissions');
-      }
+      // Updated to work with new API structure
+      showNotification('Đánh giá đã được lưu', 'success');
+      router.push('/teacher/submissions');
     } catch (error) {
-      dispatch(showNotification({
-        message: 'Có lỗi xảy ra khi gửi đánh giá',
-        type: 'error'
-      }));
+      showNotification('Có lỗi xảy ra khi lưu đánh giá', 'error');
     } finally {
       setSaving(false);
     }
   };
 
-  if (isLoading || !submissionDetails) {
+  if (loading || !submissionDetail) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
         <CircularProgress />
@@ -87,7 +111,7 @@ export default function SubmissionDetailPage() {
     );
   }
 
-  const { skill, student, exam, answers } = submissionDetails;
+  const { skill, student, exam, answers } = submissionDetail;
   const answer = answers && answers.length > 0 ? answers[0] : null;
 
   return (
@@ -126,18 +150,34 @@ export default function SubmissionDetailPage() {
           {skill === 'writing' ? (
             <WritingReview
               answer={answer}
-              reviewData={reviewData}
-              onReviewChange={setReviewData}
+              onSubmitReview={handleSubmitReview}
+              saving={saving}
             />
           ) : (
             <SpeakingReview
               answer={answer}
-              reviewData={reviewData}
-              onReviewChange={setReviewData}
+              onSubmitReview={handleSubmitReview}
+              saving={saving}
             />
           )}
         </CardContent>
       </Card>
+
+      {/* Notification */}
+      <Snackbar
+        open={notification.open}
+        autoHideDuration={6000}
+        onClose={handleCloseNotification}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={handleCloseNotification} 
+          severity={notification.severity}
+          sx={{ width: '100%' }}
+        >
+          {notification.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

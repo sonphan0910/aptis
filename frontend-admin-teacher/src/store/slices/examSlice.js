@@ -28,11 +28,31 @@ const initialState = {
 // Async thunks
 export const fetchExams = createAsyncThunk(
   'exams/fetchExams',
-  async ({ page = 1, limit = 10, filters = {} }, { rejectWithValue }) => {
+  async (params, { rejectWithValue }) => {
     try {
-      const response = await examApi.getExams({ page, limit, ...filters });
+      const { page = 1, limit = 10, filters = {} } = params;
+      
+      // Build query params, filtering out undefined/null/empty values
+      const queryParams = {
+        page,
+        limit
+      };
+      
+      // Add filters if they have values
+      if (filters.aptis_type) queryParams.aptis_type = filters.aptis_type;
+      if (filters.skill) queryParams.skill = filters.skill;
+      if (filters.status) queryParams.status = filters.status;
+      if (filters.search) queryParams.search = filters.search;
+      
+      console.log('[Redux] fetchExams called with params:', queryParams);
+      
+      const response = await examApi.getExams(queryParams);
+      
+      console.log('[Redux] fetchExams response:', response);
+      
       return response;
     } catch (error) {
+      console.error('[Redux] fetchExams error:', error);
       return rejectWithValue(error.message || 'Failed to fetch exams');
     }
   }
@@ -43,7 +63,9 @@ export const fetchExamById = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       const response = await examApi.getExamById(id);
-      return response;
+      console.log('[fetchExamById] Response:', response);
+      // response is { success: true, data: exam }
+      return response.data || response;
     } catch (error) {
       return rejectWithValue(error.message || 'Failed to fetch exam');
     }
@@ -64,10 +86,12 @@ export const createExam = createAsyncThunk(
 
 export const updateExam = createAsyncThunk(
   'exams/updateExam',
-  async ({ id, examData }, { rejectWithValue }) => {
+  async ({ id, data }, { rejectWithValue }) => {
     try {
-      const response = await examApi.updateExam(id, examData);
-      return response;
+      const response = await examApi.updateExam(id, data);
+      console.log('[updateExam] Response:', response);
+      // response is { success: true, data: exam }
+      return response.data || response;
     } catch (error) {
       return rejectWithValue(error.message || 'Failed to update exam');
     }
@@ -143,6 +167,19 @@ export const addExamSection = createAsyncThunk(
       return response;
     } catch (error) {
       return rejectWithValue(error.message || 'Failed to add section to exam');
+    }
+  }
+);
+
+// Update section
+export const updateExamSection = createAsyncThunk(
+  'exams/updateSection',
+  async ({ examId, sectionId, sectionData }, { rejectWithValue }) => {
+    try {
+      const response = await examApi.updateSection(examId, sectionId, sectionData);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.message || 'Failed to update section');
     }
   }
 );
@@ -490,6 +527,24 @@ const examSlice = createSlice({
         state.error = null;
       })
       .addCase(addExamSection.rejected, (state, action) => {
+        state.error = action.payload;
+      })
+      
+      .addCase(updateExamSection.pending, (state) => {
+        state.error = null;
+      })
+      .addCase(updateExamSection.fulfilled, (state, action) => {
+        if (state.currentExam && state.currentExam.sections) {
+          const index = state.currentExam.sections.findIndex(
+            section => section.id === action.payload.data.id
+          );
+          if (index !== -1) {
+            state.currentExam.sections[index] = action.payload.data;
+          }
+        }
+        state.error = null;
+      })
+      .addCase(updateExamSection.rejected, (state, action) => {
         state.error = action.payload;
       })
       

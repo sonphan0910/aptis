@@ -8,9 +8,11 @@ const {
   QuestionType,
   SkillType,
   User,
+  sequelize,
 } = require('../../models');
 const { paginate, paginationResponse } = require('../../utils/helpers');
 const { NotFoundError } = require('../../utils/errors');
+const { Op } = require('sequelize');
 
 /**
  * Get pending answers for review
@@ -234,7 +236,21 @@ exports.getReviewsByExam = async (req, res, next) => {
  */
 exports.getSubmissions = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, answer_type, needs_review } = req.query;
+    const { 
+      page = 1, 
+      limit = 20, 
+      answer_type, 
+      needs_review, 
+      exam_id,
+      student_id,
+      skill_type,
+      grading_status,
+      has_ai_feedback,
+      score_range_min,
+      score_range_max,
+      date_from,
+      date_to
+    } = req.query;
     const { offset, limit: validLimit } = paginate(page, limit);
 
     const where = {};
@@ -252,12 +268,73 @@ exports.getSubmissions = async (req, res, next) => {
       where.needs_review = needs_review === 'true';
     }
 
+    // Filter by grading status
+    if (grading_status) {
+      switch (grading_status) {
+        case 'ungraded':
+          where.score = null;
+          break;
+        case 'ai_graded':
+          where.ai_graded_at = { [Op.ne]: null };
+          where.reviewed_at = null;
+          break;
+        case 'manually_graded':
+          where.reviewed_at = { [Op.ne]: null };
+          break;
+        case 'needs_review':
+          where.needs_review = true;
+          break;
+      }
+    }
+
+    // Filter by AI feedback presence
+    if (has_ai_feedback !== undefined) {
+      if (has_ai_feedback === 'true') {
+        where.ai_feedback = { [Op.ne]: null };
+      } else {
+        where.ai_feedback = null;
+      }
+    }
+
+    // Score range filter
+    if (score_range_min !== undefined || score_range_max !== undefined) {
+      where.final_score = {};
+      if (score_range_min !== undefined) {
+        where.final_score[Op.gte] = parseFloat(score_range_min);
+      }
+      if (score_range_max !== undefined) {
+        where.final_score[Op.lte] = parseFloat(score_range_max);
+      }
+    }
+
+    // Date range filter
+    if (date_from || date_to) {
+      where.answered_at = {};
+      if (date_from) {
+        where.answered_at[Op.gte] = new Date(date_from);
+      }
+      if (date_to) {
+        where.answered_at[Op.lte] = new Date(date_to);
+      }
+    }
+
+    // Include conditions for attempt filtering
+    const attemptWhere = {};
+    if (exam_id) {
+      attemptWhere.exam_id = parseInt(exam_id);
+    }
+    if (student_id) {
+      attemptWhere.student_id = parseInt(student_id);
+    }
+
     const { count, rows } = await AttemptAnswer.findAndCountAll({
       where,
       include: [
         {
           model: ExamAttempt,
           as: 'attempt',
+          where: Object.keys(attemptWhere).length > 0 ? attemptWhere : undefined,
+          attributes: ['id', 'student_id', 'exam_id', 'attempt_type', 'selected_skill_id', 'attempt_number', 'start_time', 'end_time', 'status', 'total_score'],
           include: [
             {
               model: User,
@@ -268,20 +345,13 @@ exports.getSubmissions = async (req, res, next) => {
               model: Exam,
               as: 'exam',
               attributes: ['id', 'title'],
-              include: [
-                {
-                  model: ExamSection,
-                  as: 'sections',
-                  attributes: ['id', 'skill_type_id'],
-                  include: [
-                    {
-                      model: SkillType,
-                      as: 'skillType',
-                      attributes: ['id', 'name'],
-                    },
-                  ],
-                },
-              ],
+            },
+            {
+              model: SkillType,
+              as: 'selectedSkill',
+              attributes: ['id', 'code', 'skill_type_name'],
+              required: skill_type ? true : false,
+              where: skill_type ? { code: skill_type } : undefined,
             },
           ],
         },
@@ -289,21 +359,72 @@ exports.getSubmissions = async (req, res, next) => {
           model: Question,
           as: 'question',
           attributes: ['id', 'content', 'difficulty'],
+          include: [
+            {
+              model: QuestionType,
+              as: 'questionType',
+              attributes: ['id', 'code', 'question_type_name'],
+            },
+          ],
+        },
+        {
+          model: User,
+          as: 'reviewer',
+          attributes: ['id', 'full_name'],
+          required: false,
         },
       ],
       offset,
       limit: validLimit,
       order: [['answered_at', 'DESC']],
+      subQuery: false,
     });
+
+    // Transform data to include grading status and flags
+    const transformedRows = rows.map(row => ({
+      ...row.toJSON(),
+      grading_status: getGradingStatus(row),
+      can_regrade: canRegrade(row),
+      has_ai_feedback: !!row.ai_feedback,
+      review_priority: getReviewPriority(row),
+    }));
 
     res.json({
       success: true,
-      ...paginationResponse(rows, parseInt(page), validLimit, count),
+      ...paginationResponse(transformedRows, parseInt(page), validLimit, count),
     });
   } catch (error) {
     next(error);
   }
 };
+
+// Helper functions
+function getGradingStatus(answer) {
+  if (!answer.score) return 'ungraded';
+  if (answer.reviewed_at) return 'manually_graded';
+  if (answer.ai_graded_at) return 'ai_graded';
+  if (answer.auto_graded_at) return 'auto_graded';
+  return 'unknown';
+}
+
+function canRegrade(answer) {
+  // Can regrade if:
+  // 1. Has AI feedback but not manually reviewed
+  // 2. Needs review flag is set
+  // 3. Has been auto-graded but teacher wants to override
+  return !answer.reviewed_at && (
+    answer.needs_review || 
+    answer.ai_graded_at || 
+    answer.auto_graded_at
+  );
+}
+
+function getReviewPriority(answer) {
+  if (answer.needs_review) return 'high';
+  if (answer.ai_graded_at && !answer.reviewed_at) return 'medium';
+  if (answer.auto_graded_at && !answer.reviewed_at) return 'low';
+  return 'none';
+}
 
 /**
  * Get submission detail for review
@@ -487,6 +608,169 @@ exports.updateAnswerScore = async (req, res, next) => {
     res.json({
       success: true,
       data: answer,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Regrade submissions (trigger AI regrading)
+ */
+exports.regradeSubmissions = async (req, res, next) => {
+  try {
+    const { answerIds, regradeType = 'ai' } = req.body;
+    const teacherId = req.user.userId;
+
+    if (!answerIds || !Array.isArray(answerIds)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Answer IDs array is required',
+      });
+    }
+
+    const answers = await AttemptAnswer.findAll({
+      where: { 
+        id: answerIds,
+        // Only allow regrading if not manually reviewed or if specifically requested
+        [Op.or]: [
+          { reviewed_at: null },
+          { needs_review: true }
+        ]
+      },
+    });
+
+    if (answers.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No eligible answers found for regrading',
+      });
+    }
+
+    const updatePromises = answers.map(answer => {
+      const updateData = {
+        needs_review: true,
+        reviewed_at: null, // Reset manual review
+        reviewed_by: null,
+      };
+
+      if (regradeType === 'reset') {
+        // Complete reset
+        updateData.ai_graded_at = null;
+        updateData.ai_feedback = null;
+        updateData.score = null;
+        updateData.final_score = null;
+      }
+
+      return answer.update(updateData);
+    });
+
+    await Promise.all(updatePromises);
+
+    // TODO: Trigger AI regrading service here
+    // await triggerAIRegrading(answerIds);
+
+    res.json({
+      success: true,
+      message: `Successfully marked ${answers.length} submissions for regrading`,
+      data: {
+        regradedCount: answers.length,
+        regradeType,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Bulk update submission status
+ */
+exports.bulkUpdateStatus = async (req, res, next) => {
+  try {
+    const { answerIds, status, needsReview } = req.body;
+    const teacherId = req.user.userId;
+
+    if (!answerIds || !Array.isArray(answerIds)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Answer IDs array is required',
+      });
+    }
+
+    const updateData = {};
+    
+    if (needsReview !== undefined) {
+      updateData.needs_review = needsReview;
+    }
+
+    if (status === 'reviewed') {
+      updateData.reviewed_by = teacherId;
+      updateData.reviewed_at = new Date();
+      updateData.needs_review = false;
+    } else if (status === 'pending') {
+      updateData.reviewed_by = null;
+      updateData.reviewed_at = null;
+      updateData.needs_review = true;
+    }
+
+    const [updatedCount] = await AttemptAnswer.update(updateData, {
+      where: { id: answerIds },
+    });
+
+    res.json({
+      success: true,
+      message: `Successfully updated ${updatedCount} submissions`,
+      data: {
+        updatedCount,
+        status,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Get grading statistics
+ */
+exports.getGradingStats = async (req, res, next) => {
+  try {
+    const { exam_id, date_from, date_to } = req.query;
+
+    const where = {
+      answer_type: ['text', 'audio'], // Only writing and speaking
+    };
+
+    if (exam_id) {
+      const attempts = await ExamAttempt.findAll({
+        where: { exam_id },
+        attributes: ['id'],
+      });
+      where.attempt_id = attempts.map(a => a.id);
+    }
+
+    if (date_from || date_to) {
+      where.answered_at = {};
+      if (date_from) where.answered_at[Op.gte] = new Date(date_from);
+      if (date_to) where.answered_at[Op.lte] = new Date(date_to);
+    }
+
+    const stats = await AttemptAnswer.findAll({
+      where,
+      attributes: [
+        [sequelize.fn('COUNT', sequelize.col('id')), 'total'],
+        [sequelize.fn('SUM', sequelize.literal('CASE WHEN score IS NULL THEN 1 ELSE 0 END')), 'ungraded'],
+        [sequelize.fn('SUM', sequelize.literal('CASE WHEN ai_graded_at IS NOT NULL AND reviewed_at IS NULL THEN 1 ELSE 0 END')), 'ai_graded'],
+        [sequelize.fn('SUM', sequelize.literal('CASE WHEN reviewed_at IS NOT NULL THEN 1 ELSE 0 END')), 'manually_graded'],
+        [sequelize.fn('SUM', sequelize.literal('CASE WHEN needs_review = 1 THEN 1 ELSE 0 END')), 'needs_review'],
+      ],
+      raw: true,
+    });
+
+    res.json({
+      success: true,
+      data: stats[0],
     });
   } catch (error) {
     next(error);

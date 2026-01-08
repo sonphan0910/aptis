@@ -85,12 +85,27 @@ router.put(
   examController.updateExam,
 );
 
+router.delete(
+  '/exams/:examId',
+  authMiddleware,
+  isTeacherOrAdmin,
+  examController.deleteExam,
+);
+
 router.post(
   '/exams/:examId/sections',
   authMiddleware,
   isTeacherOrAdmin,
   validate(examSchemas.addSection),
   examController.addSection,
+);
+
+router.put(
+  '/exams/:examId/sections/:sectionId',
+  authMiddleware,
+  isTeacherOrAdmin,
+  validate(examSchemas.updateSection),
+  examController.updateSection,
 );
 
 router.post(
@@ -257,6 +272,28 @@ router.post(
   authMiddleware,
   isTeacherOrAdmin,
   reviewController.submitAttemptReview,
+);
+
+// New submission management routes
+router.post(
+  '/submissions/regrade',
+  authMiddleware,
+  isTeacherOrAdmin,
+  reviewController.regradeSubmissions,
+);
+
+router.post(
+  '/submissions/bulk-update',
+  authMiddleware,
+  isTeacherOrAdmin,
+  reviewController.bulkUpdateStatus,
+);
+
+router.get(
+  '/submissions/stats',
+  authMiddleware,
+  isTeacherOrAdmin,
+  reviewController.getGradingStats,
 );
 
 // Report routes

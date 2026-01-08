@@ -22,19 +22,16 @@ import {
   Add,
   Edit,
   Delete,
-  Visibility,
   Publish,
   UnpublishedOutlined
 } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import { fetchExams, deleteExam, publishExam, unpublishExam } from '@/store/slices/examSlice';
-import { 
-  DEFAULT_FILTER_OPTIONS,
-  DEFAULT_APTIS_TYPES,
-  DEFAULT_SKILLS
-} from '@/constants/filterOptions';
+import { showNotification } from '@/store/slices/uiSlice';
+import { usePublicData } from '@/hooks/usePublicData';
 import DataTable from '@/components/shared/DataTable';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
+import DeleteExamDialog from './DeleteExamDialog';
 
 export default function ExamList({
   showActions = true,
@@ -44,7 +41,15 @@ export default function ExamList({
   const router = useRouter();
   const dispatch = useDispatch();
   const { exams, isLoading: loading, pagination } = useSelector(state => state.exams);
+  const { aptisTypes, skillTypes, loading: publicDataLoading, error: publicDataError } = usePublicData();
   const [isClient, setIsClient] = useState(false);
+  
+  useEffect(() => {
+    console.log('[ExamList] APTIS Types received:', aptisTypes);
+    console.log('[ExamList] Skill Types received:', skillTypes);
+    console.log('[ExamList] Public data loading:', publicDataLoading);
+    console.log('[ExamList] Public data error:', publicDataError);
+  }, [aptisTypes, skillTypes, publicDataLoading, publicDataError]);
   
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
@@ -66,16 +71,37 @@ export default function ExamList({
     }
   }, [isClient, searchTerm, filters]);
 
+  useEffect(() => {
+    console.log('[ExamList] Filter changed:', {
+      aptis_type: filters.aptis_type,
+      skill: filters.skill,
+      status: filters.status
+    });
+  }, [filters]);
+
   const handleFetchExams = (page = 1) => {
+    // Build filter params - convert to proper types and remove empty values
     const filterParams = {};
-    if (filters.aptis_type) filterParams.aptis_type = filters.aptis_type;
-    if (filters.skill) filterParams.skill = filters.skill;
-    if (filters.status) filterParams.status = filters.status;
+    
+    if (filters.aptis_type) {
+      filterParams.aptis_type = String(filters.aptis_type);
+    }
+    if (filters.skill) {
+      filterParams.skill = String(filters.skill);
+    }
+    if (filters.status) {
+      filterParams.status = String(filters.status);
+    }
+    
+    console.log('[ExamList] handleFetchExams - page:', page, 'filters:', filterParams, 'search:', searchTerm);
     
     dispatch(fetchExams({
       page,
-      search: searchTerm,
-      ...filterParams
+      limit: 10,
+      filters: {
+        ...filterParams,
+        search: searchTerm
+      }
     }));
   };
 
@@ -87,19 +113,33 @@ export default function ExamList({
     }
   };
 
-  const handlePreview = (examId) => {
-    window.open(`/exam-preview/${examId}`, '_blank');
-  };
-
   const handlePublish = async (exam) => {
     setPublishingExam(exam);
     try {
+      let result;
       if (exam.is_published) {
-        await dispatch(unpublishExam(exam.id));
+        result = await dispatch(unpublishExam(exam.id));
+        if (unpublishExam.fulfilled.match(result)) {
+          dispatch(showNotification({
+            message: 'Hủy công khai bài thi thành công',
+            type: 'success'
+          }));
+        }
       } else {
-        await dispatch(publishExam(exam.id));
+        result = await dispatch(publishExam(exam.id));
+        if (publishExam.fulfilled.match(result)) {
+          dispatch(showNotification({
+            message: 'Công khai bài thi thành công',
+            type: 'success'
+          }));
+        }
       }
       handleFetchExams();
+    } catch (error) {
+      dispatch(showNotification({
+        message: 'Có lỗi xảy ra khi thay đổi trạng thái bài thi',
+        type: 'error'
+      }));
     } finally {
       setPublishingExam(null);
     }
@@ -111,9 +151,23 @@ export default function ExamList({
 
   const confirmDeleteExam = async () => {
     if (confirmDelete) {
-      await dispatch(deleteExam(confirmDelete.id));
-      setConfirmDelete(null);
-      handleFetchExams();
+      try {
+        const result = await dispatch(deleteExam(confirmDelete.id));
+        if (deleteExam.fulfilled.match(result)) {
+          dispatch(showNotification({
+            message: 'Xóa bài thi thành công',
+            type: 'success'
+          }));
+          handleFetchExams();
+        }
+      } catch (error) {
+        dispatch(showNotification({
+          message: 'Có lỗi xảy ra khi xóa bài thi',
+          type: 'error'
+        }));
+      } finally {
+        setConfirmDelete(null);
+      }
     }
   };
 
@@ -179,13 +233,6 @@ export default function ExamList({
         <Box>
           <IconButton
             size="small"
-            onClick={() => handlePreview(row.id)}
-            color="info"
-          >
-            <Visibility />
-          </IconButton>
-          <IconButton
-            size="small"
             onClick={() => handleEdit(row.id)}
             color="primary"
           >
@@ -203,7 +250,8 @@ export default function ExamList({
             size="small"
             onClick={() => handleDelete(row)}
             color="error"
-            disabled={row.is_published}
+            disabled={row.is_published || row.attempt_count > 0}
+            title={row.attempt_count > 0 ? `${row.attempt_count} học sinh đã làm bài thi này` : row.is_published ? 'Không thể xóa bài thi đã công khai' : ''}
           >
             <Delete />
           </IconButton>
@@ -257,13 +305,20 @@ export default function ExamList({
                   value={filters.aptis_type}
                   label="Loại APTIS"
                   onChange={(e) => setFilters(prev => ({ ...prev, aptis_type: e.target.value }))}
+                  disabled={publicDataLoading}
                 >
                   <MenuItem value="">Tất cả</MenuItem>
-                  {DEFAULT_FILTER_OPTIONS.aptisTypes.map((option) => (
-                    <MenuItem key={option.value} value={option.value}>
-                      {option.label}
+                  {aptisTypes && aptisTypes.length > 0 ? (
+                    aptisTypes.map((type) => (
+                      <MenuItem key={type.id} value={type.id}>
+                        {type.aptis_type_name || type.name || 'Unknown'}
+                      </MenuItem>
+                    ))
+                  ) : (
+                    <MenuItem value="" disabled>
+                      {publicDataLoading ? 'Đang tải...' : 'Không có dữ liệu'}
                     </MenuItem>
-                  ))}
+                  )}
                 </Select>
               </FormControl>
 
@@ -273,13 +328,20 @@ export default function ExamList({
                   value={filters.skill}
                   label="Kỹ năng"
                   onChange={(e) => setFilters(prev => ({ ...prev, skill: e.target.value }))}
+                  disabled={publicDataLoading}
                 >
                   <MenuItem value="">Tất cả</MenuItem>
-                  {DEFAULT_FILTER_OPTIONS.skills.map((option) => (
-                    <MenuItem key={option.value} value={option.value}>
-                      {option.label}
+                  {skillTypes && skillTypes.length > 0 ? (
+                    skillTypes.map((skill) => (
+                      <MenuItem key={skill.id} value={skill.id}>
+                        {skill.skill_type_name || skill.name || 'Unknown'}
+                      </MenuItem>
+                    ))
+                  ) : (
+                    <MenuItem value="" disabled>
+                      {publicDataLoading ? 'Đang tải...' : 'Không có dữ liệu'}
                     </MenuItem>
-                  ))}
+                  )}
                 </Select>
               </FormControl>
 
@@ -310,12 +372,12 @@ export default function ExamList({
       />
 
       {isClient && (
-        <ConfirmDialog
+        <DeleteExamDialog
           open={!!confirmDelete}
-          title="Xóa bài thi"
-          content={`Bạn có chắc muốn xóa bài thi "${confirmDelete?.title}"? Hành động này không thể hoàn tác.`}
+          exam={confirmDelete}
           onConfirm={confirmDeleteExam}
-          onCancel={() => setConfirmDelete(null)}
+          onClose={() => setConfirmDelete(null)}
+          loading={false}
         />
       )}
     </Box>

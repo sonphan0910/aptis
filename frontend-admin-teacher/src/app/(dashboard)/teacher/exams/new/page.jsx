@@ -8,7 +8,10 @@ import {
   Typography,
   Card,
   CardContent,
-  Button
+  Button,
+  Breadcrumbs,
+  Link,
+  Alert
 } from '@mui/material';
 import { ArrowBack } from '@mui/icons-material';
 import ExamForm from '@/components/teacher/exams/ExamForm';
@@ -20,9 +23,12 @@ export default function NewExamPage() {
   const dispatch = useDispatch();
   
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const handleFormSubmit = async (formData) => {
     setLoading(true);
+    setError(null);
+    
     try {
       const result = await dispatch(createExam(formData));
       
@@ -32,11 +38,14 @@ export default function NewExamPage() {
           type: 'success'
         }));
         
-        // Redirect to exam detail page for further editing
-        const examId = result.payload.data.id;
-        router.push(`/teacher/exams/${examId}`);
+        // Redirect back to exam list
+        router.push('/teacher/exams');
+      } else {
+        setError('Có lỗi xảy ra khi tạo bài thi');
       }
     } catch (error) {
+      console.error('Create exam error:', error);
+      setError(error.message || 'Có lỗi xảy ra khi tạo bài thi');
       dispatch(showNotification({
         message: 'Có lỗi xảy ra khi tạo bài thi',
         type: 'error'
@@ -46,12 +55,33 @@ export default function NewExamPage() {
     }
   };
 
+  const handleBack = () => {
+    router.push('/teacher/exams');
+  };
+
   return (
     <Box>
+      {/* Breadcrumbs */}
+      <Breadcrumbs sx={{ mb: 3 }}>
+        <Link 
+          underline="hover" 
+          color="inherit" 
+          onClick={handleBack}
+          sx={{ cursor: 'pointer' }}
+        >
+          Quản lý bài thi
+        </Link>
+        <Typography color="text.primary">
+          Tạo bài thi mới
+        </Typography>
+      </Breadcrumbs>
+
+      {/* Header */}
       <Box display="flex" alignItems="center" mb={3}>
         <Button
           startIcon={<ArrowBack />}
-          onClick={() => router.push('/teacher/exams')}
+          onClick={handleBack}
+          variant="outlined"
           sx={{ mr: 2 }}
         >
           Quay lại
@@ -61,23 +91,19 @@ export default function NewExamPage() {
         </Typography>
       </Box>
 
-      <Card>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            Thông tin cơ bản
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Tạo thông tin cơ bản cho bài thi. Sau khi tạo, bạn có thể thêm các phần thi và câu hỏi.
-          </Typography>
-          
-          <ExamForm
-            examData={null}
-            onSubmit={handleFormSubmit}
-            loading={loading}
-            isEditing={false}
-          />
-        </CardContent>
-      </Card>
+      {/* Error Alert */}
+      {error && (
+        <Alert severity="error" sx={{ mb: 3 }}>
+          {error}
+        </Alert>
+      )}
+
+      {/* Form */}
+      <ExamForm 
+        onSubmit={handleFormSubmit} 
+        loading={loading}
+        isEditing={false}
+      />
     </Box>
   );
 }
