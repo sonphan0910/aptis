@@ -25,7 +25,7 @@ import {
 
 // Import practice question components
 import PracticeListeningQuestionNew from '@/components/practice/PracticeListeningQuestionNew';
-import PracticeReadingQuestionNew from '@/components/practice/PracticeReadingQuestionNew';
+import PracticeReadingQuestionNew from '@/components/practice/PracticeReadingQuestionUpdated';
 import PracticeWritingQuestionNew from '@/components/practice/PracticeWritingQuestionNew';
 import PracticeSpeakingQuestionNew from '@/components/practice/PracticeSpeakingQuestionNew';
 
@@ -94,6 +94,7 @@ function PracticeSessionContent() {
     for (let i = 0; i < 10; i++) {
       baseQuestions.push({
         id: `practice_${skill}_${i + 1}`,
+        question_id: `practice_${skill}_${i + 1}`, // Add this for compatibility
         skill_code: skill,
         question_type: type || getRandomQuestionType(skill),
         difficulty_level: difficulty,

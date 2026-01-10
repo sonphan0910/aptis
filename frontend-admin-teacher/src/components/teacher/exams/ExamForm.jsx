@@ -175,6 +175,22 @@ const ExamForm = ({ examData, onSubmit, loading = false, isEditing = false }) =>
                 inputProps={{ min: 1, max: 600 }}
               />
             </Grid>
+
+            {/* Submit Button */}
+            <Grid item xs={12}>
+              <Box display="flex" justifyContent="flex-end" gap={2} mt={2}>
+                <Button
+                  type="submit"
+                  variant="contained"
+                  color="primary"
+                  disabled={loading || !formik.isValid || (!formik.dirty && !isEditing)}
+                  startIcon={loading ? <CircularProgress size={20} /> : null}
+                  size="large"
+                >
+                  {loading ? 'Đang lưu...' : (isEditing ? 'Lưu thay đổi' : 'Tạo bài thi')}
+                </Button>
+              </Box>
+            </Grid>
           </Grid>
         </form>
       </CardContent>

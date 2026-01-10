@@ -24,13 +24,15 @@ import { getAssetUrl } from '@/services/api';
 
 export default function SpeakingQuestion({ 
   question, 
+  answer,
   onAnswerChange, 
   onMoveToNextQuestion, 
   attemptId, 
   onHideHeader,
   microphoneTestCompleted = false,
   onStartMicrophoneTest,
-  onCompleteMicrophoneTest
+  onCompleteMicrophoneTest,
+  isPractice = false
 }) {
   // Early return if no question
   if (!question) {

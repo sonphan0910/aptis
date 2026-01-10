@@ -248,18 +248,6 @@ export default function ExamDetailPage() {
                 >
                   Hủy
                 </Button>
-                <Button
-                  variant="contained"
-                  color="success"
-                  startIcon={<Save />}
-                  disabled={loading}
-                  onClick={() => {
-                    document.querySelector('form')?.requestSubmit();
-                  }}
-                  size="small"
-                >
-                  {loading ? 'Lưu...' : 'Lưu'}
-                </Button>
               </Box>
             </Box>
             
