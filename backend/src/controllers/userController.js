@@ -11,9 +11,6 @@ const StorageService = require('../services/StorageService');
 const { NotFoundError, BadRequestError, ConflictError } = require('../utils/errors');
 const { Op } = require('sequelize');
 
-/**
- * Get current user profile
- */
 exports.getProfile = async (req, res, next) => {
   try {
     const user = await User.findByPk(req.user.userId);
@@ -31,9 +28,6 @@ exports.getProfile = async (req, res, next) => {
   }
 };
 
-/**
- * Update profile
- */
 exports.updateProfile = async (req, res, next) => {
   try {
     const { full_name, phone } = req.body;
@@ -58,9 +52,6 @@ exports.updateProfile = async (req, res, next) => {
   }
 };
 
-/**
- * Change password
- */
 exports.changePassword = async (req, res, next) => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -71,17 +62,14 @@ exports.changePassword = async (req, res, next) => {
       throw new NotFoundError('User not found');
     }
 
-    // Verify current password
     const { comparePassword, hashPassword } = require('../utils/helpers');
     const isPasswordValid = await comparePassword(currentPassword, user.password_hash);
     if (!isPasswordValid) {
       throw new BadRequestError('Current password is incorrect');
     }
 
-    // Hash new password
     const password_hash = await hashPassword(newPassword);
 
-    // Update password
     await user.update({ password_hash });
 
     res.json({
@@ -93,9 +81,6 @@ exports.changePassword = async (req, res, next) => {
   }
 };
 
-/**
- * Upload avatar
- */
 exports.uploadAvatar = async (req, res, next) => {
   try {
     if (!req.file) {
@@ -109,15 +94,12 @@ exports.uploadAvatar = async (req, res, next) => {
       throw new NotFoundError('User not found');
     }
 
-    // Delete old avatar if exists
     if (user.avatar_url) {
       await StorageService.deleteFile(user.avatar_url);
     }
 
-    // Save new avatar
     const fileInfo = await StorageService.saveFile(req.file, 'avatars');
 
-    // Update user
     await user.update({ avatar_url: fileInfo.url });
 
     res.json({
@@ -131,9 +113,6 @@ exports.uploadAvatar = async (req, res, next) => {
   }
 };
 
-/**
- * Get all users (Admin only)
- */
 exports.getAllUsers = async (req, res, next) => {
   try {
     const { page = 1, limit = 20, role, status, search } = req.query;
@@ -174,24 +153,18 @@ exports.getAllUsers = async (req, res, next) => {
   }
 };
 
-/**
- * Create user (Admin only)
- */
 exports.createUser = async (req, res, next) => {
   try {
     const { email, full_name, role, phone, status = 'active' } = req.body;
 
-    // Check if email exists
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
       throw new ConflictError('Email already exists');
     }
 
-    // Generate temporary password
     const tempPassword = generateRandomPassword(12);
     const password_hash = await hashPassword(tempPassword);
 
-    // Create user
     const user = await User.create({
       email,
       password_hash,
@@ -201,7 +174,6 @@ exports.createUser = async (req, res, next) => {
       status,
     });
 
-    // Send welcome email with temporary password
     await EmailService.sendWelcomeEmail(user, tempPassword).catch((err) =>
       console.error('Failed to send welcome email:', err),
     );
@@ -216,9 +188,6 @@ exports.createUser = async (req, res, next) => {
   }
 };
 
-/**
- * Update user (Admin only)
- */
 exports.updateUser = async (req, res, next) => {
   try {
     const { userId } = req.params;
@@ -245,9 +214,6 @@ exports.updateUser = async (req, res, next) => {
   }
 };
 
-/**
- * Delete user (Admin only)
- */
 exports.deleteUser = async (req, res, next) => {
   try {
     const { userId } = req.params;
@@ -257,7 +223,6 @@ exports.deleteUser = async (req, res, next) => {
       throw new NotFoundError('User not found');
     }
 
-    // Don't allow deleting self
     if (user.id === req.user.userId) {
       throw new BadRequestError('Cannot delete your own account');
     }
@@ -273,9 +238,6 @@ exports.deleteUser = async (req, res, next) => {
   }
 };
 
-/**
- * Reset user password (Admin only)
- */
 exports.resetUserPassword = async (req, res, next) => {
   try {
     const { userId } = req.params;
@@ -285,13 +247,11 @@ exports.resetUserPassword = async (req, res, next) => {
       throw new NotFoundError('User not found');
     }
 
-    // Generate temporary password
     const tempPassword = generateRandomPassword(12);
     const password_hash = await hashPassword(tempPassword);
 
     await user.update({ password_hash });
 
-    // Send email
     await EmailService.sendWelcomeEmail(user, tempPassword);
 
     res.json({

@@ -219,13 +219,13 @@ class PracticeController {
           feedback = `You got ${correctCount} out of ${userAnswers.length} gaps correct.`;
           break;
 
-        case 'WRITING_ESSAY':
+        // case 'WRITING_ESSAY': - removed per APTIS Technical Report
         case 'WRITING_LETTER':
         case 'WRITING_REPORT':
         case 'WRITING_REVIEW':
           // Basic word count and structure check for writing
           const wordCount = answer_data.text ? answer_data.text.trim().split(/\s+/).length : 0;
-          const minWords = question.QuestionType.type_name === 'WRITING_ESSAY' ? 150 : 100;
+          const minWords = 100; // Default min words for writing tasks
           
           if (wordCount >= minWords) {
             score = Math.min(question.max_score, Math.round((wordCount / minWords) * question.max_score * 0.8));
@@ -360,7 +360,7 @@ class PracticeController {
           {
             date: '2024-01-13',
             skill: 'WRITING',
-            question_type: 'WRITING_ESSAY',
+            question_type: 'WRITING_FORM', // Updated per APTIS Technical Report
             score: 6,
             max_score: 10
           }

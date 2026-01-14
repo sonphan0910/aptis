@@ -13,9 +13,6 @@ const { paginate, paginationResponse } = require('../../utils/helpers');
 const { NotFoundError, BadRequestError } = require('../../utils/errors');
 const EmailService = require('../../services/EmailService');
 
-/**
- * Create exam
- */
 exports.createExam = async (req, res, next) => {
   try {
     const { aptis_type_id, title, description, duration_minutes, total_score } = req.body;
@@ -31,7 +28,6 @@ exports.createExam = async (req, res, next) => {
       total_score: total_score || 0,
     });
 
-    // Fetch the created exam with relationships
     const examWithRelations = await Exam.findByPk(exam.id, {
       include: [
         {
@@ -51,9 +47,6 @@ exports.createExam = async (req, res, next) => {
   }
 };
 
-/**
- * Update exam
- */
 exports.updateExam = async (req, res, next) => {
   try {
     const { examId } = req.params;
@@ -71,7 +64,6 @@ exports.updateExam = async (req, res, next) => {
 
     await exam.update(updateData);
 
-    // Fetch updated exam with relationships
     const updatedExam = await Exam.findByPk(examId, {
       include: [
         {
@@ -91,9 +83,6 @@ exports.updateExam = async (req, res, next) => {
   }
 };
 
-/**
- * Delete exam (only if no attempts have been made)
- */
 exports.deleteExam = async (req, res, next) => {
   try {
     const { examId } = req.params;
@@ -105,12 +94,10 @@ exports.deleteExam = async (req, res, next) => {
       throw new NotFoundError('Exam not found');
     }
 
-    // Check if user is the owner of the exam
     if (exam.created_by !== teacherId) {
       throw new BadRequestError('You do not have permission to delete this exam');
     }
 
-    // Check if exam has any attempts
     const attemptCount = await ExamAttempt.count({
       where: { exam_id: examId }
     });
@@ -119,7 +106,6 @@ exports.deleteExam = async (req, res, next) => {
       throw new BadRequestError(`Cannot delete exam because ${attemptCount} student(s) have already taken this exam`);
     }
 
-    // Delete all questions from sections of this exam
     const sections = await ExamSection.findAll({
       where: { exam_id: examId },
       attributes: ['id']
@@ -133,12 +119,10 @@ exports.deleteExam = async (req, res, next) => {
       });
     }
 
-    // Delete all sections
     await ExamSection.destroy({
       where: { exam_id: examId }
     });
 
-    // Delete the exam itself
     await exam.destroy();
 
     res.json({
@@ -150,9 +134,6 @@ exports.deleteExam = async (req, res, next) => {
   }
 };
 
-/**
- * Add section to exam
- */
 exports.addSection = async (req, res, next) => {
   try {
     const { examId } = req.params;
@@ -185,9 +166,6 @@ exports.addSection = async (req, res, next) => {
   }
 };
 
-/**
- * Update section
- */
 exports.updateSection = async (req, res, next) => {
   try {
     const { examId, sectionId } = req.params;
@@ -216,7 +194,6 @@ exports.updateSection = async (req, res, next) => {
       instruction: instruction !== undefined ? instruction : section.instruction,
     });
 
-    // Fetch updated section with relationships
     const updatedSection = await ExamSection.findByPk(sectionId, {
       include: [
         {
@@ -236,9 +213,6 @@ exports.updateSection = async (req, res, next) => {
   }
 };
 
-/**
- * Add question to section
- */
 exports.addQuestionToSection = async (req, res, next) => {
   try {
     const { examId, sectionId } = req.params;
@@ -264,7 +238,6 @@ exports.addQuestionToSection = async (req, res, next) => {
       max_score,
     });
 
-    // Update total score
     const exam = await Exam.findByPk(examId, {
       include: [
         {
@@ -296,9 +269,6 @@ exports.addQuestionToSection = async (req, res, next) => {
   }
 };
 
-/**
- * Remove question from section
- */
 exports.removeQuestionFromSection = async (req, res, next) => {
   try {
     const { examId, sectionId, questionId } = req.params;
@@ -330,9 +300,6 @@ exports.removeQuestionFromSection = async (req, res, next) => {
   }
 };
 
-/**
- * Update question order in section (for drag-drop reordering)
- */
 exports.updateQuestionInSection = async (req, res, next) => {
   try {
     const { examId, sectionId, questionId } = req.params;
@@ -354,7 +321,6 @@ exports.updateQuestionInSection = async (req, res, next) => {
       throw new NotFoundError('Question not found in section');
     }
 
-    // Update order_index and/or points if provided
     if (order_index !== undefined) {
       esq.order_index = order_index;
     }
@@ -374,9 +340,6 @@ exports.updateQuestionInSection = async (req, res, next) => {
   }
 };
 
-/**
- * Publish exam
- */
 exports.publishExam = async (req, res, next) => {
   try {
     const { examId } = req.params;
@@ -405,7 +368,6 @@ exports.publishExam = async (req, res, next) => {
       throw new BadRequestError('Exam already published');
     }
 
-    // Validate exam has sections and questions
     if (!exam.sections || exam.sections.length === 0) {
       throw new BadRequestError('Exam must have at least one section');
     }
@@ -421,7 +383,6 @@ exports.publishExam = async (req, res, next) => {
       published_at: new Date(),
     });
 
-    // Send notification emails if requested
     if (notify_students) {
       const students = await User.findAll({
         where: { role: 'student', status: 'active' },
@@ -444,9 +405,6 @@ exports.publishExam = async (req, res, next) => {
   }
 };
 
-/**
- * Get teacher's exams
- */
 exports.getMyExams = async (req, res, next) => {
   try {
     const { 
@@ -460,32 +418,21 @@ exports.getMyExams = async (req, res, next) => {
     const { offset, limit: validLimit } = paginate(page, limit);
     const teacherId = req.user.userId;
 
-    console.log('[getMyExams] Query params:', { page, limit, status, aptis_type, skill, search, teacherId });
 
     const where = { created_by: teacherId };
-    
-    // Status filter
     if (status && status !== 'undefined') {
       where.status = status;
-      console.log('[getMyExams] Applied status filter:', status);
     }
-    
-    // APTIS type filter - FIX: ensure it's not string 'undefined' or empty
     if (aptis_type && aptis_type !== 'undefined' && aptis_type !== '') {
       where.aptis_type_id = parseInt(aptis_type);
-      console.log('[getMyExams] Applied aptis_type_id filter:', parseInt(aptis_type));
     }
-    
-    // Search filter
     if (search && search !== 'undefined' && search !== '') {
       where[Op.or] = [
         { title: { [Op.like]: `%${search}%` } },
         { description: { [Op.like]: `%${search}%` } }
       ];
-      console.log('[getMyExams] Applied search filter:', search);
     }
 
-    // Build include array
     const include = [
       {
         model: AptisType,
@@ -506,14 +453,11 @@ exports.getMyExams = async (req, res, next) => {
       },
     ];
 
-    // If skill filter is applied, filter by related SkillType
     if (skill && skill !== 'undefined' && skill !== '') {
       include[1].where = { skill_type_id: parseInt(skill) };
       include[1].required = true; // INNER JOIN
-      console.log('[getMyExams] Applied skill filter:', parseInt(skill));
     }
 
-    console.log('[getMyExams] Final where clause:', where);
 
     const { count, rows } = await Exam.findAndCountAll({
       where,
@@ -524,7 +468,6 @@ exports.getMyExams = async (req, res, next) => {
       distinct: true, // Important for counting with joins
     });
 
-    // Get attempt counts for each exam
     const examIds = rows.map(exam => exam.id);
     const attemptCounts = await ExamAttempt.findAll({
       attributes: [
@@ -541,7 +484,6 @@ exports.getMyExams = async (req, res, next) => {
       attemptCountMap[item.exam_id] = parseInt(item.count);
     });
 
-    // Transform data to match frontend expectations
     const transformedRows = rows.map(exam => ({
       id: exam.id,
       title: exam.title,
@@ -570,9 +512,6 @@ exports.getMyExams = async (req, res, next) => {
   }
 };
 
-/**
- * Unpublish exam
- */
 exports.unpublishExam = async (req, res, next) => {
   try {
     const { examId } = req.params;
@@ -601,9 +540,6 @@ exports.unpublishExam = async (req, res, next) => {
   }
 };
 
-/**
- * Remove section from exam
- */
 exports.removeSection = async (req, res, next) => {
   try {
     const { examId, sectionId } = req.params;
@@ -621,12 +557,10 @@ exports.removeSection = async (req, res, next) => {
       throw new NotFoundError('Section not found');
     }
 
-    // Remove all questions from section first
     await ExamSectionQuestion.destroy({
       where: { exam_section_id: sectionId },
     });
 
-    // Remove the section
     await section.destroy();
 
     res.json({
@@ -638,9 +572,6 @@ exports.removeSection = async (req, res, next) => {
   }
 };
 
-/**
- * Get exam by ID (for detailed view)
- */
 exports.getExamById = async (req, res, next) => {
   try {
     const { examId } = req.params;

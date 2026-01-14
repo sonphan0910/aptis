@@ -1,3 +1,20 @@
+/**
+ * =================================================================
+ * ADMIN ROUTES - ĐỊNH TUYẾN QUẢN TRỊ HỆ THỐNG
+ * =================================================================
+ * 
+ * File này quản lý tất cả các route dành cho Admin:
+ * - Quản lý người dùng (tạo, sửa, xóa, thống kê)
+ * - Quản lý bài thi (duyệt, từ chối, thống kê)
+ * - Báo cáo và phân tích hệ thống
+ * - Cấu hình hệ thống và bảo trì
+ * 
+ * Tất cả routes yêu cầu:
+ * - authMiddleware: Đã đăng nhập
+ * - isAdmin: Có quyền admin
+ * =================================================================
+ */
+
 const express = require('express');
 const router = express.Router();
 const UserManagementController = require('../controllers/adminController/userManagement');
@@ -10,7 +27,7 @@ const { isAdmin } = require('../middleware/roleCheck');
 const { validate, userSchemas, examSchemas } = require('../middleware/validation');
 const { apiLimiter, uploadLimiter } = require('../middleware/rateLimiter');
 
-// All admin routes require authentication and admin role
+// Tất cả admin routes yêu cầu xác thực và quyền admin
 router.use(authMiddleware);
 router.use(isAdmin);
 

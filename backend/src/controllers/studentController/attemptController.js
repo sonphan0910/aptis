@@ -258,11 +258,17 @@ exports.getAttempt = async (req, res, next) => {
 
 /**
  * Submit exam
+ * ⚠️ IMPORTANT: This endpoint returns immediately (202 Accepted) when AI scoring is needed
+ * to prevent timeout issues. AI scoring happens asynchronously in the background.
  */
 exports.submitAttempt = async (req, res, next) => {
+  const submitStartTime = Date.now();
+  
   try {
     const { attemptId } = req.params;
     const studentId = req.user.userId;
+
+    console.log(`[submitAttempt] Starting submission for attempt ${attemptId}, student ${studentId}`);
 
     const attempt = await ExamAttempt.findOne({
       where: { id: attemptId, student_id: studentId },
@@ -284,8 +290,9 @@ exports.submitAttempt = async (req, res, next) => {
 
     // Calculate total score for auto-graded questions only
     const totalScore = await ScoringService.calculateAttemptScore(attemptId);
-
     await attempt.update({ total_score: totalScore });
+
+    console.log(`[submitAttempt] Auto-graded score: ${totalScore}`);
 
     // Get all answers to check for Writing/Speaking that need AI grading
     const answers = await AttemptAnswer.findAll({
@@ -305,8 +312,10 @@ exports.submitAttempt = async (req, res, next) => {
       ],
     });
 
-    // Score Writing and Speaking answers synchronously with AI
-    const aiScoringResults = [];
+    // Find answers that need AI scoring
+    const aiAnswersToScore = [];
+    const speakingAnswersNeedTranscription = [];
+    
     for (const answer of answers) {
       const questionType = answer.question.questionType;
       
@@ -320,50 +329,26 @@ exports.submitAttempt = async (req, res, next) => {
         const questionCode = questionType.code.toLowerCase();
 
         if (questionCode.includes('writing')) {
-          // Score Writing synchronously
-          if (answer.text_answer && answer.text_answer.trim()) {
-            try {
-              console.log(`[submitAttempt] Scoring Writing answer ${answer.id} synchronously with AI`);
-              const result = await AiScoringService.scoreWriting(answer.id);
-              aiScoringResults.push({
-                answerId: answer.id,
-                score: result.totalScore,
-                feedback: result.overallFeedback,
-                type: 'writing',
-                status: 'success'
-              });
-              console.log(`[submitAttempt] Writing answer ${answer.id} scored: ${result.totalScore}/${result.totalMaxScore}`);
-            } catch (error) {
-              console.error(`[submitAttempt] Error scoring Writing answer ${answer.id}:`, error.message);
-              aiScoringResults.push({
-                answerId: answer.id,
-                type: 'writing',
-                status: 'error',
-                error: error.message
-              });
-            }
+          if ((answer.text_answer && answer.text_answer.trim()) || (answer.answer_json && answer.answer_json.trim())) {
+            aiAnswersToScore.push({
+              answerId: answer.id,
+              type: 'writing',
+              content: answer.text_answer || answer.answer_json
+            });
           }
         } else if (questionCode.includes('speaking')) {
-          // Score Speaking synchronously: transcribe then score with AI
           if (answer.audio_url) {
-            try {
-              console.log(`[submitAttempt] Processing Speaking answer ${answer.id} synchronously`);
-              const result = await AiScoringService.scoreSpeaking(answer.id);
-              aiScoringResults.push({
+            aiAnswersToScore.push({
+              answerId: answer.id,
+              type: 'speaking',
+              audioUrl: answer.audio_url
+            });
+            
+            // If transcribed_text is not available, queue for transcription
+            if (!answer.transcribed_text) {
+              speakingAnswersNeedTranscription.push({
                 answerId: answer.id,
-                score: result.totalScore,
-                feedback: result.overallFeedback,
-                type: 'speaking',
-                status: 'success'
-              });
-              console.log(`[submitAttempt] Speaking answer ${answer.id} scored: ${result.totalScore}/${result.totalMaxScore}`);
-            } catch (error) {
-              console.error(`[submitAttempt] Error scoring Speaking answer ${answer.id}:`, error.message);
-              aiScoringResults.push({
-                answerId: answer.id,
-                type: 'speaking',
-                status: 'error',
-                error: error.message
+                audioUrl: answer.audio_url
               });
             }
           }
@@ -371,20 +356,193 @@ exports.submitAttempt = async (req, res, next) => {
       }
     }
 
-    console.log(`[submitAttempt] Attempt ${attemptId} submitted. Scored ${aiScoringResults.filter(r => r.status === 'success').length} answers with AI.`);
+    const hasAiScoring = aiAnswersToScore.length > 0;
+    console.log(`[submitAttempt] Found ${aiAnswersToScore.length} answers needing AI scoring`);
+    console.log(`[submitAttempt] Found ${speakingAnswersNeedTranscription.length} speaking answers needing transcription`);
 
-    // Recalculate total score after AI scoring (includes newly scored answers)
-    const finalScore = await ScoringService.calculateAttemptScore(attemptId);
-    await attempt.update({ total_score: finalScore });
+    // ⏳ IMPORTANT: If AI scoring is needed, use async approach to prevent timeout
+    if (hasAiScoring) {
+      console.log(`[submitAttempt] ⚠️  AI scoring needed - will score asynchronously`);
+
+      // Queue AI scoring in the background (don't await!)
+      // Using setImmediate to prevent blocking the response
+      setImmediate(async () => {
+        try {
+          console.log(`[submitAttempt-Background] Starting async processing for attempt ${attemptId}`);
+          const backgroundStartTime = Date.now();
+
+          // Step 1: Transcribe speaking answers first
+          if (speakingAnswersNeedTranscription.length > 0) {
+            console.log(`[submitAttempt-Background] Adding ${speakingAnswersNeedTranscription.length} speaking answers to transcription queue...`);
+            for (const speechAnswer of speakingAnswersNeedTranscription) {
+              addSpeechJob({
+                answerId: speechAnswer.answerId,
+                audioUrl: speechAnswer.audioUrl,
+                language: 'en'  // Default to English - could be made configurable based on exam language
+              });
+            }
+            
+            // Wait a bit for transcription to start processing
+            // Note: We don't wait for full completion, scoring will check if transcribed_text is available
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+
+          // Step 2: Score all answers (writing and speaking)
+          let successCount = 0;
+          let errorCount = 0;
+
+          for (const answerItem of aiAnswersToScore) {
+            try {
+              const itemStartTime = Date.now();
+              
+              if (answerItem.type === 'writing') {
+                console.log(`[submitAttempt-Background] Scoring Writing answer ${answerItem.answerId} comprehensively...`);
+                await AiScoringService.scoreAnswerComprehensively(answerItem.answerId, false);
+                const itemDuration = Date.now() - itemStartTime;
+                console.log(`[submitAttempt-Background] ✅ Writing answer ${answerItem.answerId} scored comprehensively in ${itemDuration}ms`);
+                successCount++;
+              } else if (answerItem.type === 'speaking') {
+                console.log(`[submitAttempt-Background] Scoring Speaking answer ${answerItem.answerId} comprehensively...`);
+                await AiScoringService.scoreAnswerComprehensively(answerItem.answerId, true);
+                const itemDuration = Date.now() - itemStartTime;
+                console.log(`[submitAttempt-Background] ✅ Speaking answer ${answerItem.answerId} scored comprehensively in ${itemDuration}ms`);
+                successCount++;
+              }
+            } catch (error) {
+              errorCount++;
+              console.error(`[submitAttempt-Background] ❌ Failed to score answer ${answerItem.answerId}:`, error.message);
+              console.error(`[submitAttempt-Background] Error stack:`, error.stack);
+              // Continue with other answers even if one fails
+            }
+          }
+
+          // Recalculate final score
+          const finalScore = await ScoringService.calculateAttemptScore(attemptId);
+          await attempt.update({ total_score: finalScore });
+
+          const backgroundDuration = Date.now() - backgroundStartTime;
+          console.log(`[submitAttempt-Background] ✅ Async processing completed for attempt ${attemptId}`);
+          console.log(`[submitAttempt-Background]    - Transcribed: ${speakingAnswersNeedTranscription.length} speaking answers`);
+          console.log(`[submitAttempt-Background]    - Scored: ${successCount}/${aiAnswersToScore.length} answers`);
+          console.log(`[submitAttempt-Background]    - Errors: ${errorCount}`);
+          console.log(`[submitAttempt-Background]    - Total time: ${backgroundDuration}ms`);
+
+        } catch (error) {
+          console.error(`[submitAttempt-Background] ❌ Background processing failed:`, error);
+        }
+      });
+
+      // Return 202 Accepted immediately (DON'T WAIT FOR AI SCORING)
+      const submitDuration = Date.now() - submitStartTime;
+      console.log(`[submitAttempt] ✅ Returning 202 Accepted after ${submitDuration}ms (AI scoring in background)`);
+
+      return res.status(202).json({
+        success: true,
+        data: {
+          attemptId: attempt.id,
+          status: attempt.status,
+          total_score: totalScore,
+          message: '✅ Bài thi đã được nộp thành công!',
+          aiScoringInfo: {
+            status: 'scoring_in_progress',
+            answers_to_score: aiAnswersToScore.length,
+            estimated_time: `${aiAnswersToScore.length * 30}s`,
+            check_status_url: `/student/attempts/${attemptId}/status`,
+            note: 'Điểm Writing và Speaking sẽ được cập nhật trong vài phút. Vui lòng kiểm tra lại kết quả sau ít phút.'
+          }
+        },
+      });
+    }
+
+    // No AI scoring needed - return immediately with final score
+    const submitDuration = Date.now() - submitStartTime;
+    console.log(`[submitAttempt] ✅ Attempt ${attemptId} submitted in ${submitDuration}ms (no AI scoring needed)`);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        attemptId: attempt.id,
+        status: attempt.status,
+        total_score: totalScore,
+        message: '✅ Bài thi đã được nộp thành công. Điểm đã được tính toán.',
+      },
+    });
+
+  } catch (error) {
+    const submitDuration = Date.now() - submitStartTime;
+    console.error(`[submitAttempt] ❌ Error after ${submitDuration}ms:`, error.message);
+    next(error);
+  }
+};
+
+/**
+ * Get attempt status and scoring progress
+ * Used to check if AI scoring is complete
+ */
+exports.getAttemptStatus = async (req, res, next) => {
+  try {
+    const { attemptId } = req.params;
+    const studentId = req.user.userId;
+
+    const attempt = await ExamAttempt.findOne({
+      where: { id: attemptId, student_id: studentId },
+      include: [
+        {
+          model: AttemptAnswer,
+          as: 'answers',
+          attributes: ['id', 'question_id', 'answer_type', 'score', 'ai_graded_at'],
+          include: [
+            {
+              model: Question,
+              as: 'question',
+              attributes: ['id', 'question_type_id'],
+              include: [
+                {
+                  model: QuestionType,
+                  as: 'questionType',
+                  attributes: ['id', 'code', 'scoring_method'],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    if (!attempt) {
+      throw new NotFoundError('Attempt not found');
+    }
+
+    // Calculate scoring progress
+    const answers = attempt.answers || [];
+    const aiAnswers = answers.filter(
+      a => a.question?.questionType?.scoring_method === SCORING_METHODS.AI
+    );
+    
+    const scoredAiAnswers = aiAnswers.filter(a => a.score !== null && a.score !== undefined);
+    const pendingAiAnswers = aiAnswers.filter(a => a.score === null || a.score === undefined);
+
+    const scoringProgress = {
+      total_ai_answers: aiAnswers.length,
+      scored_ai_answers: scoredAiAnswers.length,
+      pending_ai_answers: pendingAiAnswers.length,
+      progress_percentage: aiAnswers.length > 0 
+        ? Math.round((scoredAiAnswers.length / aiAnswers.length) * 100)
+        : 100,
+      is_complete: pendingAiAnswers.length === 0,
+    };
 
     res.json({
       success: true,
       data: {
         attemptId: attempt.id,
         status: attempt.status,
-        total_score: finalScore,
-        aiScoringResults,
-        message: 'Bài thi đã được nộp thành công. Điểm Writing và Speaking đã được cập nhật bằng AI.',
+        total_score: attempt.total_score,
+        scoring_status: attempt.status === 'submitted' 
+          ? (scoringProgress.is_complete ? 'complete' : 'in_progress')
+          : 'not_submitted',
+        scoring_progress: scoringProgress,
+        last_updated: new Date(),
       },
     });
   } catch (error) {
@@ -464,7 +622,7 @@ exports.getAttemptQuestions = async (req, res, next) => {
             { 
               model: QuestionType, 
               as: 'questionType',
-              attributes: ['id', 'code', 'question_type_name', 'scoring_method']
+              attributes: ['id', 'code', 'question_type_name', 'scoring_method', 'skill_type_id']
             },
           ],
         },

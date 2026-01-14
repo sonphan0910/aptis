@@ -14,9 +14,6 @@ const { DIFFICULTY_LEVELS, QUESTION_STATUS } = require('../../utils/constants');
 const { Op } = require('sequelize');
 const StorageService = require('../../services/StorageService');
 
-/**
- * Create question
- */
 exports.createQuestion = async (req, res, next) => {
   try {
     const {
@@ -33,7 +30,6 @@ exports.createQuestion = async (req, res, next) => {
 
     const teacherId = req.user.userId;
 
-    // Create question
     const question = await Question.create({
       question_type_id,
       aptis_type_id,
@@ -45,7 +41,6 @@ exports.createQuestion = async (req, res, next) => {
       status: 'draft',
     });
 
-    // Create items if provided
     if (items && items.length > 0) {
       for (const item of items) {
         await QuestionItem.create({
@@ -56,7 +51,6 @@ exports.createQuestion = async (req, res, next) => {
       }
     }
 
-    // Create options if provided
     if (options && options.length > 0) {
       for (const option of options) {
         await QuestionOption.create({
@@ -69,7 +63,6 @@ exports.createQuestion = async (req, res, next) => {
       }
     }
 
-    // Create sample answer if provided
     if (sample_answer) {
       await QuestionSampleAnswer.create({
         question_id: question.id,
@@ -82,7 +75,6 @@ exports.createQuestion = async (req, res, next) => {
       });
     }
 
-    // Reload with associations
     const fullQuestion = await Question.findByPk(question.id, {
       include: [
         { model: QuestionType, as: 'questionType' },
@@ -102,9 +94,6 @@ exports.createQuestion = async (req, res, next) => {
   }
 };
 
-/**
- * Get questions list
- */
 exports.getQuestions = async (req, res, next) => {
   try {
     const {
@@ -119,7 +108,6 @@ exports.getQuestions = async (req, res, next) => {
     } = req.query;
     const { offset, limit: validLimit } = paginate(page, limit);
 
-    console.log('[getQuestions] Query params:', { page, limit, question_type, aptis_type, skill, difficulty, status, search });
 
     const where = {};
 
@@ -139,7 +127,6 @@ exports.getQuestions = async (req, res, next) => {
       where.content = { [Op.like]: `%${search}%` };
     }
 
-    // Build include array for relations
     const include = [
       { 
         model: QuestionType, 
@@ -156,17 +143,12 @@ exports.getQuestions = async (req, res, next) => {
       { model: AptisType, as: 'aptisType', attributes: ['id', 'aptis_type_name', 'code'] },
     ];
 
-    // If skill filter is applied, we need to filter by related SkillType
     let finalWhere = where;
     if (skill) {
-      // Use sequelize to include and filter by related skill type
       include[0].where = { skill_type_id: skill };
       include[0].required = true; // INNER JOIN to enforce the filter
-      console.log('[getQuestions] Skill filter applied:', { skill });
     }
 
-    console.log('[getQuestions] Final where clause:', finalWhere);
-    console.log('[getQuestions] Include config:', JSON.stringify(include, null, 2));
 
     const { count, rows } = await Question.findAndCountAll({
       where: finalWhere,
@@ -178,7 +160,6 @@ exports.getQuestions = async (req, res, next) => {
       distinct: true, // Important for counting with joins
     });
 
-    // Transform data to match frontend expectations
     const transformedRows = rows.map(question => ({
       id: question.id,
       title: question.content?.substring(0, 100) || 'Untitled Question',
@@ -212,9 +193,6 @@ exports.getQuestions = async (req, res, next) => {
   }
 };
 
-/**
- * Get question details
- */
 exports.getQuestionDetails = async (req, res, next) => {
   try {
     const { questionId } = req.params;
@@ -242,9 +220,6 @@ exports.getQuestionDetails = async (req, res, next) => {
   }
 };
 
-/**
- * Update question
- */
 exports.updateQuestion = async (req, res, next) => {
   try {
     const { questionId } = req.params;
@@ -256,7 +231,6 @@ exports.updateQuestion = async (req, res, next) => {
       throw new NotFoundError('Question not found');
     }
 
-    // Check if question is being used in any exam
     const usage = await ExamSectionQuestion.count({
       where: { question_id: questionId },
     });
@@ -276,9 +250,6 @@ exports.updateQuestion = async (req, res, next) => {
   }
 };
 
-/**
- * Delete question
- */
 exports.deleteQuestion = async (req, res, next) => {
   try {
     const { questionId } = req.params;
@@ -289,7 +260,6 @@ exports.deleteQuestion = async (req, res, next) => {
       throw new NotFoundError('Question not found');
     }
 
-    // Check usage
     const usage = await ExamSectionQuestion.count({
       where: { question_id: questionId },
     });
@@ -298,7 +268,6 @@ exports.deleteQuestion = async (req, res, next) => {
       throw new BadRequestError('Cannot delete question that is used in exams');
     }
 
-    // Delete media if exists
     if (question.media_url) {
       await StorageService.deleteFile(question.media_url);
     }
@@ -314,9 +283,6 @@ exports.deleteQuestion = async (req, res, next) => {
   }
 };
 
-/**
- * Get question usage
- */
 exports.getQuestionUsage = async (req, res, next) => {
   try {
     const { questionId } = req.params;
@@ -348,37 +314,29 @@ exports.getQuestionUsage = async (req, res, next) => {
   }
 };
 
-/**
- * Get filter options for questions
- */
 exports.getFilterOptions = async (req, res, next) => {
   try {
-    // Get all question types
     const questionTypes = await QuestionType.findAll({
       attributes: ['id', 'question_type_name', 'code'],
       order: [['question_type_name', 'ASC']],
     });
 
-    // Get all APTIS types
     const aptisTypes = await AptisType.findAll({
       attributes: ['id', 'aptis_type_name', 'code'],
       order: [['aptis_type_name', 'ASC']],
     });
 
-    // Get all skill types
     const skillTypes = await SkillType.findAll({
       attributes: ['id', 'skill_type_name', 'code'],
       order: [['display_order', 'ASC']],
     });
 
-    // Difficulty options from constants
     const difficulties = [
       { value: DIFFICULTY_LEVELS.EASY, label: 'Dễ' },
       { value: DIFFICULTY_LEVELS.MEDIUM, label: 'Trung bình' },
       { value: DIFFICULTY_LEVELS.HARD, label: 'Khó' }
     ];
 
-    // Status options from constants
     const statuses = [
       { value: QUESTION_STATUS.DRAFT, label: 'Bản nháp' },
       { value: QUESTION_STATUS.ACTIVE, label: 'Hoạt động' },

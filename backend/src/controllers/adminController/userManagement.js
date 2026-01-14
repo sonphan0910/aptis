@@ -7,9 +7,6 @@ const { successResponse, errorResponse } = require('../../utils/response');
  * Handles user management operations for administrators
  */
 class AdminUserController {
-  /**
-   * Get all users with filtering and pagination
-   */
   static async getAllUsers(req, res) {
     try {
       const { page, limit, role, status, search } = req.query;
@@ -28,9 +25,6 @@ class AdminUserController {
     }
   }
 
-  /**
-   * Get user by ID
-   */
   static async getUserById(req, res) {
     try {
       const { userId } = req.params;
@@ -42,9 +36,6 @@ class AdminUserController {
     }
   }
 
-  /**
-   * Create new user
-   */
   static async createUser(req, res) {
     try {
       const { email, full_name, role, phone, status = 'active' } = req.body;
@@ -78,9 +69,6 @@ class AdminUserController {
     }
   }
 
-  /**
-   * Update user
-   */
   static async updateUser(req, res) {
     try {
       const { userId } = req.params;
@@ -104,9 +92,6 @@ class AdminUserController {
     }
   }
 
-  /**
-   * Delete user
-   */
   static async deleteUser(req, res) {
     try {
       const { userId } = req.params;
@@ -158,9 +143,6 @@ class AdminUserController {
     }
   }
 
-  /**
-   * Get user statistics
-   */
   static async getUserStats(req, res) {
     try {
       const stats = await UserService.getUserStats();
@@ -209,9 +191,6 @@ class AdminUserController {
     }
   }
 
-  /**
-   * Bulk update users
-   */
   static async bulkUpdateUsers(req, res) {
     try {
       const { userIds, updateData } = req.body;
@@ -246,9 +225,7 @@ class AdminUserController {
     }
   }
 
-  /**
-   * Export users data
-   */
+
   static async exportUsers(req, res) {
     try {
       const { format = 'json', role, status, fields } = req.query;

@@ -2,14 +2,7 @@ const ExamService = require('../../services/ExamService');
 const { ValidationError } = require('../../utils/errors');
 const { successResponse, errorResponse } = require('../../utils/response');
 
-/**
- * Admin Exam Controller
- * Handles exam management operations for administrators
- */
 class AdminExamController {
-  /**
-   * Get all exams with advanced filtering
-   */
   static async getAllExams(req, res) {
     try {
       const {
@@ -38,9 +31,6 @@ class AdminExamController {
     }
   }
 
-  /**
-   * Get exam details with sections and questions
-   */
   static async getExamById(req, res) {
     try {
       const { examId } = req.params;
@@ -52,15 +42,11 @@ class AdminExamController {
     }
   }
 
-  /**
-   * Create new exam
-   */
   static async createExam(req, res) {
     try {
       const examData = req.body;
       const createdBy = req.user.id;
 
-      // Validate required fields
       const requiredFields = ['title', 'exam_type', 'duration_minutes'];
       for (const field of requiredFields) {
         if (!examData[field]) {
@@ -68,7 +54,6 @@ class AdminExamController {
         }
       }
 
-      // Validate exam settings if provided
       if (examData.settings) {
         const validation = ExamService.validateExamSettings(examData.settings);
         if (!validation.isValid) {
@@ -84,16 +69,12 @@ class AdminExamController {
     }
   }
 
-  /**
-   * Update exam
-   */
   static async updateExam(req, res) {
     try {
       const { examId } = req.params;
       const updateData = req.body;
       const updatedBy = req.user.id;
 
-      // Validate exam settings if provided
       if (updateData.settings) {
         const validation = ExamService.validateExamSettings(updateData.settings);
         if (!validation.isValid) {
@@ -109,9 +90,6 @@ class AdminExamController {
     }
   }
 
-  /**
-   * Delete exam
-   */
   static async deleteExam(req, res) {
     try {
       const { examId } = req.params;
@@ -124,9 +102,6 @@ class AdminExamController {
     }
   }
 
-  /**
-   * Publish exam
-   */
   static async publishExam(req, res) {
     try {
       const { examId } = req.params;
@@ -139,9 +114,6 @@ class AdminExamController {
     }
   }
 
-  /**
-   * Approve exam (admin)
-   */
   static async approveExam(req, res) {
     try {
       const { examId } = req.params;
@@ -155,9 +127,6 @@ class AdminExamController {
     }
   }
 
-  /**
-   * Reject exam (admin)
-   */
   static async rejectExam(req, res) {
     try {
       const { examId } = req.params;
@@ -175,9 +144,6 @@ class AdminExamController {
     }
   }
 
-  /**
-   * Get pending exams
-   */
   static async getPendingExams(req, res) {
     try {
       const { page, limit } = req.query;
@@ -193,9 +159,6 @@ class AdminExamController {
     }
   }
 
-  /**
-   * Archive exam
-   */
   static async archiveExam(req, res) {
     try {
       const { examId } = req.params;
@@ -208,9 +171,6 @@ class AdminExamController {
     }
   }
 
-  /**
-   * Duplicate exam
-   */
   static async duplicateExam(req, res) {
     try {
       const { examId } = req.params;
@@ -229,9 +189,6 @@ class AdminExamController {
     }
   }
 
-  /**
-   * Validate exam structure
-   */
   static async validateExamStructure(req, res) {
     try {
       const { examId } = req.params;
@@ -244,9 +201,6 @@ class AdminExamController {
     }
   }
 
-  /**
-   * Get exam statistics
-   */
   static async getExamStats(req, res) {
     try {
       const { examId } = req.params;
@@ -259,9 +213,6 @@ class AdminExamController {
     }
   }
 
-  /**
-   * Search exams
-   */
   static async searchExams(req, res) {
     try {
       const { q: query, exam_type, status, limit } = req.query;
@@ -284,15 +235,11 @@ class AdminExamController {
     }
   }
 
-  /**
-   * Create exam section
-   */
   static async createExamSection(req, res) {
     try {
       const { examId } = req.params;
       const sectionData = req.body;
 
-      // Validate required fields
       const requiredFields = ['title', 'section_type'];
       for (const field of requiredFields) {
         if (!sectionData[field]) {
@@ -308,9 +255,6 @@ class AdminExamController {
     }
   }
 
-  /**
-   * Update exam section
-   */
   static async updateExamSection(req, res) {
     try {
       const { sectionId } = req.params;
@@ -324,9 +268,6 @@ class AdminExamController {
     }
   }
 
-  /**
-   * Delete exam section
-   */
   static async deleteExamSection(req, res) {
     try {
       const { sectionId } = req.params;
@@ -339,9 +280,6 @@ class AdminExamController {
     }
   }
 
-  /**
-   * Get exam sections
-   */
   static async getExamSections(req, res) {
     try {
       const { examId } = req.params;
@@ -354,9 +292,6 @@ class AdminExamController {
     }
   }
 
-  /**
-   * Assign questions to section
-   */
   static async assignQuestionsToSection(req, res) {
     try {
       const { sectionId } = req.params;
@@ -374,9 +309,6 @@ class AdminExamController {
     }
   }
 
-  /**
-   * Export exam data
-   */
   static async exportExam(req, res) {
     try {
       const { examId } = req.params;
@@ -419,9 +351,6 @@ class AdminExamController {
     }
   }
 
-  /**
-   * Bulk operations on exams
-   */
   static async bulkOperations(req, res) {
     try {
       const { action, examIds, data } = req.body;

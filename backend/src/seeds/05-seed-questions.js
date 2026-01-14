@@ -8,16 +8,17 @@ const {
   AptisType,
   User,
 } = require('../models');
-const VoiceRSSService = require('../services/VoiceRSSService');
+const GTTSService = require('../services/GTTSService');
 
 /**
- * Seed APTIS questions theo cấu trúc thực tế (200 điểm tổng)
+ * Seed APTIS questions theo cấu trúc chính thức (200 điểm tổng)
  * 
- * CẤU TRÚC ĐỀ THI APTIS:
- * - Reading: 20 câu (Part 1: 5 Gap Filling, Part 2: 5 Ordering, Part 3: 5 Matching, Part 4: 5 Matching Headings)
- * - Listening: 25 câu (4 parts)
- * - Writing: 4 tasks (AI scoring)
- * - Speaking: 4 tasks (AI scoring)
+ * CẤU TRÚC ĐỀ THI APTIS CHÍNH THỨC:
+ * - Listening: 25 câu, 50 điểm (Part 1: 13 câu, Part 2-4: 4 câu nhỏ mỗi part)
+ * - Reading: 29 câu, 50 điểm (Part 1: 5 câu-10đ, Part 2: 5 câu-5đ, Part 3: 5 câu-5đ, Part 4: 7 câu-16đ, Part 5: 7 câu-14đ)
+ * - Writing: 50 điểm (4 tasks, CEFR-based scoring)
+ * - Speaking: 50 điểm (4 tasks, CEFR-based scoring)
+ * TỔNG: 200 điểm
  */
 async function seedQuestions() {
   try {
@@ -52,11 +53,12 @@ async function seedGrammarQuestions(aptisType, teacher) {
 }
 
 // ========================================
-// READING - 20 câu trong 4 parts
-// Part 1: Gap Filling - 5 câu
-// Part 2: Ordering - 5 câu
-// Part 3: Matching - 5 items
-// Part 4: Matching Headings - 5 items
+// READING - 29 câu trong 5 parts, 50 điểm
+// Part 1: Gap Filling - 5 câu = 10 điểm (2 điểm/câu)
+// Part 2: Ordering - 5 câu = 5 điểm (1 điểm/câu)
+// Part 3: Matching - 5 câu = 5 điểm (1 điểm/câu)
+// Part 4: Matching Headings - 7 câu = 16 điểm (~2.29 điểm/câu)
+// Part 5: Short Text Matching - 7 câu = 14 điểm (2 điểm/câu)
 // ========================================
 async function seedReadingQuestions(aptisType, teacher) {
   console.log('[Seed] Seeding 25 Reading questions in 5 parts...');
@@ -343,7 +345,9 @@ Of course, one cannot discuss the benefits of vegetarianism without understandin
     { num: 2, heading: 'Various explanations behind dietary choices and preferences', correct: 8 },
     { num: 3, heading: 'Understanding the possible global food crisis and its causes', correct: 1 },
     { num: 4, heading: 'The ethical and environmental implications of factory farming', correct: 4 },
-    { num: 5, heading: 'Numerous health benefits of plant-based diets', correct: 5 }
+    { num: 5, heading: 'Numerous health benefits of plant-based diets', correct: 5 },
+    { num: 6, heading: 'Shared global responsibility towards sustainable eating', correct: 6 },
+    { num: 7, heading: 'Respect for life: embracing compassion for all living beings', correct: 7 }
   ];
 
   const headingOptions = [
@@ -370,8 +374,8 @@ Of course, one cannot discuss the benefits of vegetarianism without understandin
     headingOptionMap[headingOptions[k]] = option.id;
   }
 
-  // Create 5 items linked to correct heading options
-  for (let j = 0; j < 5; j++) {
+  // Create 7 items linked to correct heading options
+  for (let j = 0; j < 7; j++) {
     const item = await QuestionItem.create({
       question_id: question4.id,
       item_text: `Paragraph ${paragraphs[j].num}`,
@@ -383,21 +387,110 @@ Of course, one cannot discuss the benefits of vegetarianism without understandin
     await item.update({ correct_option_id: headingOptionMap[paragraphs[j].heading] });
   }
 
-  console.log(`[Seed]   - Part 4: 5 Matching Headings questions (8 headings created once, not 40 times)`);
-  console.log(`[Seed] ✓ 25 Reading questions created (5+5+5+5 Gap Fill + Ordering + Matching + Matching Headings = 100 điểm)`);
+  console.log(`[Seed]   - Part 4: 7 Matching Headings questions (16 điểm - ~2.29 điểm/câu)`);
+
+  // Part 5: Short Text Matching (7 câu) - Ghép văn bản ngắn với mô tả  
+  await createShortTextMatchingQuestions(aptisType, teacher);
+  
+  console.log(`[Seed]   - Part 5: 7 Short Text Matching questions (14 điểm - 2 điểm/câu)`);
+  console.log(`[Seed] ✓ 29 Reading questions created (5+5+5+7+7 = 29 câu = 50 điểm)`);
+}
+
+/**
+ * Create Short Text Matching questions (Part 5) - 7 câu
+ */
+async function createShortTextMatchingQuestions(aptisType, teacher) {
+  const readingMatchingType = await QuestionType.findOne({ where: { code: 'READING_MATCHING' } });
+  
+  const question5 = await Question.create({
+    question_type_id: readingMatchingType.id,
+    aptis_type_id: aptisType.id,
+    difficulty: 'medium',
+    content: `Match each short text (1-7) with the correct description (A-J). There are three descriptions you do not need.
+
+Short Texts:
+1. "No parking between 8 AM - 6 PM Monday to Friday. Violators will be towed."
+2. "Students must wear safety goggles at all times in the laboratory."
+3. "Please keep noise to a minimum after 10 PM. Thank you for your consideration."
+4. "All items must be returned by the due date to avoid late fees."
+5. "This elevator is out of service. Please use the stairs or the elevator at the other end."
+6. "Smoking is prohibited in all areas of this building including balconies."
+7. "Please turn off all electronic devices during the performance."
+
+Descriptions:
+A. A warning about vehicle removal
+B. A request for quiet behavior  
+C. Safety instructions for students
+D. Information about equipment failure
+E. Rules about borrowed items
+F. A ban on smoking
+G. Instructions for audience members
+H. Directions to another location
+I. Information about opening hours
+J. A notice about cleaning`,
+    created_by: teacher.id,
+    status: 'active',
+  });
+
+  // Create description options (A-J)
+  const descriptions = [
+    { text: 'A warning about vehicle removal', label: 'A' },
+    { text: 'A request for quiet behavior', label: 'B' },
+    { text: 'Safety instructions for students', label: 'C' },
+    { text: 'Information about equipment failure', label: 'D' },
+    { text: 'Rules about borrowed items', label: 'E' },
+    { text: 'A ban on smoking', label: 'F' },
+    { text: 'Instructions for audience members', label: 'G' },
+    { text: 'Directions to another location', label: 'H' },
+    { text: 'Information about opening hours', label: 'I' },
+    { text: 'A notice about cleaning', label: 'J' }
+  ];
+
+  const optionMap = {};
+  for (let k = 0; k < descriptions.length; k++) {
+    const option = await QuestionOption.create({
+      question_id: question5.id,
+      item_id: null,
+      option_text: descriptions[k].text,
+      option_order: k + 1,
+      is_correct: false,
+    });
+    optionMap[descriptions[k].label] = option.id;
+  }
+
+  // Create 7 matching items with correct answers
+  const matchingItems = [
+    { text: 'No parking sign', correctAnswer: 'A' },
+    { text: 'Lab safety rule', correctAnswer: 'C' },
+    { text: 'Noise complaint', correctAnswer: 'B' },
+    { text: 'Library notice', correctAnswer: 'E' },
+    { text: 'Elevator notice', correctAnswer: 'D' },
+    { text: 'Smoking ban', correctAnswer: 'F' },
+    { text: 'Theater rule', correctAnswer: 'G' }
+  ];
+
+  for (let j = 0; j < 7; j++) {
+    const item = await QuestionItem.create({
+      question_id: question5.id,
+      item_order: j + 1,
+      item_text: matchingItems[j].text,
+      correct_option_id: optionMap[matchingItems[j].correctAnswer],
+    });
+  }
 }
 
 // ========================================
-// LISTENING - 17 câu trong 4 parts (50 điểm tổng)
-// Part 1: MCQ - 5 câu x 3 điểm = 15 điểm
-// Part 2: Speaker Matching - 4 speakers x 3 điểm = 12 điểm
-// Part 3: MCQ Multi-question - 2 shared audio (4 câu) x 3 điểm = 12 điểm
-// Part 4: Statement Matching - 4 statements x 3 điểm = 12 điểm (Tổng 17 câu)
+// LISTENING - 25 câu, 50 điểm (mỗi câu đúng = 2 điểm)
+// Part 1: MCQ - 13 câu = 26 điểm (2 điểm/câu)
+// Part 2: câu 14 gồm 4 câu nhỏ = 8 điểm (2 điểm/câu)
+// Part 3: câu 15 gồm 4 câu nhỏ = 8 điểm (2 điểm/câu) 
+// Part 4: câu 16-17 gồm 4 câu nhỏ = 8 điểm (2 điểm/câu)
+// TỔNG: 25 câu = 50 điểm
 // ========================================
 async function seedListeningQuestions(aptisType, teacher) {
-  console.log('[Seed] Seeding 17 Listening questions in 4 parts...');
+  console.log('[Seed] Seeding 25 Listening questions in 4 parts...');
 
-  // Part 1: MCQ (5 câu)
+  // Part 1: MCQ (13 câu = 26 điểm)
   const listeningMcqType = await QuestionType.findOne({ where: { code: 'LISTENING_MCQ' } });
   
   const part1Scripts = [
@@ -405,7 +498,15 @@ async function seedListeningQuestions(aptisType, teacher) {
     'A woman is going to the cinema with her husband. What time does the movie begin?',
     'A teacher is talking to her students. Where are the students now?',
     'A man is sharing a new guidebook. Choose the correct answers.',
-    'A reviewer discussing a book about the life of a scientist. Choose the correct answers.'
+    'A reviewer discussing a book about the life of a scientist. Choose the correct answers.',
+    'A woman is booking a hotel room. How many nights will she stay?',
+    'A student is talking to his teacher about homework. When is the deadline?',
+    'A customer is ordering food at a restaurant. What drink does she choose?',
+    'A man is asking for directions to the library. Which street should he take?',
+    'A woman is discussing her vacation plans. Where will she go first?',
+    'A student is calling about exam results. What grade did he get?',
+    'A person is buying tickets for a concert. How much do they cost?',
+    'A man is talking about his new job. When does he start working?'
   ];
 
   const mcqOptions = [
@@ -413,16 +514,28 @@ async function seedListeningQuestions(aptisType, teacher) {
     ['6:40', '7:00', '9:20'],
     ['At school', 'In a townhouse', 'In a museum'],
     ['It focuses solely on historical landmarks', 'It creates an adventure', 'It is difficult to navigate'],
-    ['It is focused on technical details', 'It is exciting to read', 'It is more of a textbook than a biography']
+    ['It is focused on technical details', 'It is exciting to read', 'It is more of a textbook than a biography'],
+    ['2 nights', '3 nights', '4 nights'],
+    ['Monday', 'Wednesday', 'Friday'],
+    ['Water', 'Juice', 'Coffee'],
+    ['Main Street', 'Park Avenue', 'Oak Road'],
+    ['Paris', 'London', 'Rome'],
+    ['A', 'B', 'C'],
+    ['$25', '$30', '$35'],
+    ['Next Monday', 'Next Wednesday', 'Next Friday']
   ];
 
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 13; i++) {
+    // Generate audio file with GTTS
+    console.log(`[Seed]     Generating audio for Listening Part 1 Question ${i + 1}...`);
+    const audioInfo = await GTTSService.generateAudioFile(part1Scripts[i], 'en', `listening_part1_q${i + 1}.mp3`);
+    
     const question = await Question.create({
       question_type_id: listeningMcqType.id,
       aptis_type_id: aptisType.id,
       difficulty: i <= 1 ? 'easy' : i <= 2 ? 'medium' : 'hard',
       content: part1Scripts[i],
-      media_url: '/uploads/audio/test.mp3',
+      media_url: audioInfo.url,
       created_by: teacher.id,
       status: 'active',
     });
@@ -438,30 +551,46 @@ async function seedListeningQuestions(aptisType, teacher) {
     }
   }
 
-  console.log(`[Seed]   - Part 1: 5 MCQ questions with audio`);
+  console.log(`[Seed]   - Part 1: 13 MCQ questions with audio (26 điểm)`);
 
-  // Part 2: Speaker Matching (4 speakers với các file audio riêng)
+  // Part 2: Speaker Matching (6 speakers = 12 điểm)
   const listeningMatchingType = await QuestionType.findOne({ where: { code: 'LISTENING_MATCHING' } });
+  
+  // Generate main instruction audio
+  console.log(`[Seed]     Generating audio for Listening Part 2 main instruction...`);
+  const mainAudioInfo = await GTTSService.generateAudioFile('Listen to opinions of 6 people A B C D E F about when they like listening to music', 'en', 'listening_part2_instruction.mp3');
   
   const question2 = await Question.create({
     question_type_id: listeningMatchingType.id,
     aptis_type_id: aptisType.id,
     difficulty: 'medium',
-    content: 'Listen to opinions of 4 people A B C D about when they like listening to music',
-    media_url: '/uploads/audio/test.mp3', // Main instruction audio
+    content: 'Listen to opinions of 6 people A B C D E F about when they like listening to music',
+    media_url: mainAudioInfo.url,
     created_by: teacher.id,
     status: 'active',
   });
 
-  const speakers = ['Speaker A', 'Speaker B', 'Speaker C', 'Speaker D'];
-  const musicOptions = ['After waking up', 'While singing', 'To relax', 'While reading', 'While studying', 'While sleeping'];
+  const speakers = ['Speaker A', 'Speaker B', 'Speaker C', 'Speaker D', 'Speaker E', 'Speaker F'];
+  const speakerTexts = [
+    'I usually listen to music after waking up in the morning. It helps me start my day with positive energy.',
+    'I love listening to music while studying. It helps me concentrate better and makes the work more enjoyable.',
+    'I listen to music to relax after a long day at work. It helps me unwind and forget my stress.',
+    'I enjoy music while reading books. The background music creates a peaceful atmosphere for my reading time.',
+    'I listen to music while exercising at the gym. The rhythm keeps me motivated and energized.',
+    'I prefer listening to music before going to sleep. It helps me calm down and prepare for rest.'
+  ];
+  const musicOptions = ['After waking up', 'While studying', 'To relax', 'While reading', 'While exercising', 'Before sleeping'];
 
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 6; i++) {
+    // Generate individual speaker audio
+    console.log(`[Seed]     Generating audio for ${speakers[i]}...`);
+    const speakerAudioInfo = await GTTSService.generateAudioFile(speakerTexts[i], 'en', `listening_part2_speaker_${String.fromCharCode(65 + i)}.mp3`);
+    
     const item = await QuestionItem.create({
       question_id: question2.id,
       item_text: speakers[i],
       item_order: i + 1,
-      media_url: `/uploads/audio/speaker_${String.fromCharCode(65 + i)}.mp3`, // Individual audio for each speaker
+      media_url: speakerAudioInfo.url,
     });
   }
 
@@ -476,17 +605,22 @@ async function seedListeningQuestions(aptisType, teacher) {
     });
   }
 
-  console.log(`[Seed]   - Part 2: 4 Speaker Matching with individual audio files`);
+  console.log(`[Seed]   - Part 2: 6 Speaker Matching with individual audio files (12 điểm)`);
 
-  // Part 3: Statement Matching (1 câu hỏi với 4 statements)
+  // Part 3: Statement Matching (4 statements = 8 điểm)
   const statementMatchingType = await QuestionType.findOne({ where: { code: 'LISTENING_STATEMENT_MATCHING' } });
+  
+  // Generate discussion audio
+  console.log(`[Seed]     Generating audio for Listening Part 3 discussion...`);
+  const discussionText = 'Man: I think singers can be good models for young people. Music is definitely a universal language that connects everyone. Woman: Well, I believe taste in music is a highly personal thing. Music can also be used to manipulate people\'s feelings quite easily.';
+  const discussionAudioInfo = await GTTSService.generateAudioFile(discussionText, 'en', 'listening_part3_discussion.mp3');
   
   const question3 = await Question.create({
     question_type_id: statementMatchingType.id,
     aptis_type_id: aptisType.id,
     difficulty: 'medium',
     content: 'Listen to two people discussing singers and music. Read the opinions below and decide whose opinion matches the statements, the man, the woman, or both the man and the woman.',
-    media_url: '/uploads/audio/discussion.mp3',
+    media_url: discussionAudioInfo.url,
     created_by: teacher.id,
     status: 'active',
   });
@@ -518,13 +652,13 @@ async function seedListeningQuestions(aptisType, teacher) {
     });
   }
 
-  console.log(`[Seed]   - Part 3: 4 Statement Matching items`);
+  console.log(`[Seed]   - Part 3: 4 Statement Matching items (8 điểm)`);
 
-  // Part 4: MCQ Multi-question (2 shared audio files với 2 câu hỏi mỗi file)
+  // Part 4: MCQ Multi-question (2 shared audio files, mỗi audio 1 câu = 2 câu MCQ = 4 điểm)
   const multiQuestionScripts = [
     {
-      audio: '/uploads/audio/guidebook.mp3',
       content: 'A man is sharing a new guidebook. Choose the correct answers.',
+      text: 'This guidebook creates an exciting adventure for travelers by focusing on unique experiences rather than just historical landmarks. In my opinion, it is particularly suitable for younger generations who are looking for something different.',
       questions: [
         'What does this guidebook offer to its audience?',
         'What is the speaker\'s opinion about this guidebook?'
@@ -535,8 +669,8 @@ async function seedListeningQuestions(aptisType, teacher) {
       ]
     },
     {
-      audio: '/uploads/audio/book_review.mp3',
       content: 'A reviewer discussing a book about the life of a scientist. Choose the correct answers.',
+      text: 'The book about this scientist is exciting to read, not just technical details. The author has written it for a general audience, making complex scientific concepts accessible to everyone.',
       questions: [
         'What does the speaker say about the way of writing?',
         'What does the speaker say about the overall content of the book?'
@@ -549,15 +683,19 @@ async function seedListeningQuestions(aptisType, teacher) {
   ];
 
   for (let i = 0; i < 2; i++) {
+    // Generate audio for each multi-question script
+    console.log(`[Seed]     Generating audio for Listening Part 4 Script ${i + 1}...`);
+    const audioInfo = await GTTSService.generateAudioFile(multiQuestionScripts[i].text, 'en', `listening_part4_script_${i + 1}.mp3`);
+    
     const question = await Question.create({
       question_type_id: listeningMcqType.id,
       aptis_type_id: aptisType.id,
       difficulty: 'hard',
       content: multiQuestionScripts[i].content,
-      media_url: multiQuestionScripts[i].audio,
+      media_url: audioInfo.url,
       additional_media: JSON.stringify([
-        { type: 'audio', description: 'Question 1', url: multiQuestionScripts[i].audio },
-        { type: 'audio', description: 'Question 2', url: multiQuestionScripts[i].audio }
+        { type: 'audio', description: 'Question 1', url: audioInfo.url },
+        { type: 'audio', description: 'Question 2', url: audioInfo.url }
       ]),
       created_by: teacher.id,
       status: 'active',
@@ -584,161 +722,105 @@ async function seedListeningQuestions(aptisType, teacher) {
     }
   }
 
-  console.log(`[Seed]   - Part 4: 2 Multi-question MCQ (4 total sub-questions)`);
-  console.log(`[Seed] ✓ 17 Listening questions created (5+4+4+4 = 50 điểm)`);
+  console.log(`[Seed]   - Part 4: 2 Multi-question MCQ (4 total sub-questions = 4 điểm)`);
+  console.log(`[Seed] ✓ 25 Listening questions created (13+6+4+2 = 25 câu, 50 điểm)`);
 }
 
 // ========================================
-// WRITING - 4 tasks (50 điểm tổng, AI scoring)
-// Task 1: Short (12.5 điểm)
-// Task 2: Email (12.5 điểm)
-// Task 3: Long (12.5 điểm)
-// Task 4: Essay (12.5 điểm)
+// WRITING - 4 tasks (Based on APTIS Technical Report)
+// Task 1: A1 Form Filling (basic information) - 0-4 scale
+// Task 2: A2 Short Response (20-30 words) - 0-5 scale
+// Task 3: B1 Chat Responses (30-40 words each) - 0-5 scale  
+// Task 4: B2 Email Writing (friend + authority) - 0-6 scale with C1/C2 extension
 // ========================================
 async function seedWritingQuestions(aptisType, teacher) {
-  console.log('[Seed] Seeding 4 Writing tasks...');
+  console.log('[Seed] Seeding Writing tasks with multiple questions...');
 
   const writingShortType = await QuestionType.findOne({ where: { code: 'WRITING_SHORT' } });
   const writingFormType = await QuestionType.findOne({ where: { code: 'WRITING_FORM' } });
   const writingLongType = await QuestionType.findOne({ where: { code: 'WRITING_LONG' } });
   const writingEmailType = await QuestionType.findOne({ where: { code: 'WRITING_EMAIL' } });
 
-  // Part 1: Short Answers (1-5 words each)
-  const part1 = await Question.create({
-    question_type_id: writingShortType.id,
-    aptis_type_id: aptisType.id,
-    difficulty: 'easy',
-    content: JSON.stringify({
-      title: "Book Club Membership",
-      description: "You want to join a Book club. You have 5 messages from a member of the club. Write short answers (1-5 words) to each message.",
-      messages: [
-        "Which sport is the most popular in your country?",
-        "What do you like doing with your friend?", 
-        "Which sport do you like to play the most?",
-        "Where do you usually go at weekends?",
-        "How often do you play sport with friends?"
-      ]
-    }),
-    created_by: teacher.id,
-    status: 'active',
-  });
+  // Task 1 (A1): Individual Form Fields - 15 câu hỏi riêng biệt (3 form x 5 field)
+  const task1Fields = [
+    // Personal Information Form (5 fields)
+    "Personal Information Form - Name\n\nFill in your name:\n\nName: _______",
+    "Personal Information Form - Age\n\nFill in your age:\n\nAge: _______",
+    "Personal Information Form - City\n\nFill in your city:\n\nCity: _______",
+    "Personal Information Form - Job\n\nFill in your job:\n\nJob: _______", 
+    "Personal Information Form - Email\n\nFill in your email:\n\nEmail: _______",
+    
+  ];
 
-  await QuestionSampleAnswer.create({
-    question_id: part1.id,
-    answer_text: JSON.stringify({
-      "0": "Football",
-      "1": "Watch movies together",
-      "2": "Basketball",
-      "3": "Shopping mall",
-      "4": "Every weekend"
-    }),
-    score: 12.5,
-    comment: 'Perfect short answers within word limit.',
-  });
+  for (let i = 0; i < 5; i++) {
+    await Question.create({
+      question_type_id: writingShortType.id,
+      aptis_type_id: aptisType.id,
+      difficulty: 'easy',
+      content: task1Fields[i],
+      created_by: teacher.id,
+      status: 'active',
+    });
+  }
 
-  // Part 2: Form Filling (20-30 words)
-  const part2 = await Question.create({
-    question_type_id: writingFormType.id,
-    aptis_type_id: aptisType.id,
-    difficulty: 'easy',
-    content: JSON.stringify({
-      title: "Book Club Application Form",
-      description: "You want to join a book club. Fill in the form. Write in sentences. Use 20-30 words.",
-      question: "When and where do you usually read books?",
-      placeholder: "Please describe your reading habits in complete sentences."
-    }),
-    created_by: teacher.id,
-    status: 'active',
-  });
+  // Task 2 (A2): Short Constructed Response - 2 câu hỏi
+  const task2Questions = [
+    "What is your hobby?\n\nWrite about your hobby (20-30 words):\nWhat do you like to do in your free time?\n\nWrite your answer here:",
+  ];
 
-  await QuestionSampleAnswer.create({
-    question_id: part2.id,
-    answer_text: 'I usually read books in the evening at home after dinner. I like to sit in my comfortable chair in the living room with a cup of tea.',
-    score: 12.5,
-    comment: 'Good sentence structure and appropriate length.',
-  });
+  for (let i = 0; i < 1; i++) {
+    await Question.create({
+      question_type_id: writingFormType.id,
+      aptis_type_id: aptisType.id,
+      difficulty: 'easy',
+      content: task2Questions[i],
+      created_by: teacher.id,
+      status: 'active',
+    });
+  }
 
-  // Part 3: Chat Responses (30-40 words each)
-  const part3 = await Question.create({
-    question_type_id: writingLongType.id,
-    aptis_type_id: aptisType.id,
-    difficulty: 'medium',
-    content: JSON.stringify({
-      title: "Book Club Chat Room",
-      description: "You are talking to other members of the club in the chat room. Talk to them using sentences. Use 30-40 words per answer.",
-      messages: [
-        {
-          person: "Person A",
-          message: "Tell me about your favourite time and place to read a book?"
-        },
-        {
-          person: "Person B", 
-          message: "I bought a book as a gift for my friend but I don't know what kind of book he likes. Can you give me some advice?"
-        }
-      ]
-    }),
-    created_by: teacher.id,
-    status: 'active',
-  });
+  // Task 3 (B1): Chat Responses - 2 câu hỏi
+  const task3Questions = [
+    "Chat about your weekend\n\nReply to chat messages (30-40 words each):\n\nAlex: Hi! Did you do anything fun last weekend?\nYour reply: _______\n\nSam: What's your favorite thing to do on weekends?\nYour reply: _______",
+  ];
 
-  await QuestionSampleAnswer.create({
-    question_id: part3.id,
-    answer_text: JSON.stringify({
-      "personA": "My favourite time to read is in the evening after work. I love sitting in my garden with a good book and a cup of coffee. The quiet atmosphere helps me focus and relax completely.",
-      "personB": "I suggest asking your friend about their hobbies and interests first. Maybe choose a popular thriller or mystery novel as most people enjoy them. You could also check what books are currently bestsellers."
-    }),
-    score: 12.5,
-    comment: 'Good conversational responses within word limits.',
-  });
+  for (let i = 0; i < 1; i++) {
+    await Question.create({
+      question_type_id: writingLongType.id,
+      aptis_type_id: aptisType.id,
+      difficulty: 'easy',
+      content: task3Questions[i],
+      created_by: teacher.id,
+      status: 'active',
+    });
+  }
+  
+  // Task 4 (B2): Email Writing - 2 câu hỏi
+  const task4Questions = [
+    "Email about a class trip\n\nRead the email from your teacher:\n\nFrom: Teacher <teacher@school.com>\nSubject: School trip to the museum\n\nDear student,\n\nWe are planning a class trip to the museum. Do you want to go? What do you want to see there?\n\nPlease write back with your answer.\n\nTeacher\n\n---\n\nWrite TWO emails:\n\n1. Email to a friend (50 words):\n_______\n\n2. Reply to teacher (100-120 words):\n_______",
+  ];
 
-  // Part 4: Email Writing (50 words + 120-150 words)
-  const part4 = await Question.create({
-    question_type_id: writingEmailType.id,
-    aptis_type_id: aptisType.id,
-    difficulty: 'hard',
-    content: JSON.stringify({
-      title: "Book Club Author Event",
-      description: "You are a member of the book club. You received this email from the club's manager.",
-      managerEmail: {
-        subject: "Author Event Planning",
-        body: "Dear member,\n\nOur club wants to organize an event for the public by inviting a famous author as a speaker. What kind of author do you suggest? What topic should the speaker speak on?\n\nI am writing to ask all members for their suggestions. Please send me your ideas in an email.\n\nThe manager."
-      },
-      tasks: [
-        {
-          type: "friend",
-          description: "Write an email to your friend, who is also a member of the group. (50 words)",
-          wordLimit: 50
-        },
-        {
-          type: "manager", 
-          description: "Write an email to the manager of the club. Tell the manager about your opinion. (120-150 words)",
-          wordLimit: {min: 120, max: 150}
-        }
-      ]
-    }),
-    created_by: teacher.id,
-    status: 'active',
-  });
+  for (let i = 0; i < 1; i++) {
+    await Question.create({
+      question_type_id: writingEmailType.id,
+      aptis_type_id: aptisType.id,
+      difficulty: 'hard',
+      content: task4Questions[i],
+      created_by: teacher.id,
+      status: 'active',
+    });
+  }
 
-  await QuestionSampleAnswer.create({
-    question_id: part4.id,
-    answer_text: JSON.stringify({
-      "friendEmail": "Hi Alex! Did you see the manager's email about the author event? I think we should suggest a mystery writer like Agatha Christie style. What do you think? Let me know your ideas!",
-      "managerEmail": "Dear Manager,\n\nThank you for your email about organizing an author event for the public.\n\nI would like to suggest inviting a mystery or thriller novelist as the speaker. These genres are very popular and attract a wide audience. The topic should be about creative writing techniques and how to develop compelling characters.\n\nI believe this would attract many people and benefit our club by gaining new members who are interested in writing and reading mysteries. A practical workshop on plot development would be engaging.\n\nI look forward to hearing your thoughts.\n\nBest regards,\n[Student Name]"
-    }),
-    score: 12.5,
-    comment: 'Both emails well-structured with appropriate tone and word counts.',
-  });
-
-  console.log(`[Seed] ✓ 4 Writing tasks created (4 x 12.5 = 50 điểm)`);
+  console.log('[Seed] ✓ Writing tasks created: Task 1 (15 câu riêng biệt) + Task 2 (2 câu) + Task 3 (2 câu) + Task 4 (2 câu) = 21 câu tổng');
 }
 
 // ========================================
-// SPEAKING - 4 tasks (50 điểm tổng, AI scoring)
-// Task 1: Personal (12.5 điểm)
-// Task 2: Compare (12.5 điểm)
-// Task 3: Picture (12.5 điểm)
-// Task 4: Discussion (12.5 điểm)
+// SPEAKING - 4 tasks (Based on APTIS Technical Report with task-specific scales)
+// Task 1: A2 Personal Introduction - 0-5 scale
+// Task 2: B1 Picture/Topic Description - 0-5 scale  
+// Task 3: B1 Comparison - 0-5 scale
+// Task 4: B2 Topic Discussion - 0-6 scale with C1/C2 extension
+// Focus: Sustainability - ability to sustain CEFR level throughout response
 // ========================================
 async function seedSpeakingQuestions(aptisType, teacher) {
   console.log('[Seed] Seeding 4 Speaking tasks...');

@@ -3,13 +3,15 @@ const { User } = require('../models');
 const { hashPassword } = require('../utils/helpers');
 
 /**
- * Seed users (admin, teachers, students)
+ * Seed users (admin, teachers, students) - Tạo tài khoản người dùng mẫu cho hệ thống
  */
 async function seedUsers() {
   try {
-    console.log('[Seed] Seeding users...');
 
-    // Seed admin users
+    // Bắt đầu seed người dùng
+    console.log('[Seed] Đang tạo tài khoản người dùng...');
+
+    // Tạo tài khoản admin
     const admins = [
       {
         email: 'admin@aptis.local',
@@ -27,6 +29,8 @@ async function seedUsers() {
       },
     ];
 
+
+    // Thêm từng admin vào database
     for (const admin of admins) {
       await User.findOrCreate({
         where: { email: admin.email },
@@ -34,9 +38,10 @@ async function seedUsers() {
       });
     }
 
-    console.log(`[Seed] ${admins.length} admin users seeded`);
 
-    // Seed teacher users
+    console.log(`[Seed] Đã tạo ${admins.length} tài khoản admin`);
+
+    // Tạo tài khoản giáo viên
     const teachers = [
       {
         email: 'teacher1@aptis.local',
@@ -64,6 +69,8 @@ async function seedUsers() {
       },
     ];
 
+
+    // Thêm từng giáo viên vào database
     for (const teacher of teachers) {
       await User.findOrCreate({
         where: { email: teacher.email },
@@ -71,9 +78,10 @@ async function seedUsers() {
       });
     }
 
-    console.log(`[Seed] ${teachers.length} teacher users seeded`);
 
-    // Seed student users
+    console.log(`[Seed] Đã tạo ${teachers.length} tài khoản giáo viên`);
+
+    // Tạo tài khoản học sinh
     const students = [
       {
         email: 'student1@aptis.local',
@@ -117,6 +125,8 @@ async function seedUsers() {
       },
     ];
 
+
+    // Thêm từng học sinh vào database
     for (const student of students) {
       await User.findOrCreate({
         where: { email: student.email },
@@ -124,19 +134,22 @@ async function seedUsers() {
       });
     }
 
-    console.log(`[Seed] ${students.length} student users seeded`);
-    console.log('[Seed] Users seeded successfully');
 
-    // Print credentials
-    console.log('\n=== USER CREDENTIALS ===');
+    console.log(`[Seed] Đã tạo ${students.length} tài khoản học sinh`);
+    console.log('[Seed] Đã tạo xong toàn bộ tài khoản người dùng');
+
+
+    // In ra thông tin đăng nhập mẫu
+    console.log('\n=== THÔNG TIN ĐĂNG NHẬP MẪU ===');
     console.log('Admin: admin@aptis.local / password123');
     console.log('Teacher: teacher1@aptis.local / password123');
     console.log('Student: student1@aptis.local / password123');
-    console.log('========================\n');
+    console.log('===============================\n');
 
     process.exit(0);
   } catch (error) {
-    console.error('[Seed] Failed to seed users:', error);
+    // Lỗi khi tạo tài khoản
+    console.error('[Seed] Lỗi khi tạo tài khoản người dùng:', error);
     process.exit(1);
   }
 }

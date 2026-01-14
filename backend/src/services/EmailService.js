@@ -1,12 +1,6 @@
 const { transporter, EMAIL_TEMPLATES, EMAIL_CONFIG } = require('../config/email');
 
-/**
- * EmailService - Handles all email sending operations
- */
 class EmailService {
-  /**
-   * Send email using configured transporter
-   */
   async sendEmail(to, subject, html) {
     try {
       const mailOptions = {
@@ -29,9 +23,6 @@ class EmailService {
     }
   }
 
-  /**
-   * Send welcome email to new user
-   */
   async sendWelcomeEmail(user, temporaryPassword) {
     const { subject, html } = EMAIL_TEMPLATES.welcome;
 
@@ -44,9 +35,6 @@ class EmailService {
     return await this.sendEmail(user.email, subject, emailHtml);
   }
 
-  /**
-   * Send password reset email
-   */
   async sendResetPasswordEmail(user, resetToken) {
     const { subject, html } = EMAIL_TEMPLATES.resetPassword;
 
@@ -60,9 +48,6 @@ class EmailService {
     return await this.sendEmail(user.email, subject, emailHtml);
   }
 
-  /**
-   * Send exam published notification to students
-   */
   async sendExamPublishedEmail(studentEmail, exam) {
     const { subject, html } = EMAIL_TEMPLATES.examPublished;
 
@@ -74,9 +59,6 @@ class EmailService {
     return await this.sendEmail(studentEmail, subject, emailHtml);
   }
 
-  /**
-   * Send exam graded notification to student
-   */
   async sendExamGradedEmail(student, exam, totalScore, maxScore) {
     const { subject, html } = EMAIL_TEMPLATES.examGraded;
 
@@ -90,9 +72,6 @@ class EmailService {
     return await this.sendEmail(student.email, subject, emailHtml);
   }
 
-  /**
-   * Send bulk emails (for exam publication to all students)
-   */
   async sendBulkEmails(recipients, subject, htmlTemplate, data) {
     const results = [];
 
@@ -114,9 +93,6 @@ class EmailService {
     return results;
   }
 
-  /**
-   * Test email connection
-   */
   async testConnection() {
     try {
       await transporter.verify();

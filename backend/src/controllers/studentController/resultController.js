@@ -2,7 +2,6 @@ const {
   ExamAttempt,
   AttemptAnswer,
   AnswerAiFeedback,
-  AiScoringCriteria,
   AttemptSection,
   ExamSection,
   ExamSectionQuestion,
@@ -109,6 +108,7 @@ exports.getResults = async (req, res, next) => {
     // Get all answers with AI feedbacks for detailed results
     const answersWithFeedback = await AttemptAnswer.findAll({
       where: { attempt_id: attemptId },
+      attributes: ['id', 'question_id', 'answer_type', 'selected_option_id', 'answer_json', 'text_answer', 'audio_url', 'transcribed_text', 'score', 'max_score', 'ai_feedback', 'ai_graded_at', 'final_score', 'manual_feedback', 'needs_review', 'answered_at'],
       include: [
         {
           model: Question,
@@ -125,13 +125,7 @@ exports.getResults = async (req, res, next) => {
         {
           model: AnswerAiFeedback,
           as: 'aiFeedbacks',
-          include: [
-            {
-              model: AiScoringCriteria,
-              as: 'criteria',
-              attributes: ['id', 'criteria_name', 'description', 'weight'],
-            },
-          ],
+          attributes: ['id', 'answer_id', 'score', 'comment', 'strengths', 'weaknesses', 'suggestions', 'cefr_level']
         },
       ],
     });

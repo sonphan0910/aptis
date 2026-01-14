@@ -4,33 +4,23 @@ const NotificationService = require('../../services/NotificationService');
 const { successResponse, errorResponse } = require('../../utils/response');
 const { ValidationError } = require('../../utils/errors');
 
-/**
- * Admin Dashboard Controller
- * Handles dashboard data and analytics for administrators
- */
 class AdminDashboardController {
-  /**
-   * Get dashboard overview statistics
-   */
   static async getDashboardOverview(req, res) {
     try {
       const { period = '30' } = req.query;
       const days = parseInt(period);
 
-      // Get basic statistics
       const [userStats, recentUsers] = await Promise.all([
         UserService.getUserStats(),
         UserService.getRecentUsers(days),
       ]);
 
-      // Calculate user growth
       const userGrowth = {
         total: userStats.total,
         newUsers: recentUsers.length,
         growthRate: userStats.total > 0 ? (recentUsers.length / userStats.total) * 100 : 0,
       };
 
-      // Get exam statistics (placeholder - would need actual implementation)
       const examStats = {
         totalExams: 0,
         publishedExams: 0,
@@ -38,15 +28,13 @@ class AdminDashboardController {
         archivedExams: 0,
       };
 
-      // Get notification statistics
       const notificationStats = await NotificationService.getNotificationStats();
 
-      // System health metrics (placeholder)
       const systemHealth = {
         status: 'healthy',
         uptime: process.uptime(),
         memoryUsage: process.memoryUsage(),
-        cpuUsage: 0, // Would need actual CPU monitoring
+        cpuUsage: 0,
       };
 
       const overview = {
@@ -70,9 +58,6 @@ class AdminDashboardController {
     }
   }
 
-  /**
-   * Get user analytics
-   */
   static async getUserAnalytics(req, res) {
     try {
       const { period = '30' } = req.query;
@@ -83,7 +68,6 @@ class AdminDashboardController {
         UserService.getRecentUsers(days),
       ]);
 
-      // Group recent users by day
       const usersByDay = {};
       const today = new Date();
 
@@ -123,15 +107,10 @@ class AdminDashboardController {
     }
   }
 
-  /**
-   * Get exam analytics
-   */
   static async getExamAnalytics(req, res) {
     try {
       const { period = '30' } = req.query;
 
-      // This would need proper implementation with actual exam data
-      // For now, returning placeholder structure
       const analytics = {
         overview: {
           totalExams: 0,
@@ -157,14 +136,10 @@ class AdminDashboardController {
     }
   }
 
-  /**
-   * Get system analytics
-   */
   static async getSystemAnalytics(req, res) {
     try {
       const { period = '30' } = req.query;
 
-      // System performance metrics
       const systemMetrics = {
         uptime: process.uptime(),
         memory: process.memoryUsage(),
@@ -173,7 +148,6 @@ class AdminDashboardController {
         arch: process.arch,
       };
 
-      // Database metrics (placeholder)
       const databaseMetrics = {
         connections: 0,
         queriesPerSecond: 0,
@@ -181,7 +155,6 @@ class AdminDashboardController {
         totalQueries: 0,
       };
 
-      // API metrics (placeholder)
       const apiMetrics = {
         totalRequests: 0,
         requestsPerSecond: 0,
@@ -189,7 +162,6 @@ class AdminDashboardController {
         errorRate: 0,
       };
 
-      // Storage metrics (placeholder)
       const storageMetrics = {
         totalFiles: 0,
         totalSize: 0,
@@ -214,15 +186,10 @@ class AdminDashboardController {
     }
   }
 
-  /**
-   * Get activity logs
-   */
   static async getActivityLogs(req, res) {
     try {
       const { page = 1, limit = 50, type, user_id, action, date_from, date_to } = req.query;
 
-      // This would need proper implementation with an activity log system
-      // For now, returning placeholder structure
       const logs = {
         activities: [],
         pagination: {
@@ -239,15 +206,11 @@ class AdminDashboardController {
     }
   }
 
-  /**
-   * Get real-time statistics
-   */
   static async getRealTimeStats(req, res) {
     try {
-      // Real-time metrics that update frequently
       const stats = {
-        activeUsers: 0, // Would need session tracking
-        onlineUsers: 0, // Would need WebSocket tracking
+        activeUsers: 0,
+        onlineUsers: 0,
         currentExamAttempts: 0,
         systemLoad: {
           cpu: 0,
@@ -268,9 +231,6 @@ class AdminDashboardController {
     }
   }
 
-  /**
-   * Generate reports
-   */
   static async generateReport(req, res) {
     try {
       const { reportType, period = '30', format = 'json', includeCharts = 'false' } = req.query;
@@ -299,7 +259,6 @@ class AdminDashboardController {
           break;
         }
         case 'exams': {
-          // Would implement exam report generation
           reportData = {
             type: 'exams',
             period: days,
@@ -328,29 +287,23 @@ class AdminDashboardController {
       reportData.generatedBy = req.user.id;
 
       if (format === 'pdf') {
-        // Would generate PDF report
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${reportType}_report.pdf"`);
         return res.send('PDF generation would be implemented here');
       }
 
       if (format === 'csv') {
-        // Would generate CSV report
         res.setHeader('Content-Type', 'text/csv');
         res.setHeader('Content-Disposition', `attachment; filename="${reportType}_report.csv"`);
         return res.send('CSV generation would be implemented here');
       }
 
-      // Default JSON format
       return successResponse(res, 'Report generated successfully', { report: reportData });
     } catch (error) {
       return errorResponse(res, error.message, error.statusCode || 500);
     }
   }
 
-  /**
-   * Get health check
-   */
   static async getHealthCheck(req, res) {
     try {
       const health = {
@@ -360,10 +313,10 @@ class AdminDashboardController {
         version: process.env.npm_package_version || '1.0.0',
         environment: process.env.NODE_ENV || 'development',
         services: {
-          database: 'healthy', // Would check actual DB connection
-          storage: 'healthy', // Would check file storage
-          email: 'healthy', // Would check email service
-          cache: 'healthy', // Would check Redis/cache
+          database: 'healthy',
+          storage: 'healthy',
+          email: 'healthy',
+          cache: 'healthy',
         },
         metrics: {
           memory: {
@@ -372,12 +325,11 @@ class AdminDashboardController {
             percentage: (process.memoryUsage().heapUsed / process.memoryUsage().heapTotal) * 100,
           },
           cpu: {
-            usage: 0, // Would implement actual CPU monitoring
+            usage: 0,
           },
         },
       };
 
-      // Determine overall health status
       const serviceStatuses = Object.values(health.services);
       if (serviceStatuses.some((status) => status !== 'healthy')) {
         health.status = 'degraded';

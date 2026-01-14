@@ -1,193 +1,285 @@
 const path = require('path');
-const { getGroqModel, GROQ_CONFIG } = require('../config/ai');
 const {
   AttemptAnswer,
   AiScoringCriteria,
   AnswerAiFeedback,
   Question,
   QuestionSampleAnswer,
+  QuestionType,
+  ExamSection,
+  Exam,
+  ExamAttempt,
+  AptisType,
 } = require('../models');
-const { AI_SCORING_CONFIG } = require('../utils/constants');
-const { delay } = require('../utils/helpers');
-const { BadRequestError } = require('../utils/errors');
+const { BadRequestError, NotFoundError } = require('../utils/errors');
 
-/**
- * AiScoringService - Handles AI-powered scoring for Writing and Speaking
- */
+// Import modular services
+const CefrConverter = require('./scoring/CefrConverterService');
+const ScoringPromptBuilder = require('./scoring/ScoringPromptBuilder');
+const AudioAnalysisEnhancer = require('./scoring/AudioAnalysisEnhancer');
+const FeedbackGenerator = require('./scoring/FeedbackGenerator');
+const AiServiceClient = require('./scoring/AiServiceClient');
+
 class AiScoringService {
   /**
-   * Score writing answer using AI
+   * Convert CEFR level to numeric score based on task type and max score
+   * @param {string} cefrLevel - CEFR level like 'A2.1', 'B1.2', 'C1', etc.
+   * @param {string} questionTypeCode - Question type code to determine task
+   * @param {number} maxScore - Maximum score for the criterion
+   * @returns {number} Numeric score
    */
+  convertCefrToScore(cefrLevel, questionTypeCode, maxScore) {
+    return CefrConverter.convertCefrToScore(cefrLevel, questionTypeCode, maxScore);
+  }
+
   async scoreWriting(answerId) {
-    console.log(`[scoreWriting] Starting to score Writing answer ${answerId}`);
+    console.log(`[scoreWriting] Starting comprehensive writing assessment for answer ${answerId}`);
 
-    const answer = await AttemptAnswer.findByPk(answerId, {
-      include: [
-        {
-          model: Question,
-          as: 'question',
-          include: [
-            {
-              model: QuestionSampleAnswer,
-              as: 'sampleAnswer',
-            },
-          ],
-        },
-      ],
-    });
+    try {
+      // Use comprehensive scoring
+      const result = await this.scoreAnswerComprehensively(answerId, false);
 
-    if (!answer) {
-      throw new BadRequestError('Answer not found');
+      // Refetch answer from database to get a fresh instance for updating
+      const answer = await AttemptAnswer.findByPk(answerId);
+      if (!answer) {
+        throw new BadRequestError('Answer not found');
+      }
+
+      const finalScore = Math.min(result.score, answer.max_score || 10);
+      
+      if (finalScore !== result.score) {
+        console.warn(`[scoreWriting] ⚠️  AI score capped: ${result.score} -> ${finalScore} (max: ${answer.max_score})`);
+      }
+      
+      await answer.update({
+        score: finalScore,
+        ai_feedback: result.overallFeedback || result.comment,
+        ai_graded_at: new Date(),
+      });
+
+      console.log(`[scoreWriting] ✅ Writing answer ${answerId} scored comprehensively: ${finalScore}/${answer.max_score}`);
+      return result;
+      
+    } catch (error) {
+      console.error(`[scoreWriting] ❌ Failed to score writing answer ${answerId}:`, error.message);
+      throw error;
     }
-
-    if (!answer.text_answer) {
-      throw new BadRequestError('No text answer provided');
-    }
-
-    console.log(`[scoreWriting] Answer ID ${answerId}: Text length = ${answer.text_answer.length} chars`);
-
-    // Get AI scoring criteria for this question type
-    const criteria = await AiScoringCriteria.findAll({
-      where: {
-        aptis_type_id: answer.question.aptis_type_id,
-        question_type_id: answer.question.question_type_id,
-      },
-    });
-
-    if (!criteria || criteria.length === 0) {
-      throw new BadRequestError('No AI scoring criteria found for this question type');
-    }
-
-    console.log(
-      `[scoreWriting] Found ${criteria.length} criteria for APTIS type ${answer.question.aptis_type_id}, question type ${answer.question.question_type_id}`
-    );
-
-    // Build prompt and score
-    const result = await this.scoreWithCriteria(answer.text_answer, answer.question, criteria);
-
-    // Save AI feedback for each criterion
-    await this.createAnswerAiFeedbacks(answerId, result.criteriaScores);
-
-    // Update answer with AI score and feedback
-    // CRITICAL: Ensure AI score doesn't exceed answer.max_score
-    const finalScore = Math.min(result.totalScore, answer.max_score);
-    
-    if (finalScore !== result.totalScore) {
-      console.warn(`[scoreWriting] ⚠️  AI score capped: ${result.totalScore} -> ${finalScore} (max: ${answer.max_score})`);
-    }
-    
-    await answer.update({
-      score: finalScore,
-      ai_feedback: result.overallFeedback,
-      ai_graded_at: new Date(),
-    });
-
-    console.log(
-      `[scoreWriting] Answer ${answerId} scored successfully: ${finalScore}/${answer.max_score} (AI calculated: ${result.totalScore}/${result.totalMaxScore})`
-    );
-
-    return result;
   }
 
-  /**
-   * Score speaking answer using AI (from transcribed text)
-   */
+  async scoreSpeakingWithAudioAnalysis(answerId) {
+    console.log(`[scoreSpeakingWithAudioAnalysis] Starting comprehensive speaking assessment for answer ${answerId}`);
+
+    try {
+      // Use comprehensive scoring with audio analysis
+      const result = await this.scoreAnswerComprehensively(answerId, true);
+
+      // Refetch answer from database to get a fresh instance for updating
+      const answer = await AttemptAnswer.findByPk(answerId);
+      if (!answer) {
+        throw new BadRequestError('Answer not found');
+      }
+
+      const finalScore = Math.min(result.score, answer.max_score || 10);
+      
+      if (finalScore !== result.score) {
+        console.warn(`[scoreSpeakingWithAudioAnalysis] ⚠️  AI score capped: ${result.score} -> ${finalScore} (max: ${answer.max_score})`);
+      }
+      
+      await answer.update({
+        score: finalScore,
+        ai_feedback: result.overallFeedback || result.comment,
+        ai_graded_at: new Date(),
+      });
+
+      console.log(`[scoreSpeakingWithAudioAnalysis] ✅ Speaking answer ${answerId} scored comprehensively: ${finalScore}/${answer.max_score}`);
+      return result;
+      
+    } catch (error) {
+      console.error(`[scoreSpeakingWithAudioAnalysis] ❌ Failed to score speaking answer ${answerId}:`, error.message);
+      throw error;
+    }
+  }
+
   async scoreSpeaking(answerId) {
-    console.log(`[scoreSpeaking] Starting to score Speaking answer ${answerId}`);
+    console.log(`[scoreSpeaking] Starting comprehensive speaking assessment for answer ${answerId}`);
 
-    const answer = await AttemptAnswer.findByPk(answerId, {
-      include: [
-        {
-          model: Question,
-          as: 'question',
+    try {
+      // For speaking, we need to wait for transcription if it's still processing
+      // Try to get the answer with transcription, with retries
+      let answer = await AttemptAnswer.findByPk(answerId, {
+        include: [
+          {
+            model: Question,
+            as: 'question',
+            include: [
+              { model: QuestionType, as: 'questionType' }
+            ]
+          }
+        ]
+      });
+      
+      if (!answer) {
+        throw new BadRequestError('Answer not found');
+      }
+      
+      // If transcribed_text is not available, wait for transcription queue to process
+      let maxRetries = 10;
+      let retryCount = 0;
+      while (!answer.transcribed_text && retryCount < maxRetries) {
+        retryCount++;
+        console.log(`[scoreSpeaking] Waiting for transcription (attempt ${retryCount}/${maxRetries})...`);
+        // Wait 3 seconds before checking again
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        answer = await AttemptAnswer.findByPk(answerId, {
           include: [
             {
-              model: QuestionSampleAnswer,
-              as: 'sampleAnswer',
-            },
-          ],
-        },
-      ],
-    });
+              model: Question,
+              as: 'question',
+              include: [
+                { model: QuestionType, as: 'questionType' }
+              ]
+            }
+          ]
+        });
+      }
+      
+      // If still no transcription, log warning but proceed anyway
+      // AI will score based on audio_url or minimal context
+      if (!answer.transcribed_text) {
+        console.warn(`[scoreSpeaking] ⚠️  No transcription available for answer ${answerId} after waiting. Will attempt scoring with available data.`);
+      } else {
+        console.log(`[scoreSpeaking] ✅ Transcription available: ${answer.transcribed_text.substring(0, 100)}...`);
+      }
+      
+      // Use comprehensive scoring with audio analysis - speaking has audio
+      const result = await this.scoreAnswerComprehensively(answerId, true);
 
-    if (!answer) {
-      throw new BadRequestError('Answer not found');
+      // Refetch answer from database to get a fresh instance for updating
+      answer = await AttemptAnswer.findByPk(answerId);
+      if (!answer) {
+        throw new BadRequestError('Answer not found');
+      }
+
+      const finalScore = Math.min(result.score, answer.max_score || 10);
+      
+      if (finalScore !== result.score) {
+        console.warn(`[scoreSpeaking] ⚠️  AI score capped: ${result.score} -> ${finalScore} (max: ${answer.max_score})`);
+      }
+      
+      await answer.update({
+        score: finalScore,
+        ai_feedback: result.overallFeedback || result.comment,
+        ai_graded_at: new Date(),
+      });
+
+      console.log(`[scoreSpeaking] ✅ Speaking answer ${answerId} scored comprehensively: ${finalScore}/${answer.max_score}`);
+      return result;
+      
+    } catch (error) {
+      console.error(`[scoreSpeaking] ❌ Failed to score speaking answer ${answerId}:`, error.message);
+      console.error(`[scoreSpeaking] Error stack:`, error.stack);
+      throw error;
     }
+  }
 
-    // If no transcription yet, do it first
-    if (!answer.transcribed_text && answer.audio_url) {
-      console.log(`[scoreSpeaking] Transcribing audio first for answer ${answerId}`);
-      const SpeechToTextService = require('./SpeechToTextService');
-      
-      // Convert relative URL to absolute path
-      const audioPath = answer.audio_url.startsWith('/uploads') 
-        ? path.join(require('../config/storage').STORAGE_CONFIG.basePath, answer.audio_url.replace('/uploads', ''))
-        : answer.audio_url;
-      
-      const transcription = await SpeechToTextService.convertAudioToText(audioPath, 'en-US');
-      
-      // Update answer with transcription
-      await answer.update({ transcribed_text: transcription });
-      answer.transcribed_text = transcription; // Update local object
-      
-      console.log(`[scoreSpeaking] Transcription complete: ${transcription.substring(0, 100)}...`);
-    }
-
-    if (!answer.transcribed_text || answer.transcribed_text.trim() === '') {
-      throw new BadRequestError('Transcription failed or is empty');
-    }
-
-    console.log(
-      `[scoreSpeaking] Answer ID ${answerId}: Transcribed text length = ${answer.transcribed_text.length} chars`
-    );
-
-    // Get AI scoring criteria
-    const criteria = await AiScoringCriteria.findAll({
-      where: {
-        aptis_type_id: answer.question.aptis_type_id,
-        question_type_id: answer.question.question_type_id,
-      },
-    });
-
+  /**
+   * Enhanced scoring method that incorporates audio analysis data
+   * Provides more accurate assessment by combining AI evaluation with objective metrics
+   */
+  async scoreWithAudioAnalysis(answerText, question, criteria, taskType = 'general', audioAnalysis = null) {
     if (!criteria || criteria.length === 0) {
-      throw new BadRequestError('No AI scoring criteria found for this question type');
+      throw new BadRequestError('No scoring criteria provided');
     }
 
-    console.log(
-      `[scoreSpeaking] Found ${criteria.length} criteria for APTIS type ${answer.question.aptis_type_id}, question type ${answer.question.question_type_id}`
-    );
+    const criteriaScores = [];
+    let totalScore = 0;
+    let totalMaxScore = 0;
 
-    // Score transcribed text
-    const result = await this.scoreWithCriteria(answer.transcribed_text, answer.question, criteria);
+    console.log(`[scoreWithAudioAnalysis] Enhanced scoring with ${criteria.length} criteria and audio analysis: ${!!audioAnalysis}`);
 
-    // Save AI feedback
-    await this.createAnswerAiFeedbacks(answerId, result.criteriaScores);
+    for (let i = 0; i < criteria.length; i++) {
+      const criterion = criteria[i];
+      try {
+        console.log(`[scoreWithAudioAnalysis] Scoring criterion ${i + 1}/${criteria.length}: ${criterion.criteria_name}`);
 
-    // Update answer
-    // CRITICAL: Ensure AI score doesn't exceed answer.max_score
-    const finalScore = Math.min(result.totalScore, answer.max_score);
-    
-    if (finalScore !== result.totalScore) {
-      console.warn(`[scoreSpeaking] ⚠️  AI score capped: ${result.totalScore} -> ${finalScore} (max: ${answer.max_score})`);
+        // Build enhanced prompt with audio analysis
+        const prompt = ScoringPromptBuilder.buildEnhancedScoringPrompt(
+          answerText,
+          question,
+          criterion,
+          taskType,
+          audioAnalysis
+        );
+
+        // Call AI service
+        const aiResponse = await AiServiceClient.callAiWithRetry(prompt);
+        const parsedResult = AiServiceClient.parseAiResponse(aiResponse, criterion.max_score);
+
+        // Apply audio analysis adjustments if available
+        let finalScore = parsedResult.score;
+        if (audioAnalysis && AudioAnalysisEnhancer.validateAudioAnalysis(audioAnalysis)) {
+          finalScore = AudioAnalysisEnhancer.applyAudioAnalysisAdjustment(
+            parsedResult.score,
+            criterion.criteria_name,
+            audioAnalysis,
+            criterion.max_score
+          );
+          // Ensure score stays within bounds
+          finalScore = Math.max(0, Math.min(criterion.max_score, finalScore));
+        }
+
+        const criteriaScore = {
+          criteriaId: criterion.id,
+          criteriaName: criterion.criteria_name,
+          score: Math.round(finalScore * 100) / 100,
+          maxScore: criterion.max_score,
+          weight: criterion.weight,
+          cefrLevel: parsedResult.cefrLevel,
+          comment: parsedResult.comment,
+          strengths: parsedResult.strengths,
+          weaknesses: parsedResult.weaknesses,
+          suggestions: parsedResult.suggestions,
+          aiEnhanced: !!audioAnalysis
+        };
+
+        criteriaScores.push(criteriaScore);
+        totalScore += criteriaScore.score;
+        totalMaxScore += criteriaScore.maxScore;
+
+        console.log(`[scoreWithAudioAnalysis] ✅ Criterion scored: ${criterion.criteria_name} = ${criteriaScore.score}/${criteriaScore.maxScore} (${parsedResult.cefrLevel})`);
+      } catch (error) {
+        console.error(`[scoreWithAudioAnalysis] ❌ Failed to score criterion ${criterion.criteria_name}:`, error.message);
+        criteriaScores.push({
+          criteriaId: criterion.id,
+          criteriaName: criterion.criteria_name,
+          score: 0,
+          maxScore: criterion.max_score,
+          weight: criterion.weight,
+          cefrLevel: 'Error',
+          comment: `Error: ${error.message}`,
+          strengths: 'Unable to assess due to error',
+          weaknesses: 'System error occurred during assessment',
+          suggestions: 'Please retry the assessment'
+        });
+      }
     }
-    
-    await answer.update({
-      score: finalScore,
-      ai_feedback: result.overallFeedback,
-      ai_graded_at: new Date(),
-    });
 
-    console.log(
-      `[scoreSpeaking] Answer ${answerId} scored successfully: ${finalScore}/${answer.max_score} (AI calculated: ${result.totalScore}/${result.totalMaxScore})`
-    );
+    const overallFeedback = FeedbackGenerator.generateEnhancedOverallFeedback(criteriaScores, audioAnalysis);
+
+    const result = {
+      totalScore: Math.round(totalScore * 100) / 100,
+      totalMaxScore: Math.round(totalMaxScore * 100) / 100,
+      criteriaScores,
+      overallFeedback,
+      audioAnalysisUsed: !!audioAnalysis
+    };
+
+    console.log(`[scoreWithAudioAnalysis] Enhanced final score: ${result.totalScore}/${result.totalMaxScore}`);
 
     return result;
   }
 
-  /**
-   * Score answer against multiple criteria
-   */
-  async scoreWithCriteria(answerText, question, criteria) {
+  async scoreWithCriteria(answerText, question, criteria, writingType = 'general') {
     if (!criteria || criteria.length === 0) {
       throw new BadRequestError('No scoring criteria provided');
     }
@@ -198,54 +290,51 @@ class AiScoringService {
 
     console.log(`[scoreWithCriteria] Scoring answer with ${criteria.length} criteria`);
 
-    // Score each criterion
     for (let i = 0; i < criteria.length; i++) {
       const criterion = criteria[i];
       try {
-        const prompt = this.buildScoringPrompt(answerText, question, criterion);
-        const aiResponse = await this.callAiWithRetry(prompt);
-        const parsed = this.parseAiResponse(aiResponse, criterion.max_score);
+        console.log(`[scoreWithCriteria] Scoring criterion ${i + 1}/${criteria.length}: ${criterion.criteria_name}`);
 
-        // Validate score is within bounds
-        if (parsed.score < 0 || parsed.score > criterion.max_score) {
-          console.warn(
-            `[scoreWithCriteria] Score ${parsed.score} out of bounds [0, ${criterion.max_score}], clamping`
-          );
-          parsed.score = Math.max(0, Math.min(parsed.score, criterion.max_score));
-        }
+        const prompt = ScoringPromptBuilder.buildScoringPrompt(answerText, question, criterion, writingType);
+        const aiResponse = await AiServiceClient.callAiWithRetry(prompt);
+        const parsedResult = AiServiceClient.parseAiResponse(aiResponse, criterion.max_score);
 
         const criteriaScore = {
-          criteria_id: criterion.id,
-          criteria_name: criterion.criteria_name,
-          score: parsed.score,
-          max_score: criterion.max_score,
+          criteriaId: criterion.id,
+          criteriaName: criterion.criteria_name,
+          score: Math.round(parsedResult.score * 100) / 100,
+          maxScore: criterion.max_score,
           weight: criterion.weight,
-          comment: parsed.comment,
-          suggestions: parsed.suggestions,
-          strengths: parsed.strengths,
-          weaknesses: parsed.weaknesses,
+          cefrLevel: parsedResult.cefrLevel,
+          comment: parsedResult.comment,
+          strengths: parsedResult.strengths,
+          weaknesses: parsedResult.weaknesses,
+          suggestions: parsedResult.suggestions,
         };
 
         criteriaScores.push(criteriaScore);
+        totalScore += criteriaScore.score;
+        totalMaxScore += criteriaScore.maxScore;
 
-        // Apply weight (weight is already a decimal 0-1)
-        totalScore += parsed.score * criterion.weight;
-        totalMaxScore += criterion.max_score * criterion.weight;
-
-        console.log(
-          `[scoreWithCriteria] Criterion ${i + 1}/${criteria.length} "${criterion.criteria_name}": ${parsed.score}/${criterion.max_score}`
-        );
+        console.log(`[scoreWithCriteria] ✅ Criterion scored: ${criterion.criteria_name} = ${criteriaScore.score}/${criteriaScore.maxScore} (${parsedResult.cefrLevel})`);
       } catch (error) {
-        console.error(
-          `[scoreWithCriteria] Error scoring criterion "${criterion.criteria_name}":`,
-          error.message
-        );
-        throw error;
+        console.error(`[scoreWithCriteria] ❌ Failed to score criterion ${criterion.criteria_name}:`, error.message);
+        criteriaScores.push({
+          criteriaId: criterion.id,
+          criteriaName: criterion.criteria_name,
+          score: 0,
+          maxScore: criterion.max_score,
+          weight: criterion.weight,
+          cefrLevel: 'Error',
+          comment: `Error: ${error.message}`,
+          strengths: 'Unable to assess due to error',
+          weaknesses: 'System error occurred during assessment',
+          suggestions: 'Please retry the assessment'
+        });
       }
     }
 
-    // Generate overall feedback
-    const overallFeedback = this.generateOverallFeedback(criteriaScores);
+    const overallFeedback = FeedbackGenerator.generateOverallFeedback(criteriaScores);
 
     const result = {
       totalScore: Math.round(totalScore * 100) / 100,
@@ -260,324 +349,508 @@ class AiScoringService {
   }
 
   /**
-   * Build scoring prompt for AI
+   * Enhanced prompt builder that incorporates detailed audio analysis data
+   * Provides AI with objective metrics to make more accurate assessments
    */
-  buildScoringPrompt(answerText, question, criterion) {
-    const sampleAnswer = question.sampleAnswer?.sample_answer || 'N/A';
-    const keyPoints = question.sampleAnswer?.answer_key_points
-      ? JSON.parse(question.sampleAnswer.answer_key_points).join(', ')
-      : 'N/A';
-
-    return `
-You are an expert APTIS English language examiner. Your task is to score a student's answer based on a specific criterion.
-
-CONTEXT:
-=========
-Question Type: APTIS Writing/Speaking Assessment
-Question: ${question.content}
-
-Sample Answer: ${sampleAnswer}
-
-Key Points Expected: ${keyPoints}
-
-STUDENT'S ANSWER:
-=================
-${answerText}
-
-SCORING CRITERION:
-==================
-Criterion Name: ${criterion.criteria_name}
-Description: ${criterion.description || 'N/A'}
-Maximum Score: ${criterion.max_score} points
-Weight: ${(criterion.weight * 100).toFixed(0)}%
-
-RUBRIC FOR SCORING:
-====================
-${criterion.rubric_prompt}
-
-SCORING INSTRUCTIONS:
-=====================
-1. Carefully evaluate the student's answer ONLY based on the criterion above.
-2. Award a score from 0 to ${criterion.max_score} (decimals allowed, e.g., 3.5).
-3. Provide honest, constructive feedback.
-4. Be consistent with APTIS standards.
-
-RESPONSE FORMAT - MUST BE VALID JSON:
-====================================
-Return EXACTLY this JSON format. ALL text fields MUST be strings with escaped newlines:
-- Use literal \\n for line breaks (not actual newlines)
-- Each bullet point should be on a separate line in the string
-- Use proper JSON escaping for special characters
-
-{
-  "score": 8.5,
-  "comment": "Brief explanation of score (1-2 sentences)",
-  "strengths": "• Strength 1\\n• Strength 2\\n• Strength 3",
-  "weaknesses": "• Weakness 1\\n• Weakness 2",
-  "suggestions": "• Suggestion 1\\n• Suggestion 2\\n• Suggestion 3"
-}
-
-CRITICAL REQUIREMENTS:
-======================
-- score MUST be a number (e.g., 7.5, not "7.5")
-- All text fields MUST be valid JSON strings with proper escaping
-- Use \\n (escaped) to separate bullet points, NOT actual newlines
-- Ensure valid JSON that can be parsed by JSON.parse()
-- Return ONLY the JSON object, no markdown, no code blocks, no extra text
-
-Example of correct format:
-{
-  "score": 8,
-  "comment": "Good work with clear structure.",
-  "strengths": "• Clear ideas\\n• Good grammar",
-  "weaknesses": "• Could add more examples",
-  "suggestions": "• Try using advanced structures\\n• Add specific examples"
-}
-`.trim();
+  buildEnhancedScoringPrompt(answerText, question, criterion, taskType = 'general', audioAnalysis = null) {
+    return ScoringPromptBuilder.buildEnhancedScoringPrompt(answerText, question, criterion, taskType, audioAnalysis);
   }
 
-  /**
-   * Call Groq AI with retry logic
-   */
-  async callAiWithRetry(prompt, maxRetries = AI_SCORING_CONFIG.MAX_RETRIES) {
-    let lastError;
-
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`[callAiWithRetry] Attempt ${attempt}/${maxRetries} - Calling Groq API`);
-
-        const groqClient = getGroqModel();
-        const result = await groqClient.chat.completions.create({
-          messages: [
-            {
-              role: 'user',
-              content: prompt,
-            },
-          ],
-          model: GROQ_CONFIG.model,
-          temperature: GROQ_CONFIG.temperature,
-          max_tokens: GROQ_CONFIG.max_tokens,
-        });
-
-        // Extract text from Groq response
-        const response = result.choices[0]?.message?.content || '';
-
-        if (!response || response.length === 0) {
-          throw new Error('Empty response from Groq API');
-        }
-
-        console.log(
-          `[callAiWithRetry] Success - Response length: ${response.length} chars`
-        );
-
-        return response;
-      } catch (error) {
-        lastError = error;
-        console.error(
-          `[callAiWithRetry] Attempt ${attempt} failed:`,
-          error.message
-        );
-
-        if (attempt < maxRetries) {
-          const delayMs = AI_SCORING_CONFIG.RETRY_DELAY * attempt;
-          console.log(`[callAiWithRetry] Retrying in ${delayMs}ms...`);
-          await delay(delayMs);
-        }
-      }
-    }
-
-    throw new Error(
-      `AI scoring failed after ${maxRetries} attempts: ${lastError?.message || 'Unknown error'}`
-    );
+  buildScoringPrompt(answerText, question, criterion, writingType = 'general') {
+    return ScoringPromptBuilder.buildScoringPrompt(answerText, question, criterion, writingType);
   }
 
-  /**
-   * Parse AI response - handle both valid JSON and escaped newlines
-   */
+  async callAiWithRetry(prompt, maxRetries = 3) {
+    return AiServiceClient.callAiWithRetry(prompt, maxRetries);
+  }
+
   parseAiResponse(responseText, maxScore) {
-    try {
-      // Extract JSON from response (handle markdown code blocks)
-      let jsonText = responseText.trim();
-
-      // Remove markdown code blocks if present
-      if (jsonText.includes('```')) {
-        jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-      }
-
-      // Try to extract JSON object if wrapped in text
-      const jsonMatch = jsonText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        jsonText = jsonMatch[0];
-      }
-
-      // First attempt: parse as-is (strict JSON)
-      let parsed;
-      try {
-        parsed = JSON.parse(jsonText);
-      } catch (e1) {
-        // Second attempt: clean up unescaped newlines
-        console.warn('[parseAiResponse] Strict JSON failed, attempting cleanup:', e1.message);
-        
-        // Replace actual newlines with escaped newlines in string values
-        jsonText = jsonText.replace(/\n/g, '\\n');
-        // Remove any double backslashes that might have been created
-        jsonText = jsonText.replace(/\\\\\n/g, '\\n');
-        
-        try {
-          parsed = JSON.parse(jsonText);
-        } catch (e2) {
-          console.error('[parseAiResponse] Cleanup attempt also failed:', e2.message);
-          throw e2;
-        }
-      }
-
-      // Validate required fields
-      if (typeof parsed.score === 'undefined') {
-        throw new Error('Missing score field in response');
-      }
-
-      // Ensure score is within bounds
-      let score = parseFloat(parsed.score);
-      if (isNaN(score)) {
-        throw new Error(`Invalid score value: ${parsed.score}`);
-      }
-      score = Math.max(0, Math.min(score, maxScore));
-
-      // Convert array/object fields to strings, handle escaped newlines
-      const convertToString = (value, defaultValue = '') => {
-        if (typeof value === 'string') {
-          // Handle escaped newlines - convert \n string to actual newlines for display
-          return value.trim() || defaultValue;
-        }
-        if (Array.isArray(value)) {
-          // Join array items with newline and bullet points
-          return value.map(item => `• ${String(item).trim()}`).join('\n') || defaultValue;
-        }
-        if (typeof value === 'object' && value !== null) {
-          return JSON.stringify(value, null, 2);
-        }
-        return String(value || defaultValue);
-      };
-
-      const result = {
-        score: Math.round(score * 100) / 100,
-        comment: convertToString(parsed.comment, 'No comment provided'),
-        strengths: convertToString(parsed.strengths, 'None identified'),
-        weaknesses: convertToString(parsed.weaknesses, 'None identified'),
-        suggestions: convertToString(parsed.suggestions, 'No suggestions'),
-      };
-
-      console.log('[parseAiResponse] Successfully parsed response');
-
-      return result;
-    } catch (error) {
-      console.error('[parseAiResponse] JSON parsing error:', error.message);
-      console.error('[parseAiResponse] Response text (first 300 chars):', responseText.substring(0, 300));
-
-      // Fallback: try to extract score using regex
-      const scoreMatch = responseText.match(/"score"\s*:\s*(\d+\.?\d*)/);
-      const score = scoreMatch ? Math.min(parseFloat(scoreMatch[1]), maxScore) : 0;
-
-      console.warn(`[parseAiResponse] Using fallback score: ${score}`);
-
-      return {
-        score: Math.round(score * 100) / 100,
-        comment: 'Feedback formatting issue - please check raw feedback',
-        strengths: 'N/A',
-        weaknesses: 'N/A',
-        suggestions: 'N/A',
-      };
-    }
+    return AiServiceClient.parseAiResponse(responseText, maxScore);
   }
 
-  /**
-   * Create answer AI feedback records
-   */
   async createAnswerAiFeedbacks(answerId, criteriaScores) {
     if (!criteriaScores || criteriaScores.length === 0) {
-      console.warn(`[createAnswerAiFeedbacks] No criteria scores to save for answer ${answerId}`);
       return;
     }
 
     console.log(
       `[createAnswerAiFeedbacks] Creating ${criteriaScores.length} feedback records for answer ${answerId}`
     );
+    console.log(`[createAnswerAiFeedbacks] Criteria scores:`, criteriaScores.map(cs => `${cs.criteriaName}: ${cs.score}/${cs.maxScore}`));
 
     for (const cs of criteriaScores) {
-      // Validate data
-      if (!cs.criteria_id || !cs.score || !cs.max_score) {
-        console.error('[createAnswerAiFeedbacks] Invalid criteria score:', cs);
-        continue;
-      }
-
       try {
-        const feedback = await AnswerAiFeedback.create({
+        const feedbackData = {
           answer_id: answerId,
-          criteria_id: cs.criteria_id,
+          criteria_id: cs.criteriaId,
           score: cs.score,
-          max_score: cs.max_score,
-          comment: cs.comment || '',
-          suggestions: cs.suggestions || '',
-          strengths: cs.strengths || '',
-          weaknesses: cs.weaknesses || '',
-        });
-
-        console.log(
-          `[createAnswerAiFeedbacks] Saved feedback for criteria ${cs.criteria_id}: score ${cs.score}/${cs.max_score}`
-        );
+          comment: cs.comment,
+          strengths: cs.strengths,
+          weaknesses: cs.weaknesses,
+          suggestions: cs.suggestions,
+        };
+        
+        console.log(`[createAnswerAiFeedbacks] Creating feedback for ${cs.criteriaName}:`, feedbackData);
+        
+        const feedback = await AnswerAiFeedback.create(feedbackData);
+        console.log(`[createAnswerAiFeedbacks] ✅ Created feedback ${feedback.id} for criterion ${cs.criteriaName}: ${cs.score}/${cs.maxScore}`);
       } catch (error) {
         console.error(
-          `[createAnswerAiFeedbacks] Error creating feedback for criteria ${cs.criteria_id}:`,
+          `[createAnswerAiFeedbacks] ❌ Failed to create feedback for criterion ${cs.criteriaName}:`,
           error.message
         );
-        throw error;
+        console.error(`[createAnswerAiFeedbacks] Error details:`, error);
       }
+    }
+    
+    console.log(`[createAnswerAiFeedbacks] Completed feedback creation for answer ${answerId}`);
+  }
+
+  generateOverallFeedback(criteriaScores) {
+    return FeedbackGenerator.generateOverallFeedback(criteriaScores);
+  }
+
+  /**
+   * Apply audio analysis adjustments to AI-generated scores
+   * Uses objective metrics to fine-tune subjective assessments
+   */
+  applyAudioAnalysisAdjustment(baseScore, criteriaName, audioAnalysis, maxScore) {
+    return AudioAnalysisEnhancer.applyAudioAnalysisAdjustment(baseScore, criteriaName, audioAnalysis, maxScore);
+  }
+
+  /**
+   * Generate enhanced overall feedback incorporating audio analysis
+   */
+  generateEnhancedOverallFeedback(criteriaScores, audioAnalysis) {
+    return FeedbackGenerator.generateEnhancedOverallFeedback(criteriaScores, audioAnalysis);
+  }
+
+  /**
+   * New method: Score entire answer as single unit using all criteria as context
+   */
+  async scoreEntireAnswer(answerText, question, criteria, taskType = 'general') {
+    if (!criteria || criteria.length === 0) {
+      throw new BadRequestError('No scoring criteria provided');
+    }
+
+    console.log(`[scoreEntireAnswer] Scoring entire answer with ${criteria.length} criteria as context`);
+
+    try {
+      console.log(`[scoreEntireAnswer] Building prompt for ${criteria.length} criteria`);
+      // Build comprehensive prompt with all criteria
+      const prompt = this.buildComprehensiveScoringPrompt(answerText, question, criteria, taskType);
+
+      // Call AI service
+      const aiResponse = await AiServiceClient.callAiWithRetry(prompt);
+      console.log(`[scoreEntireAnswer] Raw AI response: ${aiResponse.substring(0, 200)}...`);
+      const parsedResult = AiServiceClient.parseAiResponse(aiResponse, question.max_score || 10);
+
+      const result = {
+        score: Math.round(parsedResult.score * 100) / 100,
+        overallFeedback: parsedResult.comment || 'No feedback provided',
+        comment: parsedResult.comment,
+        strengths: parsedResult.strengths,
+        weaknesses: parsedResult.weaknesses,
+        suggestions: parsedResult.suggestions,
+        cefrLevel: parsedResult.cefrLevel,
+        criteriaUsed: criteria.map(c => c.criteria_name)
+      };
+
+      console.log(`[scoreEntireAnswer] ✅ Answer scored: ${result.score}/${question.max_score}`);
+      return result;
+    } catch (error) {
+      console.error(`[scoreEntireAnswer] ❌ Failed to score answer:`, error.message);
+      throw error;
     }
   }
 
   /**
-   * Generate overall feedback summary
+   * Score entire answer with audio analysis
    */
-  generateOverallFeedback(criteriaScores) {
-    if (!criteriaScores || criteriaScores.length === 0) {
-      return 'Overall Performance: No feedback available';
+  async scoreEntireAnswerWithAudio(answerText, question, criteria, taskType = 'general', audioAnalysis = null) {
+    if (!criteria || criteria.length === 0) {
+      throw new BadRequestError('No scoring criteria provided');
     }
 
-    // Calculate percentage based on weighted scores
-    let totalWeightedScore = 0;
-    let totalWeightedMax = 0;
+    console.log(`[scoreEntireAnswerWithAudio] Scoring with audio analysis: ${!!audioAnalysis}`);
 
-    criteriaScores.forEach((cs) => {
-      if (cs.weight) {
-        totalWeightedScore += cs.score * cs.weight;
-        totalWeightedMax += cs.max_score * cs.weight;
+    try {
+      console.log(`[scoreEntireAnswerWithAudio] Building enhanced prompt for ${criteria.length} criteria`);
+      // Build enhanced prompt with audio analysis
+      const prompt = this.buildEnhancedComprehensiveScoringPrompt(
+        answerText, 
+        question, 
+        criteria, 
+        taskType, 
+        audioAnalysis
+      );
+
+      // Call AI service
+      const aiResponse = await AiServiceClient.callAiWithRetry(prompt);
+      console.log(`[scoreEntireAnswerWithAudio] Raw AI response: ${aiResponse.substring(0, 200)}...`);
+      const parsedResult = AiServiceClient.parseAiResponse(aiResponse, question.max_score || 10);
+
+      // Apply audio analysis adjustments if available
+      let finalScore = parsedResult.score;
+      if (audioAnalysis && AudioAnalysisEnhancer.validateAudioAnalysis(audioAnalysis)) {
+        finalScore = AudioAnalysisEnhancer.applyOverallAudioAnalysisAdjustment(
+          parsedResult.score,
+          audioAnalysis,
+          question.max_score || 10
+        );
+        finalScore = Math.max(0, Math.min(question.max_score || 10, finalScore));
       }
-    });
 
-    const avgPercentage =
-      totalWeightedMax > 0 ? (totalWeightedScore / totalWeightedMax) * 100 : 0;
+      const result = {
+        score: Math.round(finalScore * 100) / 100,
+        overallFeedback: parsedResult.comment || 'No feedback provided',
+        comment: parsedResult.comment,
+        strengths: parsedResult.strengths,
+        weaknesses: parsedResult.weaknesses,
+        suggestions: parsedResult.suggestions,
+        cefrLevel: parsedResult.cefrLevel,
+        criteriaUsed: criteria.map(c => c.criteria_name),
+        audioAnalysisUsed: !!audioAnalysis
+      };
 
-    let level = 'Needs Improvement';
-    let description = 'The answer needs significant improvement in multiple areas';
+      console.log(`[scoreEntireAnswerWithAudio] ✅ Answer scored: ${result.score}/${question.max_score}`);
+      return result;
+    } catch (error) {
+      console.error(`[scoreEntireAnswerWithAudio] ❌ Failed to score answer:`, error.message);
+      throw error;
+    }
+  }
 
-    if (avgPercentage >= 90) {
-      level = 'Excellent';
-      description = 'Exceptional performance across all criteria';
-    } else if (avgPercentage >= 80) {
-      level = 'Very Good';
-      description = 'Strong performance with minor areas for improvement';
-    } else if (avgPercentage >= 70) {
-      level = 'Good';
-      description = 'Solid performance with some areas to develop';
-    } else if (avgPercentage >= 60) {
-      level = 'Satisfactory';
-      description = 'Acceptable but needs improvement in several areas';
-    } else if (avgPercentage >= 50) {
-      level = 'Weak';
-      description = 'Below satisfactory; significant improvements needed';
+  /**
+   * Build comprehensive prompt for scoring entire answer
+   */
+  buildComprehensiveScoringPrompt(answerText, question, criteria, taskType) {
+    const criteriaList = criteria.map(c => `- ${c.criteria_name}: ${c.description || c.rubric_prompt}`).join('\n');
+    
+    return `You are an expert language assessor. Score this ${taskType} response holistically using ALL the following criteria:
+
+${criteriaList}
+
+Question: ${question.content}
+Student Response: ${answerText}
+
+Provide a comprehensive assessment considering ALL criteria above. Return your response in this exact JSON format:
+{
+  "cefr_level": "[CEFR level: A1, A2, B1, B2, C1, or C2]",
+  "comment": "[overall assessment combining all criteria]",
+  "strengths": "[what the student did well across all criteria]",
+  "weaknesses": "[areas needing improvement across all criteria]",
+  "suggestions": "[specific recommendations for improvement]"
+}`;
+  }
+
+  /**
+   * Build enhanced prompt with audio analysis
+   */
+  buildEnhancedComprehensiveScoringPrompt(answerText, question, criteria, taskType, audioAnalysis) {
+    const basePrompt = this.buildComprehensiveScoringPrompt(answerText, question, criteria, taskType);
+    
+    if (!audioAnalysis) {
+      return basePrompt;
     }
 
-    return `Overall Performance: ${level} (${Math.round(avgPercentage)}%). ${description}.`;
+    const audioInfo = `
+Audio Analysis Data:
+- Fluency: ${audioAnalysis.fluency || 'N/A'}
+- Pace: ${audioAnalysis.averageWordsPerMinute || 'N/A'} WPM
+- Pause frequency: ${audioAnalysis.pauseFrequency || 'N/A'}
+- Total duration: ${audioAnalysis.totalDuration || 'N/A'}s
+
+Consider this objective audio data when assessing speaking fluency and delivery.`;
+
+    return basePrompt + audioInfo;
+  }
+
+  /**
+   * Get all scoring criteria for a question type
+   */
+  async getCriteriaByQuestionType(questionTypeId, aptisTypeId) {
+    try {
+      const criteria = await AiScoringCriteria.findAll({
+        where: {
+          question_type_id: questionTypeId,
+          aptis_type_id: aptisTypeId
+        },
+        order: [['criteria_name', 'ASC']]
+      });
+      
+      console.log(`[getCriteriaByQuestionType] Found ${criteria.length} criteria for question type ${questionTypeId}`);
+      return criteria;
+    } catch (error) {
+      console.error('[getCriteriaByQuestionType] Error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Score answer comprehensively with all criteria at once
+   */
+  async scoreAnswerComprehensively(answerId, includeAudio = false) {
+    try {
+      console.log(`[scoreAnswerComprehensively] Starting comprehensive scoring for answer ${answerId}`);
+
+      // Get answer with related data
+      const answer = await AttemptAnswer.findByPk(answerId, {
+        include: [
+          {
+            model: Question,
+            as: 'question',
+            include: [
+              { model: QuestionType, as: 'questionType' }
+            ]
+          },
+          {
+            model: ExamAttempt,
+            as: 'attempt',
+            include: [{
+              model: Exam,
+              as: 'exam',
+              attributes: ['aptis_type_id']
+            }]
+          }
+        ]
+      });
+
+      if (!answer) {
+        throw new NotFoundError(`Answer ${answerId} not found`);
+      }
+
+      console.log(`[scoreAnswerComprehensively] Answer found with audio_url: ${answer.audio_url}`);
+
+      const question = answer.question;
+      const questionTypeId = question.question_type_id;
+      
+      // Get aptisTypeId from Question first, then fallback to Exam
+      let aptisTypeId = question.aptis_type_id;
+      
+      // Fallback to exam aptis_type_id if not in question
+      if (!aptisTypeId && answer.attempt?.exam?.aptis_type_id) {
+        aptisTypeId = answer.attempt.exam.aptis_type_id;
+      }
+      
+      if (!aptisTypeId) {
+        throw new BadRequestError(`Cannot determine APTIS type for question ${question.id}`);
+      }
+      
+      console.log(`[scoreAnswerComprehensively] Using aptisTypeId: ${aptisTypeId}, questionTypeId: ${questionTypeId}`);
+      
+      // Get all criteria for this question type
+      const criteria = await this.getCriteriaByQuestionType(questionTypeId, aptisTypeId);
+      
+      if (!criteria || criteria.length === 0) {
+        throw new BadRequestError(`No scoring criteria found for question type ${questionTypeId}`);
+      }
+
+      console.log(`[scoreAnswerComprehensively] Found ${criteria.length} criteria`);
+
+      // Determine scoring method based on question type and audio availability
+      let result;
+      const hasAudio = includeAudio && answer.audio_url;
+      
+      // For speaking, prefer transcribed_text over text_answer
+      const answerText = answer.transcribed_text || answer.text_answer || '';
+      
+      console.log(`[scoreAnswerComprehensively] hasAudio=${hasAudio}, includeAudio=${includeAudio}, answerText length=${answerText.length}`);
+      
+      if (hasAudio) {
+        console.log(`[scoreAnswerComprehensively] Using scoreEntireAnswerWithAudio`);
+        // Get audio analysis if available
+        const audioAnalysis = answer.audio_analysis ? JSON.parse(answer.audio_analysis) : null;
+        result = await this.scoreEntireAnswerWithAudio(
+          answerText, 
+          question, 
+          criteria, 
+          question.questionType.type_name || 'general',
+          audioAnalysis
+        );
+      } else {
+        console.log(`[scoreAnswerComprehensively] Using scoreEntireAnswer`);
+        result = await this.scoreEntireAnswer(
+          answerText, 
+          question, 
+          criteria, 
+          question.questionType.type_name || 'general'
+        );
+      }
+
+      console.log(`[scoreAnswerComprehensively] Got result with score: ${result.score}`);
+      
+      // Update the answer with the score and AI feedback
+      const finalScore = Math.min(result.score || 0, answer.max_score || 10);
+      await answer.update({
+        score: finalScore,
+        ai_feedback: result.comment || result.overallFeedback,
+        ai_graded_at: new Date(),
+      });
+      
+      console.log(`[scoreAnswerComprehensively] ✅ Updated answer score: ${finalScore}/${answer.max_score}`);
+      
+      // Create comprehensive feedback record
+      console.log(`[scoreAnswerComprehensively] Creating feedback record...`);
+      await this.createComprehensiveFeedback(answerId, result);
+
+      console.log(`[scoreAnswerComprehensively] ✅ Comprehensive scoring completed for answer ${answerId}`);
+      return result;
+      
+    } catch (error) {
+      console.error(`[scoreAnswerComprehensively] ❌ Error scoring answer ${answerId}:`, error.message);
+      console.error(`[scoreAnswerComprehensively] Stack:`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * Create comprehensive feedback record for entire answer
+   */
+  async createComprehensiveFeedback(answerId, result) {
+    try {
+      console.log(`[createComprehensiveFeedback] Creating comprehensive feedback for answer ${answerId}`);
+      
+      // Validate result object
+      if (!result) {
+        throw new Error('Result object is null or undefined');
+      }
+      
+      console.log(`[createComprehensiveFeedback] Result object keys:`, Object.keys(result));
+      console.log(`[createComprehensiveFeedback] Result score: ${result.score}, type: ${typeof result.score}`);
+      console.log(`[createComprehensiveFeedback] Result cefrLevel: ${result.cefrLevel}`);
+      
+      const feedbackData = {
+        answer_id: answerId,
+        score: result.score,
+        comment: result.comment || result.overallFeedback,
+        strengths: result.strengths,
+        weaknesses: result.weaknesses,
+        suggestions: result.suggestions,
+        cefr_level: result.cefrLevel
+      };
+      
+      console.log(`[createComprehensiveFeedback] Feedback data to create:`, JSON.stringify(feedbackData, null, 2));
+      
+      // Validate required fields before creating
+      if (feedbackData.score === null || feedbackData.score === undefined) {
+        throw new Error(`Invalid score: ${feedbackData.score}`);
+      }
+      if (feedbackData.answer_id === null || feedbackData.answer_id === undefined) {
+        throw new Error(`Invalid answer_id: ${feedbackData.answer_id}`);
+      }
+      
+      const feedback = await AnswerAiFeedback.create(feedbackData);
+      console.log(`[createComprehensiveFeedback] ✅ Created comprehensive feedback ${feedback.id} with score ${feedback.score}`);
+      
+      return feedback;
+    } catch (error) {
+      console.error(`[createComprehensiveFeedback] ❌ Failed to create comprehensive feedback:`, error.message);
+      console.error(`[createComprehensiveFeedback] Full error stack:`, error.stack);
+      console.error(`[createComprehensiveFeedback] Error details:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create single feedback record for entire answer
+   */
+  async createSingleAnswerFeedback(answerId, result) {
+    try {
+      // For the new approach, we still need to create a feedback record
+      // but we'll use the first criteria as a placeholder since the model expects criteria_id
+      const answer = await AttemptAnswer.findByPk(answerId, {
+        include: [{
+          model: Question,
+          as: 'question'
+        }]
+      });
+
+      if (!answer) {
+        throw new Error(`Answer ${answerId} not found`);
+      }
+
+      const firstCriteria = await AiScoringCriteria.findOne({
+        where: {
+          aptis_type_id: answer.question.aptis_type_id,
+          question_type_id: answer.question.question_type_id,
+        },
+        order: [['id', 'ASC']]
+      });
+
+      if (!firstCriteria) {
+        console.warn(`[createSingleAnswerFeedback] No criteria found for answer ${answerId}`);
+        return;
+      }
+
+      // Delete any existing feedback for this answer (clean slate)
+      await AnswerAiFeedback.destroy({
+        where: { answer_id: answerId }
+      });
+
+      const feedbackData = {
+        answer_id: answerId,
+        criteria_id: firstCriteria.id, // Required by model but represents entire answer now
+        score: result.score,
+        comment: result.comment || result.overallFeedback,
+        strengths: result.strengths,
+        weaknesses: result.weaknesses,
+        suggestions: result.suggestions,
+        cefr_level: result.cefrLevel,
+      };
+      
+      console.log(`[createSingleAnswerFeedback] Creating single feedback for answer ${answerId}:`, feedbackData);
+      
+      const feedback = await AnswerAiFeedback.create(feedbackData);
+      console.log(`[createSingleAnswerFeedback] ✅ Created feedback ${feedback.id} with score: ${result.score}`);
+      return feedback;
+    } catch (error) {
+      console.error(`[createSingleAnswerFeedback] ❌ Failed to create feedback:`, error.message);
+      console.error(`[createSingleAnswerFeedback] Error details:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Legacy method - kept for backward compatibility but now redirects to new approach
+   */
+  async scoreWithCriteria(answerText, question, criteria, taskType = 'general') {
+    console.log(`[scoreWithCriteria] LEGACY: Redirecting to scoreEntireAnswer`);
+    const result = await this.scoreEntireAnswer(answerText, question, criteria, taskType);
+    
+    // Convert to legacy format for backward compatibility
+    return {
+      totalScore: result.score,
+      totalMaxScore: question.max_score || 10,
+      criteriaScores: [], // No longer used
+      overallFeedback: result.overallFeedback
+    };
+  }
+
+  /**
+   * Legacy method for audio analysis - redirects to new approach
+   */
+  async scoreWithAudioAnalysis(answerText, question, criteria, taskType = 'general', audioAnalysis = null) {
+    console.log(`[scoreWithAudioAnalysis] LEGACY: Redirecting to scoreEntireAnswerWithAudio`);
+    const result = await this.scoreEntireAnswerWithAudio(answerText, question, criteria, taskType, audioAnalysis);
+    
+    // Convert to legacy format for backward compatibility
+    return {
+      totalScore: result.score,
+      totalMaxScore: question.max_score || 10,
+      criteriaScores: [], // No longer used
+      overallFeedback: result.overallFeedback,
+      audioAnalysisUsed: result.audioAnalysisUsed
+    };
+  }
+
+  /**
+   * Legacy method - kept for backward compatibility but simplified
+   */
+  async createAnswerAiFeedbacks(answerId, criteriaScores) {
+    console.log(`[createAnswerAiFeedbacks] LEGACY: No longer creating individual criteria feedbacks`);
+    // This method is now a no-op since we create single feedback in createSingleAnswerFeedback
+    return;
   }
 }
 

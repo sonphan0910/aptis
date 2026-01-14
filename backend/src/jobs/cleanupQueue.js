@@ -1,36 +1,30 @@
+
 const StorageService = require('../services/StorageService');
 const { Op } = require('sequelize');
 const { ExamAttempt } = require('../models');
 
 /**
- * Cleanup old files
+ * Hàm dọn dẹp file cũ (quá hạn)
+ * Xoá các file lưu trữ quá 90 ngày
  */
 async function cleanupOldFiles() {
   try {
-    console.log('[CleanupJob] Starting cleanup of old files...');
-
-    // Delete files older than 90 days
+    // Gọi service xoá file cũ, trả về số lượng file đã xoá
     const deletedCount = await StorageService.cleanupOldFiles(90);
-
-    console.log(`[CleanupJob] Deleted ${deletedCount} old files`);
-
     return { deletedFiles: deletedCount };
   } catch (error) {
-    console.error('[CleanupJob] Cleanup failed:', error);
     throw error;
   }
 }
 
 /**
- * Cleanup incomplete attempts
+ * Hàm dọn dẹp các lượt làm bài chưa hoàn thành
+ * Đánh dấu các attempt "in_progress" quá 24h thành "abandoned"
  */
 async function cleanupIncompleteAttempts() {
   try {
-    console.log('[CleanupJob] Starting cleanup of incomplete attempts...');
-
-    // Find attempts older than 24 hours that are still in_progress
+    // Tìm các attempt chưa hoàn thành quá 24h
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-
     const incompleteAttempts = await ExamAttempt.findAll({
       where: {
         status: 'in_progress',
@@ -39,93 +33,73 @@ async function cleanupIncompleteAttempts() {
         },
       },
     });
-
-    // Mark as abandoned
+    // Đánh dấu các attempt này là "abandoned"
     for (const attempt of incompleteAttempts) {
       await attempt.update({
         status: 'abandoned',
         end_time: new Date(),
       });
     }
-
-    console.log(`[CleanupJob] Marked ${incompleteAttempts.length} attempts as abandoned`);
-
     return { abandonedAttempts: incompleteAttempts.length };
   } catch (error) {
-    console.error('[CleanupJob] Cleanup incomplete attempts failed:', error);
     throw error;
   }
 }
 
 /**
- * Get storage statistics
+ * Hàm lấy thống kê dung lượng lưu trữ
  */
 async function getStorageStats() {
   try {
     const stats = await StorageService.getStorageStats();
-    console.log('[CleanupJob] Storage stats:', stats);
     return stats;
   } catch (error) {
-    console.error('[CleanupJob] Failed to get storage stats:', error);
     throw error;
   }
 }
 
 /**
- * Schedule cleanup jobs
+ * Hàm lên lịch chạy các job dọn dẹp định kỳ
+ * - Dọn dẹp file và attempt mỗi ngày lúc 3h sáng
+ * - Lấy thống kê storage mỗi giờ
  */
 function scheduleCleanupJobs() {
-  console.log('[CleanupJob] Scheduling periodic cleanup jobs...');
-
-  // Run cleanup daily at 3 AM
+  // Hàm lên lịch chạy cleanup lúc 3h sáng mỗi ngày
   const scheduleDaily = () => {
     const now = new Date();
     const next3AM = new Date(now);
     next3AM.setHours(3, 0, 0, 0);
-
     if (next3AM <= now) {
       next3AM.setDate(next3AM.getDate() + 1);
     }
-
     const msUntil3AM = next3AM.getTime() - now.getTime();
-
     setTimeout(async () => {
       await runDailyCleanup();
-      scheduleDaily(); // Schedule next run
+      scheduleDaily(); // Lên lịch lần tiếp theo
     }, msUntil3AM);
-
-    console.log(`[CleanupJob] Next cleanup scheduled at ${next3AM.toISOString()}`);
   };
-
   scheduleDaily();
-
-  // Run storage stats every hour
+  // Lấy thống kê storage mỗi giờ
   setInterval(
     async () => {
       await getStorageStats();
     },
     60 * 60 * 1000,
-  ); // 1 hour
+  ); // 1 giờ
 }
 
 /**
- * Run daily cleanup
+ * Hàm thực thi dọn dẹp hàng ngày
+ * Gồm: xoá file cũ, đánh dấu attempt bỏ dở, lấy thống kê storage
  */
 async function runDailyCleanup() {
-  console.log('[CleanupJob] Running daily cleanup...');
-
   try {
     const fileCleanup = await cleanupOldFiles();
     const attemptCleanup = await cleanupIncompleteAttempts();
     const stats = await getStorageStats();
-
-    console.log('[CleanupJob] Daily cleanup completed:', {
-      ...fileCleanup,
-      ...attemptCleanup,
-      stats,
-    });
+    // Có thể log hoặc gửi thông báo về kết quả dọn dẹp tại đây nếu cần
   } catch (error) {
-    console.error('[CleanupJob] Daily cleanup failed:', error);
+    // Có thể log hoặc gửi thông báo lỗi tại đây nếu cần
   }
 }
 

@@ -1,6 +1,10 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
+/**
+ * Model Question - Câu hỏi
+ * Lưu trữ nội dung câu hỏi, loại câu hỏi, mức độ khó, và các tệp media liên quan
+ */
 const Question = sequelize.define(
   'Question',
   {
@@ -10,6 +14,7 @@ const Question = sequelize.define(
       autoIncrement: true,
     },
     question_type_id: {
+      // ID loại câu hỏi (MCQ, Essay, Matching, Fill Blanks...)
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
@@ -18,6 +23,7 @@ const Question = sequelize.define(
       },
     },
     aptis_type_id: {
+      // Loại kỳ thi APTIS này câu hỏi thuộc về
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
@@ -26,28 +32,32 @@ const Question = sequelize.define(
       },
     },
     difficulty: {
+      // Mức độ khó: easy (dễ), medium (trung bình), hard (khó)
       type: DataTypes.ENUM('easy', 'medium', 'hard'),
       allowNull: false,
     },
     content: {
+      // Nội dung câu hỏi (văn bản)
       type: DataTypes.TEXT,
       allowNull: false,
     },
     media_url: {
+      // URL của file audio/hình ảnh chính
       type: DataTypes.STRING(500),
       allowNull: true,
-      comment: 'Primary audio/image URL'
     },
     additional_media: {
+      // Các file media bổ sung (JSON array chứa {type, url, description})
       type: DataTypes.JSON,
       allowNull: true,
-      comment: 'Additional media files for complex questions (JSON array of {type, url, description})'
     },
     duration_seconds: {
+      // Thời gian âm thanh (tính bằng giây) cho câu hỏi nghe
       type: DataTypes.INTEGER,
       allowNull: true,
     },
     created_by: {
+      // ID của admin/teacher người tạo câu hỏi
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
@@ -56,6 +66,7 @@ const Question = sequelize.define(
       },
     },
     status: {
+      // Trạng thái: draft (nháp), active (hoạt động), inactive (không hoạt động)
       type: DataTypes.ENUM('draft', 'active', 'inactive'),
       defaultValue: 'draft',
     },

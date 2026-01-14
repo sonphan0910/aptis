@@ -1,78 +1,60 @@
+
 const SpeechToTextService = require('../services/SpeechToTextService');
 const { AttemptAnswer } = require('../models');
 
-// In-memory queue
+// Hàng đợi xử lý chuyển đổi giọng nói sang văn bản (lưu trong RAM)
 const queue = [];
 let isProcessing = false;
 
 /**
- * Add speech-to-text job to queue
+ * Thêm một job chuyển đổi giọng nói sang văn bản vào hàng đợi
+ * @param {Object} jobData - Dữ liệu job (answerId, audioUrl, ...)
+ * @returns {number} id của job vừa thêm
  */
 function addSpeechJob(jobData) {
+  // Tạo job mới với thông tin, số lần thử tối đa là 3
   const job = {
-    id: Date.now() + Math.random(),
+    id: Date.now() + Math.random(), // Tạo id duy nhất
     data: jobData,
-    attempts: 0,
-    maxAttempts: 3,
+    attempts: 0, // Số lần thử
+    maxAttempts: 3, // Số lần thử tối đa
     createdAt: new Date(),
-    status: 'pending',
+    status: 'pending', // Trạng thái ban đầu
   };
-
-  queue.push(job);
-  console.log(`[SpeechQueue] Job ${job.id} added to queue (${queue.length} jobs)`);
-
-  // Start processing
+  queue.push(job); // Đưa job vào hàng đợi
+  // Nếu chưa chạy xử lý thì bắt đầu xử lý
   if (!isProcessing) {
     processQueue();
   }
-
   return job.id;
 }
 
 /**
- * Process queue
+ * Xử lý các job trong hàng đợi
+ * Tự động thử lại nếu chuyển đổi thất bại, tối đa 3 lần
  */
 async function processQueue() {
   if (isProcessing || queue.length === 0) {
     return;
   }
-
   isProcessing = true;
-
   while (queue.length > 0) {
     const job = queue[0];
-
     try {
-      console.log(
-        `[SpeechQueue] Processing job ${job.id} (attempt ${job.attempts + 1}/${job.maxAttempts})`,
-      );
-
+      // Thực hiện chuyển đổi giọng nói sang văn bản
       const transcription = await processJob(job);
-
-      // Update answer with transcription
+      // Cập nhật kết quả vào bảng AttemptAnswer
       await AttemptAnswer.update(
         { transcribed_text: transcription },
         { where: { id: job.data.answerId } },
       );
-
-      queue.shift();
-      console.log(
-        `[SpeechQueue] Job ${job.id} completed - transcribed ${transcription.length} chars`,
-      );
-
-      // Notify that transcription is complete (scoring queue can now process it)
-      console.log(`[SpeechQueue] Transcription complete for answer ${job.data.answerId}. Ready for AI scoring.`);
-      
+      queue.shift(); // Xoá job khỏi hàng đợi
+      // Có thể thông báo cho hàng đợi chấm điểm AI xử lý tiếp
     } catch (error) {
-      console.error(`[SpeechQueue] Job ${job.id} failed:`, error.message);
-
       job.attempts++;
-
       if (job.attempts >= job.maxAttempts) {
+        // Nếu quá số lần thử thì xoá khỏi hàng đợi và đánh dấu answer cần chấm tay
         queue.shift();
-        console.error(`[SpeechQueue] Job ${job.id} failed permanently`);
-
-        // Mark answer as failed
         try {
           await AttemptAnswer.update(
             { 
@@ -83,35 +65,35 @@ async function processQueue() {
             { where: { id: job.data.answerId } },
           );
         } catch (updateError) {
-          console.error('[SpeechQueue] Failed to update answer:', updateError);
+          // Nếu cập nhật thất bại thì log lỗi
         }
       } else {
-        // Retry
+        // Nếu chưa quá số lần thử thì chuyển job về cuối hàng đợi để thử lại sau
         queue.shift();
         queue.push(job);
-        await new Promise((resolve) => setTimeout(resolve, 10000)); // 10s delay
+        // Đợi 10 giây trước khi thử lại
+        await new Promise((resolve) => setTimeout(resolve, 10000));
       }
     }
   }
-
   isProcessing = false;
 }
 
 /**
- * Process individual job
+ * Xử lý từng job chuyển đổi giọng nói sang văn bản
+ * @param {Object} job - Job cần xử lý
+ * @returns {string} kết quả chuyển đổi (transcription)
  */
 async function processJob(job) {
   const { answerId, audioUrl, language = 'en' } = job.data;
-
-  console.log(`[SpeechQueue] Transcribing audio for answer ${answerId}`);
-
+  // Gọi service chuyển đổi audio sang text
   const transcription = await SpeechToTextService.convertAudioToText(audioUrl, language);
-
   return transcription;
 }
 
 /**
- * Get queue status
+ * Lấy trạng thái hàng đợi
+ * Trả về số lượng job, trạng thái xử lý và thông tin từng job
  */
 function getQueueStatus() {
   return {
@@ -127,7 +109,8 @@ function getQueueStatus() {
 }
 
 /**
- * Clear queue
+ * Xoá toàn bộ hàng đợi
+ * Dừng xử lý các job hiện tại
  */
 function clearQueue() {
   queue.length = 0;

@@ -1,6 +1,10 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
+/**
+ * Model QuestionSampleAnswer - Câu trả lời mẫu cho câu hỏi
+ * Lưu trữ đáp án mẫu, các điểm chính, và yêu cầu về độ dài/thời gian
+ */
 const QuestionSampleAnswer = sequelize.define(
   'QuestionSampleAnswer',
   {
@@ -10,6 +14,7 @@ const QuestionSampleAnswer = sequelize.define(
       autoIncrement: true,
     },
     question_id: {
+      // ID của câu hỏi (1-1 relationship)
       type: DataTypes.INTEGER,
       allowNull: false,
       unique: true,
@@ -19,27 +24,32 @@ const QuestionSampleAnswer = sequelize.define(
       },
     },
     sample_answer: {
+      // Câu trả lời mẫu (dùng cho loại essay, speaking)
       type: DataTypes.TEXT,
       allowNull: true,
     },
     answer_key_points: {
+      // Các điểm chính cần có trong câu trả lời (JSON array)
       type: DataTypes.TEXT,
       allowNull: true,
-      comment: 'JSON array of key points',
     },
     min_words: {
+      // Số từ tối thiểu (dùng cho loại essay)
       type: DataTypes.INTEGER,
       allowNull: true,
     },
     max_words: {
+      // Số từ tối đa (dùng cho loại essay)
       type: DataTypes.INTEGER,
       allowNull: true,
     },
     min_duration_seconds: {
+      // Thời gian ghi âm tối thiểu (dùng cho loại speaking)
       type: DataTypes.INTEGER,
       allowNull: true,
     },
     max_duration_seconds: {
+      // Thời gian ghi âm tối đa (dùng cho loại speaking)
       type: DataTypes.INTEGER,
       allowNull: true,
     },

@@ -1,9 +1,6 @@
 const { AptisType, SkillType, QuestionType, Question, Exam, ExamSection, sequelize } = require('../models');
 const { Op } = require('sequelize');
 
-/**
- * Get all aptis types
- */
 exports.getAptisTypes = async (req, res, next) => {
   try {
     const aptisTypes = await AptisType.findAll({
@@ -13,7 +10,6 @@ exports.getAptisTypes = async (req, res, next) => {
       raw: true,
     });
 
-    // Transform to match frontend expectations
     const transformed = aptisTypes.map(type => ({
       id: type.id,
       slug: type.code,
@@ -31,9 +27,6 @@ exports.getAptisTypes = async (req, res, next) => {
   }
 };
 
-/**
- * Get all skill types
- */
 exports.getSkillTypes = async (req, res, next) => {
   try {
     const skillTypes = await SkillType.findAll({
@@ -42,7 +35,6 @@ exports.getSkillTypes = async (req, res, next) => {
       raw: true,
     });
 
-    // Transform to match frontend expectations
     const transformed = skillTypes.map(skill => ({
       id: skill.id,
       slug: skill.code,
@@ -60,9 +52,6 @@ exports.getSkillTypes = async (req, res, next) => {
   }
 };
 
-/**
- * Get all question types (with skill information)
- */
 exports.getQuestionTypes = async (req, res, next) => {
   try {
     const questionTypes = await QuestionType.findAll({
@@ -86,9 +75,6 @@ exports.getQuestionTypes = async (req, res, next) => {
   }
 };
 
-/**
- * Get all Writing questions for testing dynamic content
- */
 exports.getWritingQuestions = async (req, res, next) => {
   try {
     const writingQuestions = await Question.findAll({

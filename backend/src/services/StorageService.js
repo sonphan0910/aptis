@@ -1,20 +1,13 @@
 const fs = require('fs');
 const path = require('path');
 const { STORAGE_CONFIG, ensureUploadDirs } = require('../config/storage');
-const { generateFilename } = require('../utils/helpers');
 const { BadRequestError } = require('../utils/errors');
 
-/**
- * StorageService - Handles local file storage
- */
 class StorageService {
   constructor() {
     ensureUploadDirs();
   }
 
-  /**
-   * Save uploaded file
-   */
   async saveFile(file, subfolder = '') {
     try {
       if (!file) {
@@ -23,12 +16,10 @@ class StorageService {
 
       const uploadDir = path.join(STORAGE_CONFIG.basePath, subfolder);
 
-      // Ensure directory exists
       if (!fs.existsSync(uploadDir)) {
         fs.mkdirSync(uploadDir, { recursive: true });
       }
 
-      // File is already saved by multer, just return path
       const relativePath = file.path.replace(STORAGE_CONFIG.basePath, '').replace(/\\/g, '/');
 
       return {
@@ -44,16 +35,12 @@ class StorageService {
     }
   }
 
-  /**
-   * Delete file
-   */
   async deleteFile(filePath) {
     try {
       if (!filePath) {
         return;
       }
 
-      // Convert URL to file path if needed
       const actualPath = filePath.startsWith('/uploads')
         ? path.join(STORAGE_CONFIG.basePath, filePath.replace('/uploads', ''))
         : filePath;
@@ -72,9 +59,6 @@ class StorageService {
     }
   }
 
-  /**
-   * Get file info
-   */
   async getFileInfo(filePath) {
     try {
       const actualPath = filePath.startsWith('/uploads')
@@ -98,9 +82,6 @@ class StorageService {
     }
   }
 
-  /**
-   * Check if file exists
-   */
   async fileExists(filePath) {
     const actualPath = filePath.startsWith('/uploads')
       ? path.join(STORAGE_CONFIG.basePath, filePath.replace('/uploads', ''))
@@ -109,9 +90,6 @@ class StorageService {
     return fs.existsSync(actualPath);
   }
 
-  /**
-   * Get storage statistics
-   */
   async getStorageStats() {
     try {
       const avatarsDir = path.join(STORAGE_CONFIG.basePath, 'avatars');
@@ -150,9 +128,6 @@ class StorageService {
     }
   }
 
-  /**
-   * Clean up old files (optional maintenance task)
-   */
   async cleanupOldFiles(daysOld = 30) {
     try {
       const now = Date.now();

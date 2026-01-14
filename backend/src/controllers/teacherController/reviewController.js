@@ -14,9 +14,6 @@ const { paginate, paginationResponse } = require('../../utils/helpers');
 const { NotFoundError } = require('../../utils/errors');
 const { Op } = require('sequelize');
 
-/**
- * Get pending answers for review
- */
 exports.getPendingReviews = async (req, res, next) => {
   try {
     const { page = 1, limit = 20, exam_id, student_id } = req.query;
@@ -25,7 +22,6 @@ exports.getPendingReviews = async (req, res, next) => {
     const where = { needs_review: true };
 
     if (exam_id) {
-      // Filter by exam
       const attempts = await ExamAttempt.findAll({
         where: { exam_id },
         attributes: ['id'],
@@ -84,9 +80,6 @@ exports.getPendingReviews = async (req, res, next) => {
   }
 };
 
-/**
- * Get answer details for review
- */
 exports.getAnswerForReview = async (req, res, next) => {
   try {
     const { answerId } = req.params;
@@ -134,9 +127,6 @@ exports.getAnswerForReview = async (req, res, next) => {
   }
 };
 
-/**
- * Submit manual review
- */
 exports.submitReview = async (req, res, next) => {
   try {
     const { answerId } = req.params;
@@ -179,9 +169,6 @@ exports.submitReview = async (req, res, next) => {
   }
 };
 
-/**
- * Get reviews by exam
- */
 exports.getReviewsByExam = async (req, res, next) => {
   try {
     const { examId } = req.params;
@@ -231,9 +218,6 @@ exports.getReviewsByExam = async (req, res, next) => {
   }
 };
 
-/**
- * Get submissions list for writing and speaking
- */
 exports.getSubmissions = async (req, res, next) => {
   try {
     const { 
@@ -254,21 +238,15 @@ exports.getSubmissions = async (req, res, next) => {
     const { offset, limit: validLimit } = paginate(page, limit);
 
     const where = {};
-    
-    // Filter by answer type (text for writing, audio for speaking)
     if (answer_type) {
       where.answer_type = answer_type;
     } else {
-      // Default to only writing and speaking
       where.answer_type = ['text', 'audio'];
     }
-    
-    // Filter by review status
     if (needs_review !== undefined) {
       where.needs_review = needs_review === 'true';
     }
 
-    // Filter by grading status
     if (grading_status) {
       switch (grading_status) {
         case 'ungraded':
@@ -287,7 +265,6 @@ exports.getSubmissions = async (req, res, next) => {
       }
     }
 
-    // Filter by AI feedback presence
     if (has_ai_feedback !== undefined) {
       if (has_ai_feedback === 'true') {
         where.ai_feedback = { [Op.ne]: null };
@@ -296,7 +273,6 @@ exports.getSubmissions = async (req, res, next) => {
       }
     }
 
-    // Score range filter
     if (score_range_min !== undefined || score_range_max !== undefined) {
       where.final_score = {};
       if (score_range_min !== undefined) {
@@ -307,7 +283,6 @@ exports.getSubmissions = async (req, res, next) => {
       }
     }
 
-    // Date range filter
     if (date_from || date_to) {
       where.answered_at = {};
       if (date_from) {
@@ -318,7 +293,6 @@ exports.getSubmissions = async (req, res, next) => {
       }
     }
 
-    // Include conditions for attempt filtering
     const attemptWhere = {};
     if (exam_id) {
       attemptWhere.exam_id = parseInt(exam_id);
@@ -380,7 +354,6 @@ exports.getSubmissions = async (req, res, next) => {
       subQuery: false,
     });
 
-    // Transform data to include grading status and flags
     const transformedRows = rows.map(row => ({
       ...row.toJSON(),
       grading_status: getGradingStatus(row),

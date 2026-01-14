@@ -4,18 +4,11 @@ const { NotFoundError, ValidationError } = require('../utils/errors');
 const { paginate } = require('../utils/helpers');
 const EventEmitter = require('events');
 
-/**
- * Notification Service
- * Handles notification management and real-time delivery
- */
 class NotificationService extends EventEmitter {
   constructor() {
     super();
   }
 
-  /**
-   * Create notification
-   */
   static async createNotification(notificationData) {
     const {
       user_id,
@@ -27,7 +20,6 @@ class NotificationService extends EventEmitter {
       category = 'general',
     } = notificationData;
 
-    // Validate user exists
     const user = await User.findByPk(user_id);
     if (!user) {
       throw new NotFoundError('User not found');
@@ -44,15 +36,11 @@ class NotificationService extends EventEmitter {
       status: 'unread',
     });
 
-    // Emit real-time notification
     this.emitNotification(user_id, notification);
 
     return this.getNotificationById(notification.id);
   }
 
-  /**
-   * Get notification by ID
-   */
   static async getNotificationById(notificationId) {
     const notification = await Notification.findByPk(notificationId, {
       include: [
@@ -68,7 +56,6 @@ class NotificationService extends EventEmitter {
       throw new NotFoundError('Notification not found');
     }
 
-    // Parse data JSON
     if (notification.data) {
       try {
         notification.data = JSON.parse(notification.data);
@@ -80,9 +67,6 @@ class NotificationService extends EventEmitter {
     return notification;
   }
 
-  /**
-   * Get user notifications
-   */
   static async getUserNotifications(
     userId,
     { page = 1, limit = 20, status, type, category, priority },
@@ -134,9 +118,6 @@ class NotificationService extends EventEmitter {
     };
   }
 
-  /**
-   * Mark notification as read
-   */
   static async markAsRead(notificationId, userId) {
     const notification = await Notification.findOne({
       where: {
@@ -157,9 +138,6 @@ class NotificationService extends EventEmitter {
     return this.getNotificationById(notificationId);
   }
 
-  /**
-   * Mark all notifications as read
-   */
   static async markAllAsRead(userId) {
     const [affectedCount] = await Notification.update(
       {
@@ -177,9 +155,6 @@ class NotificationService extends EventEmitter {
     return affectedCount;
   }
 
-  /**
-   * Delete notification
-   */
   static async deleteNotification(notificationId, userId) {
     const notification = await Notification.findOne({
       where: {
@@ -196,9 +171,6 @@ class NotificationService extends EventEmitter {
     return true;
   }
 
-  /**
-   * Delete all notifications for user
-   */
   static async deleteAllNotifications(userId) {
     const deletedCount = await Notification.destroy({
       where: { user_id: userId },
@@ -207,9 +179,6 @@ class NotificationService extends EventEmitter {
     return deletedCount;
   }
 
-  /**
-   * Get unread count
-   */
   static async getUnreadCount(userId) {
     const count = await Notification.count({
       where: {
@@ -221,9 +190,6 @@ class NotificationService extends EventEmitter {
     return count;
   }
 
-  /**
-   * Send notification to user
-   */
   static async sendToUser(userId, notificationData) {
     return this.createNotification({
       user_id: userId,
@@ -231,9 +197,6 @@ class NotificationService extends EventEmitter {
     });
   }
 
-  /**
-   * Send notification to multiple users
-   */
   static async sendToUsers(userIds, notificationData) {
     const notifications = [];
 
@@ -252,9 +215,6 @@ class NotificationService extends EventEmitter {
     return notifications;
   }
 
-  /**
-   * Send notification to all users with role
-   */
   static async sendToRole(role, notificationData) {
     const users = await User.findAll({
       where: { role, status: 'active' },
@@ -265,9 +225,6 @@ class NotificationService extends EventEmitter {
     return this.sendToUsers(userIds, notificationData);
   }
 
-  /**
-   * Send system notification
-   */
   static async sendSystemNotification(notificationData) {
     return this.createNotification({
       type: 'system',
@@ -277,9 +234,6 @@ class NotificationService extends EventEmitter {
     });
   }
 
-  /**
-   * Send exam notification
-   */
   static async sendExamNotification(userId, examData, type = 'exam_assigned') {
     const templates = {
       exam_assigned: {
@@ -312,9 +266,6 @@ class NotificationService extends EventEmitter {
     });
   }
 
-  /**
-   * Send assignment notification
-   */
   static async sendAssignmentNotification(userId, assignmentData, type = 'assignment_created') {
     const templates = {
       assignment_created: {
@@ -346,9 +297,6 @@ class NotificationService extends EventEmitter {
     });
   }
 
-  /**
-   * Send welcome notification
-   */
   static async sendWelcomeNotification(userId, userRole) {
     const templates = {
       student: {
@@ -376,9 +324,6 @@ class NotificationService extends EventEmitter {
     });
   }
 
-  /**
-   * Get notification statistics
-   */
   static async getNotificationStats(userId = null) {
     const where = userId ? { user_id: userId } : {};
 
@@ -431,9 +376,6 @@ class NotificationService extends EventEmitter {
     return result;
   }
 
-  /**
-   * Clean old notifications
-   */
   static async cleanOldNotifications(days = 30) {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
@@ -450,12 +392,7 @@ class NotificationService extends EventEmitter {
     return deletedCount;
   }
 
-  /**
-   * Get notification preferences (placeholder)
-   */
   static async getNotificationPreferences(userId) {
-    // This would typically come from a UserPreferences model
-    // Placeholder implementation
     return {
       email: true,
       push: true,
@@ -465,29 +402,17 @@ class NotificationService extends EventEmitter {
     };
   }
 
-  /**
-   * Update notification preferences (placeholder)
-   */
   static async updateNotificationPreferences(userId, preferences) {
-    // This would typically update a UserPreferences model
-    // Placeholder implementation
     return preferences;
   }
 
-  /**
-   * Emit real-time notification
-   */
   static emitNotification(userId, notification) {
-    // This would integrate with Socket.IO or other real-time systems
     this.emit('notification', {
       userId,
       notification,
     });
   }
 
-  /**
-   * Validate notification data
-   */
   static validateNotificationData(data) {
     const errors = [];
 
@@ -520,7 +445,5 @@ class NotificationService extends EventEmitter {
   }
 }
 
-// Create a singleton instance
-const notificationService = new NotificationService();
 
 module.exports = NotificationService;

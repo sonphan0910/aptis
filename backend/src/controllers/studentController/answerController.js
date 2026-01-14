@@ -10,6 +10,7 @@ const { NotFoundError, BadRequestError } = require('../../utils/errors');
 const { isValidAnswer } = require('../../utils/validators');
 const { successResponse, errorResponse } = require('../../utils/response');
 const ScoringService = require('../../services/ScoringService');
+const AiScoringService = require('../../services/AiScoringService');
 const StorageService = require('../../services/StorageService');
 const SpeechToTextService = require('../../services/SpeechToTextService');
 
@@ -77,8 +78,32 @@ exports.saveAnswer = async (req, res, next) => {
       answered_at: new Date(),
     });
 
-    // Auto-grade if possible
-    const score = await ScoringService.autoGradeAnswer(answer.id);
+    // Score answer based on question type
+    let score = null;
+    try {
+      if (answer.question.questionType.scoring_method === 'auto') {
+        // Auto-grade for MCQ, Gap Filling, Matching, Ordering, etc.
+        score = await ScoringService.autoGradeAnswer(answer.id);
+      } else if (answer.question.questionType.scoring_method === 'ai') {
+        // AI-grade for Writing and Speaking - DISABLED TO SCORE ONLY WHEN VIEWING RESULTS
+        console.log(`[saveAnswer] AI scoring disabled for realtime - will score when viewing results`);
+        
+        // TODO: Remove this comment and uncomment below lines if you want realtime AI scoring back
+        // if (answer.question.questionType.code.includes('WRITING') && (text_answer || answer_json)) {
+        //   console.log(`[saveAnswer] Triggering AI scoring for writing answer ${answer.id} (format: ${text_answer ? 'text_answer' : 'answer_json'})`);
+        //   await AiScoringService.scoreWriting(answer.id);
+        //   score = (await AttemptAnswer.findByPk(answer.id)).score; // Get updated score
+        // } else if (answer.question.questionType.code.includes('SPEAKING') && audio_url) {
+        //   console.log(`[saveAnswer] AI scoring for speaking will be handled by speech-to-text process`);
+        //   // Speaking will be scored after transcription in the audio upload process
+        // } else {
+        //   console.log(`[saveAnswer] AI scoring skipped - missing required data for question type ${answer.question.questionType.code}`);
+        // }
+      }
+    } catch (error) {
+      console.error(`[saveAnswer] Error scoring answer ${answer.id}:`, error.message);
+      // Don't throw error, just log it - answer is saved even if scoring fails
+    }
 
     // Reload answer with full data to return to frontend
     const updatedAnswer = await AttemptAnswer.findByPk(answer.id, {
@@ -325,32 +350,28 @@ exports.getAnswerFeedback = async (req, res, next) => {
     let aiFeedbackDetails = null;
 
     if (answer.graded_by === 'ai' || answer.ai_graded_at) {
-      const aiFeedbacks = await AnswerAiFeedback.findAll({
+      // New approach: Single feedback record per answer
+      const aiFeedback = await AnswerAiFeedback.findOne({
         where: { answer_id: answerId },
-        include: [
-          {
-            model: AiScoringCriteria,
-            as: 'criteria',
-          },
-        ],
-        order: [['criteria', 'criteria_name', 'ASC']],
+        order: [['id', 'DESC']], // Get latest feedback
       });
 
-      if (aiFeedbacks && aiFeedbacks.length > 0) {
-        aiFeedbackDetails = aiFeedbacks.map((feedback) => ({
-          criteria: {
-            name: feedback.criteria.criteria_name,
-            description: feedback.criteria.description,
-            weight: feedback.criteria.weight,
+      if (aiFeedback) {
+        // Since we now store single feedback for entire answer, present it as overall feedback
+        aiFeedbackDetails = {
+          overall: {
+            score: aiFeedback.score,
+            maxScore: answer.question?.max_score || 10,
+            percentage: Math.round((aiFeedback.score / (answer.question?.max_score || 10)) * 100),
+            comment: aiFeedback.comment,
+            suggestions: aiFeedback.suggestions,
+            strengths: aiFeedback.strengths,
+            weaknesses: aiFeedback.weaknesses,
+            cefrLevel: aiFeedback.cefr_level,
           },
-          score: feedback.score,
-          maxScore: feedback.max_score,
-          percentage: Math.round((feedback.score / feedback.max_score) * 100),
-          comment: feedback.comment,
-          suggestions: feedback.suggestions,
-          strengths: feedback.strengths,
-          weaknesses: feedback.weaknesses,
-        }));
+          // Keep criteria structure for backward compatibility if needed
+          criteria: [] // No longer used but kept for API compatibility
+        };
       }
     }
 

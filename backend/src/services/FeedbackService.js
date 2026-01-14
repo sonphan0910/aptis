@@ -1,12 +1,6 @@
 const { AttemptAnswer } = require('../models');
 
-/**
- * FeedbackService - Generates and manages feedback for student answers
- */
 class FeedbackService {
-  /**
-   * Generate writing feedback summary
-   */
   generateWritingFeedback(score, maxScore, criteriaFeedbacks) {
     const percentage = (score / maxScore) * 100;
     let level = '';
@@ -47,17 +41,11 @@ class FeedbackService {
     };
   }
 
-  /**
-   * Generate speaking feedback summary
-   */
   generateSpeakingFeedback(score, maxScore, criteriaFeedbacks) {
     // Similar to writing feedback
     return this.generateWritingFeedback(score, maxScore, criteriaFeedbacks);
   }
 
-  /**
-   * Generate recommendations based on weak skills
-   */
   generateRecommendations(weakSkills) {
     const recommendations = [];
 
@@ -99,9 +87,6 @@ class FeedbackService {
     return recommendations;
   }
 
-  /**
-   * Flag answer for manual review
-   */
   async flagForManualReview(answerId, reason) {
     try {
       const answer = await AttemptAnswer.findByPk(answerId);
@@ -126,9 +111,6 @@ class FeedbackService {
     }
   }
 
-  /**
-   * Get feedback summary for an attempt
-   */
   async getAttemptFeedbackSummary(attemptId) {
     const answers = await AttemptAnswer.findAll({
       where: { attempt_id: attemptId },
@@ -164,9 +146,6 @@ class FeedbackService {
     };
   }
 
-  /**
-   * Identify weak areas from criteria scores
-   */
   identifyWeakAreas(criteriaFeedbacks, threshold = 60) {
     const weakAreas = criteriaFeedbacks
       .filter((cf) => (cf.score / cf.max_score) * 100 < threshold)

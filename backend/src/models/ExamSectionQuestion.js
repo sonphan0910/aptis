@@ -1,6 +1,10 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
+/**
+ * Model ExamSectionQuestion - Câu hỏi trong một phần thi
+ * Lưu trữ các câu hỏi và thứ tự của chúng trong phần thi
+ */
 const ExamSectionQuestion = sequelize.define(
   'ExamSectionQuestion',
   {
@@ -10,6 +14,7 @@ const ExamSectionQuestion = sequelize.define(
       autoIncrement: true,
     },
     exam_section_id: {
+      // ID của phần thi
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
@@ -18,6 +23,7 @@ const ExamSectionQuestion = sequelize.define(
       },
     },
     question_id: {
+      // ID của câu hỏi
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
@@ -26,10 +32,12 @@ const ExamSectionQuestion = sequelize.define(
       },
     },
     question_order: {
+      // Thứ tự câu hỏi trong phần thi (1, 2, 3...)
       type: DataTypes.INTEGER,
       allowNull: false,
     },
     max_score: {
+      // Điểm tối đa cho câu hỏi này
       type: DataTypes.DECIMAL(5, 2),
       allowNull: false,
     },

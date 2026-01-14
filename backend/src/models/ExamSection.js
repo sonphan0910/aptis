@@ -1,6 +1,10 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
+/**
+ * Model ExamSection - Phần thi trong một kỳ thi
+ * Lưu trữ các phần thi (Listening, Speaking, Reading, Writing...)
+ */
 const ExamSection = sequelize.define(
   'ExamSection',
   {
@@ -10,6 +14,7 @@ const ExamSection = sequelize.define(
       autoIncrement: true,
     },
     exam_id: {
+      // ID của kỳ thi
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
@@ -18,6 +23,7 @@ const ExamSection = sequelize.define(
       },
     },
     skill_type_id: {
+      // ID loại kỹ năng (Listening, Speaking, Reading, Writing...)
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
@@ -26,14 +32,17 @@ const ExamSection = sequelize.define(
       },
     },
     section_order: {
+      // Thứ tự phần thi trong kỳ thi (1, 2, 3...)
       type: DataTypes.INTEGER,
       allowNull: false,
     },
     duration_minutes: {
+      // Thời gian làm phần thi này (tính bằng phút)
       type: DataTypes.INTEGER,
       allowNull: true,
     },
     instruction: {
+      // Hướng dẫn cho học sinh về phần thi này
       type: DataTypes.TEXT,
       allowNull: true,
     },

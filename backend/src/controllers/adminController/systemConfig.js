@@ -4,14 +4,7 @@ const { successResponse, errorResponse } = require('../../utils/response');
 const fs = require('fs').promises;
 const path = require('path');
 
-/**
- * Admin System Controller
- * Handles system-wide operations and configurations for administrators
- */
 class AdminSystemController {
-  /**
-   * Get system information
-   */
   static async getSystemInfo(req, res) {
     try {
       const systemInfo = {
@@ -50,12 +43,8 @@ class AdminSystemController {
     }
   }
 
-  /**
-   * Get system configuration
-   */
   static async getSystemConfig(req, res) {
     try {
-      // This would typically come from a database or config files
       const config = {
         application: {
           maxFileUploadSize: process.env.MAX_FILE_SIZE || '10MB',
@@ -67,15 +56,15 @@ class AdminSystemController {
           fromAddress: process.env.EMAIL_FROM || 'noreply@aptis.com',
         },
         exam: {
-          maxExamDuration: 180, // minutes
+          maxExamDuration: 180,
           defaultMaxAttempts: 3,
-          autoSaveInterval: 30, // seconds
+          autoSaveInterval: 30,
         },
         security: {
           passwordMinLength: 8,
           passwordRequireSpecialChars: true,
           loginMaxAttempts: 5,
-          lockoutDuration: 300, // seconds
+          lockoutDuration: 300,
         },
         features: {
           speechToTextEnabled: true,
@@ -91,9 +80,6 @@ class AdminSystemController {
     }
   }
 
-  /**
-   * Update system configuration
-   */
   static async updateSystemConfig(req, res) {
     try {
       const { configSection, updates } = req.body;
@@ -102,14 +88,11 @@ class AdminSystemController {
         throw new ValidationError('Configuration section and updates are required');
       }
 
-      // Validate configuration section
       const allowedSections = ['application', 'email', 'exam', 'security', 'features'];
       if (!allowedSections.includes(configSection)) {
         throw new ValidationError('Invalid configuration section');
       }
 
-      // This would typically update database or config files
-      // For now, we'll simulate the update
       const updatedConfig = {
         section: configSection,
         updates: updates,
@@ -125,9 +108,6 @@ class AdminSystemController {
     }
   }
 
-  /**
-   * Send system-wide notification
-   */
   static async sendSystemNotification(req, res) {
     try {
       const { title, message, type = 'system', priority = 'normal', targetRole } = req.body;
@@ -139,7 +119,6 @@ class AdminSystemController {
       let notifications;
 
       if (targetRole) {
-        // Send to specific role
         notifications = await NotificationService.sendToRole(targetRole, {
           title,
           message,
@@ -148,7 +127,6 @@ class AdminSystemController {
           category: 'system',
         });
       } else {
-        // Send to all users (would need implementation)
         notifications = await NotificationService.sendSystemNotification({
           title,
           message,
@@ -166,15 +144,10 @@ class AdminSystemController {
     }
   }
 
-  /**
-   * Get system logs
-   */
   static async getSystemLogs(req, res) {
     try {
       const { level = 'all', lines = 100, date, search } = req.query;
 
-      // This would typically read from log files
-      // For now, we'll return a placeholder structure
       const logs = {
         logs: [
           {
@@ -183,7 +156,6 @@ class AdminSystemController {
             message: 'System started successfully',
             component: 'server',
           },
-          // More log entries would be read from actual log files
         ],
         filters: {
           level,
@@ -200,15 +172,10 @@ class AdminSystemController {
     }
   }
 
-  /**
-   * Clear system logs
-   */
   static async clearSystemLogs(req, res) {
     try {
       const { logType = 'all', olderThan } = req.body;
 
-      // This would typically clear log files
-      // For security reasons, we'll just simulate the operation
       const clearedLogs = {
         logType,
         olderThan,
@@ -242,27 +209,21 @@ class AdminSystemController {
         estimatedSize: '0 MB',
       };
 
-      // Start backup process (would be async)
-      // For now, we'll just return the backup info
       return successResponse(res, 'System backup initiated successfully', { backup }, 202);
     } catch (error) {
       return errorResponse(res, error.message, error.statusCode || 500);
     }
   }
 
-  /**
-   * Get backup status
-   */
   static async getBackupStatus(req, res) {
     try {
       const { backupId } = req.params;
 
-      // This would check actual backup status
       const backupStatus = {
         backupId,
         status: 'completed',
         progress: 100,
-        startTime: new Date(Date.now() - 300000), // 5 minutes ago
+        startTime: new Date(Date.now() - 300000),
         endTime: new Date(),
         size: '125 MB',
         location: '/backups/backup_' + Date.now(),
@@ -274,9 +235,6 @@ class AdminSystemController {
     }
   }
 
-  /**
-   * Maintenance mode operations
-   */
   static async setMaintenanceMode(req, res) {
     try {
       const { enabled, message, scheduledStart, scheduledEnd } = req.body;
@@ -294,11 +252,7 @@ class AdminSystemController {
         setAt: new Date(),
       };
 
-      // This would typically update a database flag or config file
-      // that's checked by middleware
-
       if (enabled) {
-        // Send notification to all users about maintenance
         await NotificationService.sendSystemNotification({
           title: 'System Maintenance',
           message: message || 'System maintenance is starting. Please save your work.',
@@ -315,9 +269,6 @@ class AdminSystemController {
     }
   }
 
-  /**
-   * Database operations
-   */
   static async databaseOperations(req, res) {
     try {
       const { operation, options = {} } = req.body;
@@ -331,7 +282,6 @@ class AdminSystemController {
         throw new ValidationError('Invalid database operation');
       }
 
-      // This would implement actual database operations
       const result = {
         operation,
         options,
@@ -347,9 +297,6 @@ class AdminSystemController {
     }
   }
 
-  /**
-   * Cache management
-   */
   static async manageCaches(req, res) {
     try {
       const { action, cacheType = 'all' } = req.body;
@@ -363,7 +310,6 @@ class AdminSystemController {
         throw new ValidationError('Invalid cache action');
       }
 
-      // This would implement actual cache management
       const result = {
         action,
         cacheType,
@@ -379,9 +325,7 @@ class AdminSystemController {
     }
   }
 
-  /**
-   * Get security audit log
-   */
+
   static async getSecurityAudit(req, res) {
     try {
       const { page = 1, limit = 50, eventType, userId, dateFrom, dateTo, severity } = req.query;
@@ -422,21 +366,17 @@ class AdminSystemController {
     }
   }
 
-  /**
-   * System cleanup operations
-   */
   static async cleanupSystem(req, res) {
     try {
       const {
         cleanupType = 'all',
-        olderThan = 30, // days
+        olderThan = 30,
         dryRun = true,
       } = req.body;
 
       const cleanupOperations = [];
 
       if (cleanupType === 'all' || cleanupType === 'logs') {
-        // Clean old log files
         cleanupOperations.push({
           type: 'logs',
           itemsFound: 25,
@@ -446,7 +386,6 @@ class AdminSystemController {
       }
 
       if (cleanupType === 'all' || cleanupType === 'temp_files') {
-        // Clean temporary files
         cleanupOperations.push({
           type: 'temp_files',
           itemsFound: 10,
@@ -456,7 +395,6 @@ class AdminSystemController {
       }
 
       if (cleanupType === 'all' || cleanupType === 'old_notifications') {
-        // Clean old notifications
         const cleanedCount = await NotificationService.cleanOldNotifications(olderThan);
         cleanupOperations.push({
           type: 'old_notifications',
@@ -484,15 +422,10 @@ class AdminSystemController {
     }
   }
 
-  /**
-   * Restart system services
-   */
   static async restartServices(req, res) {
     try {
       const { services = ['all'] } = req.body;
 
-      // This would implement actual service restart logic
-      // For safety, we'll just simulate the operation
       const restartResults = services.map((service) => ({
         service,
         status: 'restarted',

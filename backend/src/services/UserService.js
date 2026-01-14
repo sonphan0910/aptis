@@ -4,14 +4,7 @@ const AuthService = require('./AuthService');
 const { NotFoundError, ValidationError } = require('../utils/errors');
 const { paginate } = require('../utils/helpers');
 
-/**
- * User Service
- * Handles user management operations
- */
 class UserService {
-  /**
-   * Get user by ID
-   */
   static async getUserById(userId) {
     const user = await User.findByPk(userId);
     if (!user) {
@@ -20,9 +13,6 @@ class UserService {
     return AuthService.sanitizeUser(user);
   }
 
-  /**
-   * Get user by email
-   */
   static async getUserByEmail(email) {
     const user = await User.findOne({ where: { email } });
     if (!user) {
@@ -31,16 +21,12 @@ class UserService {
     return AuthService.sanitizeUser(user);
   }
 
-  /**
-   * Update user profile
-   */
   static async updateProfile(userId, updateData) {
     const user = await User.findByPk(userId);
     if (!user) {
       throw new NotFoundError('User not found');
     }
 
-    // Only allow certain fields to be updated
     const allowedFields = ['full_name', 'phone', 'avatar_url'];
     const filteredData = {};
 
@@ -54,9 +40,6 @@ class UserService {
     return AuthService.sanitizeUser(user);
   }
 
-  /**
-   * Get all users with filtering and pagination (Admin only)
-   */
   static async getAllUsers({ page = 1, limit = 20, role, status, search }) {
     const { offset, limit: validLimit } = paginate(page, limit);
 
@@ -96,21 +79,15 @@ class UserService {
     };
   }
 
-  /**
-   * Create new user (Admin only)
-   */
   static async createUser({ email, full_name, role, phone, status = 'active' }) {
-    // Check if email already exists
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
       throw new ValidationError('Email already exists');
     }
 
-    // Generate temporary password
     const tempPassword = AuthService.generateRandomPassword(12);
     const password_hash = await AuthService.hashPassword(tempPassword);
 
-    // Create user
     const user = await User.create({
       email,
       password_hash,
@@ -122,20 +99,16 @@ class UserService {
 
     return {
       user: AuthService.sanitizeUser(user),
-      tempPassword, // Return for email sending
+      tempPassword,
     };
   }
 
-  /**
-   * Update user (Admin only)
-   */
   static async updateUser(userId, updateData) {
     const user = await User.findByPk(userId);
     if (!user) {
       throw new NotFoundError('User not found');
     }
 
-    // Fields that admin can update
     const allowedFields = ['full_name', 'phone', 'role', 'status'];
     const filteredData = {};
 
@@ -149,16 +122,12 @@ class UserService {
     return AuthService.sanitizeUser(user);
   }
 
-  /**
-   * Delete user (Admin only)
-   */
   static async deleteUser(userId, currentUserId) {
     const user = await User.findByPk(userId);
     if (!user) {
       throw new NotFoundError('User not found');
     }
 
-    // Don't allow deleting self
     if (user.id === currentUserId) {
       throw new ValidationError('Cannot delete your own account');
     }
@@ -167,16 +136,12 @@ class UserService {
     return true;
   }
 
-  /**
-   * Reset user password (Admin only)
-   */
   static async resetUserPassword(userId) {
     const user = await User.findByPk(userId);
     if (!user) {
       throw new NotFoundError('User not found');
     }
 
-    // Generate temporary password
     const tempPassword = AuthService.generateRandomPassword(12);
     const password_hash = await AuthService.hashPassword(tempPassword);
 
@@ -184,13 +149,10 @@ class UserService {
 
     return {
       user: AuthService.sanitizeUser(user),
-      tempPassword, // Return for email sending
+      tempPassword, 
     };
   }
 
-  /**
-   * Update avatar URL
-   */
   static async updateAvatar(userId, avatarUrl) {
     const user = await User.findByPk(userId);
     if (!user) {
@@ -201,9 +163,6 @@ class UserService {
     return AuthService.sanitizeUser(user);
   }
 
-  /**
-   * Get users by role
-   */
   static async getUsersByRole(role) {
     const users = await User.findAll({
       where: { role, status: 'active' },
@@ -214,9 +173,6 @@ class UserService {
     return users.map((user) => AuthService.sanitizeUser(user));
   }
 
-  /**
-   * Get user statistics
-   */
   static async getUserStats() {
     const stats = await User.findAll({
       attributes: [
@@ -252,25 +208,16 @@ class UserService {
     return result;
   }
 
-  /**
-   * Validate user role
-   */
   static validateRole(role) {
     const validRoles = ['admin', 'teacher', 'student'];
     return validRoles.includes(role);
   }
 
-  /**
-   * Validate user status
-   */
   static validateStatus(status) {
     const validStatuses = ['active', 'inactive', 'banned'];
     return validStatuses.includes(status);
   }
 
-  /**
-   * Check if user has permission
-   */
   static hasPermission(user, requiredRole) {
     const roleHierarchy = {
       admin: 3,
@@ -284,9 +231,6 @@ class UserService {
     return userLevel >= requiredLevel;
   }
 
-  /**
-   * Search users
-   */
   static async searchUsers(query, options = {}) {
     const { limit = 10, role } = options;
 
@@ -309,9 +253,6 @@ class UserService {
     return users.map((user) => AuthService.sanitizeUser(user));
   }
 
-  /**
-   * Get recent users
-   */
   static async getRecentUsers(days = 30) {
     const fromDate = new Date();
     fromDate.setDate(fromDate.getDate() - days);
@@ -329,9 +270,6 @@ class UserService {
     return users.map((user) => AuthService.sanitizeUser(user));
   }
 
-  /**
-   * Bulk update users
-   */
   static async bulkUpdateUsers(userIds, updateData) {
     const allowedFields = ['status', 'role'];
     const filteredData = {};

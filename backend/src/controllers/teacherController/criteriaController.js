@@ -3,26 +3,12 @@ const { paginate, paginationResponse } = require('../../utils/helpers');
 const { NotFoundError } = require('../../utils/errors');
 const { Op } = require('sequelize');
 
-/**
- * Create AI scoring criteria
- */
 exports.createCriteria = async (req, res, next) => {
   try {
-    const { aptis_type_id, question_type_id, criteria_name, weight, rubric_prompt, max_score, description } =
+    const { aptis_type_id, question_type_id, criteria_name, rubric_prompt, description } =
       req.body;
-    
-    // Get user from request (should be set by auth middleware)
     const userId = req.user?.userId;
-    
-    console.log('[CriteriaController] Create - User from auth:', {
-      hasUser: !!req.user,
-      userId: req.user?.userId,
-      email: req.user?.email,
-      role: req.user?.role
-    });
-    
     if (!userId) {
-      console.error('[CriteriaController] No userId found in req.user:', req.user);
       return res.status(401).json({
         success: false,
         message: 'Unauthorized: User not found'
@@ -33,9 +19,7 @@ exports.createCriteria = async (req, res, next) => {
       aptis_type_id,
       question_type_id,
       criteria_name,
-      weight,
       rubric_prompt,
-      max_score,
       description,
       created_by: userId
     });
@@ -49,25 +33,18 @@ exports.createCriteria = async (req, res, next) => {
   }
 };
 
-/**
- * Get criteria list
- */
 exports.getCriteriaList = async (req, res, next) => {
   try {
     const { page = 1, limit = 10, aptis_type, question_type, search } = req.query;
     const { offset, limit: validLimit } = paginate(page, limit);
 
     const where = {};
-    
-    // Add search filter
     if (search) {
       where[Op.or] = [
         { criteria_name: { [Op.iLike]: `%${search}%` } },
         { rubric_prompt: { [Op.iLike]: `%${search}%` } }
       ];
     }
-    
-    // Add type filters
     if (aptis_type) {
       where.aptis_type_id = aptis_type;
     }
@@ -110,9 +87,6 @@ exports.getCriteriaList = async (req, res, next) => {
   }
 };
 
-/**
- * Get single criteria by ID
- */
 exports.getCriteriaById = async (req, res, next) => {
   try {
     const { criteriaId } = req.params;
@@ -150,9 +124,6 @@ exports.getCriteriaById = async (req, res, next) => {
   }
 };
 
-/**
- * Get question types for criteria (Speaking and Writing only)
- */
 exports.getQuestionTypesForCriteria = async (req, res, next) => {
   try {
     const speakingCodes = [
@@ -161,12 +132,9 @@ exports.getQuestionTypesForCriteria = async (req, res, next) => {
       'SPEAKING_COMPARISON',
       'SPEAKING_DISCUSSION'
     ];
-    
     const writingCodes = [
-      'WRITING_SHORT',
       'WRITING_LONG',
       'WRITING_EMAIL',
-      'WRITING_ESSAY'
     ];
 
     const allCodes = [...speakingCodes, ...writingCodes];
@@ -193,14 +161,10 @@ exports.getQuestionTypesForCriteria = async (req, res, next) => {
       data: types
     });
   } catch (error) {
-    console.error('getQuestionTypesForCriteria error:', error);
     next(error);
   }
 };
 
-/**
- * Update criteria
- */
 exports.updateCriteria = async (req, res, next) => {
   try {
     const { criteriaId } = req.params;
@@ -223,9 +187,6 @@ exports.updateCriteria = async (req, res, next) => {
   }
 };
 
-/**
- * Delete criteria
- */
 exports.deleteCriteria = async (req, res, next) => {
   try {
     const { criteriaId } = req.params;
@@ -247,9 +208,6 @@ exports.deleteCriteria = async (req, res, next) => {
   }
 };
 
-/**
- * Preview criteria
- */
 exports.previewCriteria = async (req, res, next) => {
   try {
     const { criteriaId } = req.params;

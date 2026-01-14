@@ -330,7 +330,7 @@ exports.getExamSkills = async (req, res, next) => {
   try {
     const { examId } = req.params;
 
-    // Get exam with its sections and skills
+    // Get exam with its sections and skills, ordered by section_order
     const exam = await Exam.findOne({
       where: { id: examId, status: 'published' },
       include: [
@@ -344,6 +344,7 @@ exports.getExamSkills = async (req, res, next) => {
               attributes: ['id', 'code', 'skill_type_name', 'description'],
             },
           ],
+          order: [['section_order', 'ASC']], // Sort by section order
         },
       ],
     });
@@ -352,28 +353,32 @@ exports.getExamSkills = async (req, res, next) => {
       throw new NotFoundError('Exam not found');
     }
 
-    // Extract unique skills from exam sections
+    // Extract skills in order (maintaining section order)
+    const skillsArray = [];
     const skillsMap = new Map();
+    
     exam.sections.forEach(section => {
       if (section.skillType) {
         const skill = section.skillType;
-        skillsMap.set(skill.id, {
-          id: skill.id,
-          code: skill.code,
-          skill_type_name: skill.skill_type_name,
-          description: skill.description,
-        });
+        if (!skillsMap.has(skill.id)) {
+          skillsMap.set(skill.id, true);
+          skillsArray.push({
+            id: skill.id,
+            code: skill.code,
+            skill_type_name: skill.skill_type_name,
+            description: skill.description,
+            order: skillsArray.length + 1, // Add explicit order
+          });
+        }
       }
     });
-
-    const skills = Array.from(skillsMap.values());
 
     res.json({
       success: true,
       data: {
         exam_id: exam.id,
         exam_title: exam.title,
-        skills,
+        skills: skillsArray,
       },
     });
   } catch (error) {

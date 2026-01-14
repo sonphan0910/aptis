@@ -1,18 +1,9 @@
 const { successResponse, errorResponse } = require('../../utils/response');
 const { ValidationError } = require('../../utils/errors');
 
-/**
- * Admin AI Management Controller
- * Handles AI queue monitoring and management operations
- */
 class AiManagementController {
-  /**
-   * Get AI queue status
-   * Note: Scoring queue has been removed in favor of synchronous scoring
-   */
   static async getQueueStatus(req, res) {
     try {
-      // Queue status - scoring queue no longer used (sync scoring instead)
       const queueStatus = {
         scoringQueue: {
           status: 'disabled',
@@ -47,14 +38,10 @@ class AiManagementController {
     }
   }
 
-  /**
-   * Get AI processing statistics
-   */
   static async getProcessingStats(req, res) {
     try {
       const { period = '24h' } = req.query;
 
-      // Placeholder for AI processing statistics
       const stats = {
         period,
         totalProcessed: 0,
@@ -81,9 +68,6 @@ class AiManagementController {
     }
   }
 
-  /**
-   * Retry failed AI jobs
-   */
   static async retryFailedJobs(req, res) {
     try {
       const { jobType } = req.body;
@@ -92,7 +76,6 @@ class AiManagementController {
         throw new ValidationError('Job type is required');
       }
 
-      // Placeholder for retrying failed jobs
       const result = {
         jobType,
         retriedCount: 0,
@@ -106,14 +89,10 @@ class AiManagementController {
     }
   }
 
-  /**
-   * Clear completed jobs
-   */
   static async clearCompletedJobs(req, res) {
     try {
       const { olderThan = '24h' } = req.query;
 
-      // Placeholder for clearing completed jobs
       const result = {
         clearedCount: 0,
         olderThan,
@@ -125,12 +104,8 @@ class AiManagementController {
     }
   }
 
-  /**
-   * Get AI model configuration
-   */
   static async getModelConfig(req, res) {
     try {
-      // Placeholder for AI model configuration
       const config = {
         geminiModel: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
         whisperModel: process.env.WHISPER_MODEL || 'tiny',
@@ -154,9 +129,6 @@ class AiManagementController {
     }
   }
 
-  /**
-   * Update AI model configuration
-   */
   static async updateModelConfig(req, res) {
     try {
       const { config } = req.body;
@@ -164,10 +136,6 @@ class AiManagementController {
       if (!config) {
         throw new ValidationError('Configuration is required');
       }
-
-      // Placeholder for updating AI model configuration
-      // In real implementation, this would update configuration files
-      // and restart AI services if needed
 
       return successResponse(res, 'AI model configuration updated successfully', { config });
     } catch (error) {

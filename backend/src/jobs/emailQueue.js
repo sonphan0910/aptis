@@ -1,87 +1,73 @@
+
 const EmailService = require('../services/EmailService');
 
-// In-memory queue
+// Hàng đợi email lưu trong bộ nhớ (RAM)
 const queue = [];
 let isProcessing = false;
 
 /**
- * Add email job to queue
+ * Thêm một job gửi email vào hàng đợi
+ * @param {Object} emailData - Dữ liệu email cần gửi
+ * @returns {number} id của job vừa thêm
  */
 function addEmailJob(emailData) {
+  // Tạo job mới với thông tin, số lần thử tối đa là 5
   const job = {
-    id: Date.now() + Math.random(),
+    id: Date.now() + Math.random(), // Tạo id duy nhất
     data: emailData,
-    attempts: 0,
-    maxAttempts: 5,
+    attempts: 0, // Số lần thử gửi
+    maxAttempts: 5, // Số lần thử tối đa
     createdAt: new Date(),
-    status: 'pending',
+    status: 'pending', // Trạng thái ban đầu
   };
-
-  queue.push(job);
-  console.log(`[EmailQueue] Job ${job.id} added to queue (${queue.length} jobs)`);
-
-  // Start processing if not already running
+  queue.push(job); // Đưa job vào hàng đợi
+  // Nếu chưa chạy xử lý thì bắt đầu xử lý
   if (!isProcessing) {
     processQueue();
   }
-
   return job.id;
 }
 
 /**
- * Process queue
+ * Xử lý các job trong hàng đợi
+ * Tự động thử lại nếu gửi thất bại, tối đa 5 lần
  */
 async function processQueue() {
   if (isProcessing || queue.length === 0) {
     return;
   }
-
   isProcessing = true;
-
   while (queue.length > 0) {
     const job = queue[0];
-
     try {
-      console.log(
-        `[EmailQueue] Processing job ${job.id} (attempt ${job.attempts + 1}/${job.maxAttempts})`,
-      );
-
+      // Thử gửi email
       await processJob(job);
-
-      // Job succeeded
+      // Nếu gửi thành công thì xoá khỏi hàng đợi
       queue.shift();
-      console.log(`[EmailQueue] Job ${job.id} completed successfully`);
     } catch (error) {
-      console.error(`[EmailQueue] Job ${job.id} failed:`, error.message);
-
+      // Nếu gửi thất bại thì tăng số lần thử
       job.attempts++;
-
       if (job.attempts >= job.maxAttempts) {
-        // Max attempts reached
+        // Nếu quá số lần thử thì xoá khỏi hàng đợi và log lỗi
         queue.shift();
-        console.error(
-          `[EmailQueue] Job ${job.id} failed permanently after ${job.maxAttempts} attempts`,
-        );
       } else {
-        // Retry later
+        // Nếu chưa quá số lần thử thì chuyển job về cuối hàng đợi để thử lại sau
         queue.shift();
         queue.push(job);
-
-        // Wait before retry
+        // Đợi 3 giây trước khi thử lại
         await new Promise((resolve) => setTimeout(resolve, 3000));
       }
     }
   }
-
   isProcessing = false;
 }
 
 /**
- * Process individual job
+ * Xử lý từng job gửi email
+ * Tuỳ theo loại email sẽ gọi hàm gửi tương ứng
  */
 async function processJob(job) {
   const { type, to, subject, html, data } = job.data;
-
   if (type === 'welcome') {
     await EmailService.sendWelcomeEmail(to, data.fullName, data.tempPassword);
   } else if (type === 'reset-password') {
@@ -93,12 +79,13 @@ async function processJob(job) {
   } else if (type === 'custom') {
     await EmailService.sendEmail({ to, subject, html });
   } else {
-    throw new Error(`Unknown email type: ${type}`);
+    throw new Error(`Unknown email type: ${type}`); // Loại email không hợp lệ
   }
 }
 
 /**
- * Get queue status
+ * Lấy trạng thái hàng đợi email
+ * Trả về số lượng job, trạng thái xử lý và thông tin từng job
  */
 function getQueueStatus() {
   return {
@@ -115,7 +102,8 @@ function getQueueStatus() {
 }
 
 /**
- * Clear queue
+ * Xoá toàn bộ hàng đợi email
+ * Dừng xử lý các job hiện tại
  */
 function clearQueue() {
   queue.length = 0;

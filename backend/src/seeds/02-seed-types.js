@@ -2,7 +2,7 @@ require('dotenv').config();
 const { AptisType, SkillType, QuestionType } = require('../models');
 
 /**
- * Seed APTIS types
+ * Seed APTIS types - Tạo loại đề thi APTIS
  */
 async function seedAptisTypes() {
   const types = [
@@ -11,25 +11,7 @@ async function seedAptisTypes() {
       aptis_type_name: 'APTIS General',
       description: 'General English test for all purposes',
       is_active: true,
-    },
-    {
-      code: 'APTIS_ADVANCED',
-      aptis_type_name: 'APTIS Advanced',
-      description: 'Advanced level English test',
-      is_active: true,
-    },
-    {
-      code: 'APTIS_FOR_TEACHERS',
-      aptis_type_name: 'APTIS for Teachers',
-      description: 'English test specifically for teachers',
-      is_active: true,
-    },
-    {
-      code: 'APTIS_FOR_TEENS',
-      aptis_type_name: 'APTIS for Teens',
-      description: 'English test for teenagers (13-17)',
-      is_active: true,
-    },
+    }
   ];
 
   for (const type of types) {
@@ -43,7 +25,7 @@ async function seedAptisTypes() {
 }
 
 /**
- * Seed skill types
+ * Seed skill types - Tạo các kỹ năng (Nghe, Đọc, Nói, Viết)
  */
 async function seedSkillTypes() {
   const skills = [
@@ -84,17 +66,17 @@ async function seedSkillTypes() {
 }
 
 /**
- * Seed question types
+ * Seed question types - Tạo các loại câu hỏi cho từng kỹ năng
  */
 async function seedQuestionTypes() {
-  // Get skill IDs
+  // Lấy ID của từng kỹ năng
   const listening = await SkillType.findOne({ where: { code: 'LISTENING' } });
   const reading = await SkillType.findOne({ where: { code: 'READING' } });
   const speaking = await SkillType.findOne({ where: { code: 'SPEAKING' } });
   const writing = await SkillType.findOne({ where: { code: 'WRITING' } });
 
   const types = [
-    // Listening
+    // ===== LISTENING (Nghe) =====
     {
       skill_type_id: listening.id,
       code: 'LISTENING_MCQ',
@@ -124,7 +106,7 @@ async function seedQuestionTypes() {
       scoring_method: 'auto',
     },
 
-    // Reading
+    // ===== READING (Đọc) =====
     {
       skill_type_id: reading.id,
       code: 'READING_GAP_FILL',
@@ -154,62 +136,64 @@ async function seedQuestionTypes() {
       scoring_method: 'auto',
     },
 
-    // Speaking
+    // ===== SPEAKING (Nói) - Dựa trên APTIS Technical Report =====
     {
       skill_type_id: speaking.id,
       code: 'SPEAKING_INTRO',
-      question_type_name: 'Personal Introduction',
+      question_type_name: 'Personal Introduction (A2)',
       scoring_method: 'ai',
+      description: 'Task 1: Personal introduction, A2 level, 0-5 scale'
     },
     {
       skill_type_id: speaking.id,
       code: 'SPEAKING_DESCRIPTION',
-      question_type_name: 'Picture Description',
+      question_type_name: 'Picture Description (B1)',
       scoring_method: 'ai',
+      description: 'Task 2: Picture/topic description, B1 level, 0-5 scale'
     },
     {
       skill_type_id: speaking.id,
       code: 'SPEAKING_COMPARISON',
-      question_type_name: 'Comparison',
+      question_type_name: 'Comparison (B1)',
       scoring_method: 'ai',
+      description: 'Task 3: Compare and contrast, B1 level, 0-5 scale'
     },
     {
       skill_type_id: speaking.id,
       code: 'SPEAKING_DISCUSSION',
-      question_type_name: 'Topic Discussion',
+      question_type_name: 'Topic Discussion (B2)',
       scoring_method: 'ai',
+      description: 'Task 4: Extended discussion, B2 level, 0-6 scale with C1/C2 extension'
     },
 
-    // Writing
+    // ===== WRITING (Viết) - Dựa trên APTIS Technical Report =====
     {
       skill_type_id: writing.id,
       code: 'WRITING_SHORT',
-      question_type_name: 'Short Answers (1-5 words)',
+      question_type_name: 'Short Response (A1 - basic information)',
       scoring_method: 'ai',
+      description: 'Task 1: Basic form filling, A1 level, 0-4 scale'
     },
     {
       skill_type_id: writing.id,
       code: 'WRITING_FORM',
-      question_type_name: 'Form Filling (20-30 words)',
+      question_type_name: 'Form Filling (A2 - 20-30 words)',
       scoring_method: 'ai',
+      description: 'Task 2: Short constructed response to specific question, A2 level, 0-5 scale'
     },
     {
       skill_type_id: writing.id,
       code: 'WRITING_LONG',
-      question_type_name: 'Chat Responses (30-40 words)', 
+      question_type_name: 'Chat Responses (B1 - 30-40 words)', 
       scoring_method: 'ai',
+      description: 'Task 3: Chat room with 3 questions, B1 level, 0-5 scale'
     },
     {
       skill_type_id: writing.id,
       code: 'WRITING_EMAIL',
-      question_type_name: 'Email Writing (50 & 120-150 words)',
+      question_type_name: 'Email Writing (B2 - friend & authority)',
       scoring_method: 'ai',
-    },
-    {
-      skill_type_id: writing.id,
-      code: 'WRITING_ESSAY',
-      question_type_name: 'Essay Writing',
-      scoring_method: 'ai',
+      description: 'Task 4: Two emails (friend + authority), B2 level, 0-6 scale with C1/C2 extension'
     },
   ];
 
@@ -224,25 +208,31 @@ async function seedQuestionTypes() {
 }
 
 /**
- * Run all type seeds
+ * Run all type seeds - Chạy tất cả các hàm seed types
  */
 async function seedTypes() {
   try {
-    console.log('[Seed] Seeding types...');
+    // Bắt đầu seed các type
+    console.log('[Seed] Đang seed các loại...');
 
+    // Seed APTIS type
     await seedAptisTypes();
+    // Seed các kỹ năng
     await seedSkillTypes();
+    // Seed các loại câu hỏi
     await seedQuestionTypes();
 
-    console.log('[Seed] Types seeded successfully');
+    // Hoàn tất seed
+    console.log('[Seed] Đã seed các loại thành công');
     process.exit(0);
   } catch (error) {
-    console.error('[Seed] Failed to seed types:', error);
+    // Lỗi khi seed
+    console.error('[Seed] Lỗi khi seed các loại:', error);
     process.exit(1);
   }
 }
 
-// Run if called directly
+// Chạy nếu file được gọi trực tiếp
 if (require.main === module) {
   seedTypes();
 }

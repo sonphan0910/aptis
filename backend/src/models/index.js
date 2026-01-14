@@ -1,6 +1,14 @@
 const { sequelize, Sequelize } = require('../config/database');
 
-// Import all models
+/**
+ * Tệp index.js - Tổ chức tất cả các model và define các mối quan hệ
+ * Các bước:
+ * 1. Import tất cả các model
+ * 2. Define các association (hasMany, belongsTo, hasOne...)
+ * 3. Export sequelize và tất cả model để sử dụng ở các nơi khác
+ */
+
+// Bước 1: Import tất cả các model từ các file riêng
 const User = require('./User');
 const AptisType = require('./AptisType');
 const SkillType = require('./SkillType');
@@ -18,9 +26,11 @@ const AttemptSection = require('./AttemptSection');
 const AttemptAnswer = require('./AttemptAnswer');
 const AnswerAiFeedback = require('./AnswerAiFeedback');
 
-// Define associations
+/**
+ * Bước 2: Define các association (mối quan hệ giữa các model)
+ */
 
-// QuestionType belongs to SkillType
+// QuestionType thuộc SkillType (mỗi loại câu hỏi thuộc một kỹ năng)
 QuestionType.belongsTo(SkillType, {
   foreignKey: 'skill_type_id',
   as: 'skillType',
@@ -30,7 +40,7 @@ SkillType.hasMany(QuestionType, {
   as: 'questionTypes',
 });
 
-// Question belongs to QuestionType and AptisType
+// Question thuộc QuestionType, AptisType, và User
 Question.belongsTo(QuestionType, {
   foreignKey: 'question_type_id',
   as: 'questionType',
@@ -57,7 +67,7 @@ User.hasMany(Question, {
   as: 'createdQuestions',
 });
 
-// QuestionItem belongs to Question
+// QuestionItem thuộc Question (mục câu hỏi)
 QuestionItem.belongsTo(Question, {
   foreignKey: 'question_id',
   as: 'question',
@@ -67,7 +77,7 @@ Question.hasMany(QuestionItem, {
   as: 'items',
 });
 
-// QuestionOption belongs to Question and optionally QuestionItem
+// QuestionOption thuộc Question và QuestionItem (lựa chọn cho câu hỏi hoặc mục)
 QuestionOption.belongsTo(Question, {
   foreignKey: 'question_id',
   as: 'question',
@@ -85,7 +95,7 @@ QuestionItem.hasMany(QuestionOption, {
   as: 'options',
 });
 
-// QuestionSampleAnswer belongs to Question
+// QuestionSampleAnswer thuộc Question (một câu hỏi có một câu trả lời mẫu)
 QuestionSampleAnswer.belongsTo(Question, {
   foreignKey: 'question_id',
   as: 'question',
@@ -95,7 +105,8 @@ Question.hasOne(QuestionSampleAnswer, {
   as: 'sampleAnswer',
 });
 
-// AiScoringCriteria belongs to AptisType, QuestionType, and User
+// AiScoringCriteria thuộc AptisType, QuestionType, và User
+// (tiêu chí chấm điểm cho kết hợp APTIS type + loại câu hỏi)
 AiScoringCriteria.belongsTo(AptisType, {
   foreignKey: 'aptis_type_id',
   as: 'aptisType',
@@ -122,7 +133,7 @@ User.hasMany(AiScoringCriteria, {
   as: 'createdCriteria',
 });
 
-// Exam belongs to AptisType and User
+// Exam thuộc AptisType và User
 Exam.belongsTo(AptisType, {
   foreignKey: 'aptis_type_id',
   as: 'aptisType',
@@ -141,7 +152,7 @@ User.hasMany(Exam, {
   as: 'createdExams',
 });
 
-// ExamSection belongs to Exam and SkillType
+// ExamSection thuộc Exam và SkillType (mỗi phần thi thuộc một kỳ thi và một kỹ năng)
 ExamSection.belongsTo(Exam, {
   foreignKey: 'exam_id',
   as: 'exam',
@@ -160,7 +171,8 @@ SkillType.hasMany(ExamSection, {
   as: 'examSections',
 });
 
-// ExamSectionQuestion belongs to ExamSection and Question
+// ExamSectionQuestion thuộc ExamSection và Question
+// (mối quan hệ many-to-many giữa phần thi và câu hỏi)
 ExamSectionQuestion.belongsTo(ExamSection, {
   foreignKey: 'exam_section_id',
   as: 'examSection',
@@ -179,7 +191,8 @@ Question.hasMany(ExamSectionQuestion, {
   as: 'examSectionQuestions',
 });
 
-// ExamAttempt belongs to User, Exam, and optionally SkillType
+// ExamAttempt thuộc User, Exam, và SkillType
+// (lượt thi của học sinh cho một kỳ thi hoặc một kỹ năng)
 ExamAttempt.belongsTo(User, {
   foreignKey: 'student_id',
   as: 'student',
@@ -206,7 +219,8 @@ SkillType.hasMany(ExamAttempt, {
   as: 'singleSkillAttempts',
 });
 
-// AttemptSection belongs to ExamAttempt and ExamSection
+// AttemptSection thuộc ExamAttempt và ExamSection
+// (từng phần thi mà học sinh tham gia)
 AttemptSection.belongsTo(ExamAttempt, {
   foreignKey: 'attempt_id',
   as: 'attempt',
@@ -225,7 +239,8 @@ ExamSection.hasMany(AttemptSection, {
   as: 'attemptSections',
 });
 
-// AttemptAnswer belongs to ExamAttempt, Question, QuestionOption, and Users
+// AttemptAnswer thuộc ExamAttempt, Question, QuestionOption, và User
+// (câu trả lời của học sinh cho từng câu hỏi)
 AttemptAnswer.belongsTo(ExamAttempt, {
   foreignKey: 'attempt_id',
   as: 'attempt',
@@ -264,23 +279,11 @@ User.hasMany(AttemptAnswer, {
   as: 'reviewedAnswers',
 });
 
-// AnswerAiFeedback belongs to AttemptAnswer and AiScoringCriteria
-AnswerAiFeedback.belongsTo(AttemptAnswer, {
-  foreignKey: 'answer_id',
-  as: 'answer',
-});
-AnswerAiFeedback.belongsTo(AiScoringCriteria, {
-  foreignKey: 'criteria_id',
-  as: 'criteria',
-});
-
+// AnswerAiFeedback thuộc AttemptAnswer
+// (phản hồi AI cho một câu trả lời)
 AttemptAnswer.hasMany(AnswerAiFeedback, {
   foreignKey: 'answer_id',
   as: 'aiFeedbacks',
-});
-AiScoringCriteria.hasMany(AnswerAiFeedback, {
-  foreignKey: 'criteria_id',
-  as: 'feedbacks',
 });
 
 // Sync database

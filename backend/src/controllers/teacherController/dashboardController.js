@@ -8,18 +8,13 @@ const {
 } = require('../../models');
 const { Op } = require('sequelize');
 
-/**
- * Get dashboard statistics
- */
 exports.getDashboardStats = async (req, res, next) => {
   try {
-    // Get current date for monthly comparisons
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
-    // Questions stats
     const totalQuestions = await Question.count({
       where: { status: { [Op.ne]: 'deleted' } }
     });
@@ -36,7 +31,6 @@ exports.getDashboardStats = async (req, res, next) => {
       }
     });
 
-    // Exams stats
     const totalExams = await Exam.count({
       where: { status: { [Op.ne]: 'deleted' } }
     });
@@ -53,7 +47,6 @@ exports.getDashboardStats = async (req, res, next) => {
       }
     });
 
-    // Users stats (students + teachers)
     const totalUsers = await User.count({
       where: { status: 'active' }
     });
@@ -70,7 +63,6 @@ exports.getDashboardStats = async (req, res, next) => {
       }
     });
 
-    // Submissions stats (writing + speaking only)
     const submissionStats = await AttemptAnswer.findAll({
       where: {
         answer_type: ['text', 'audio'], // Only writing and speaking
@@ -98,7 +90,6 @@ exports.getDashboardStats = async (req, res, next) => {
       }
     });
 
-    // Calculate changes and trends
     const questionChange = questionsThisMonth - questionsLastMonth;
     const examChange = examsThisMonth - examsLastMonth;
     const userChange = usersThisMonth - usersLastMonth;
@@ -149,14 +140,9 @@ exports.getDashboardStats = async (req, res, next) => {
   }
 };
 
-/**
- * Get recent activities summary
- */
 exports.getRecentActivities = async (req, res, next) => {
   try {
     const { limit = 10 } = req.query;
-    
-    // Get recent exams
     const recentExams = await Exam.findAll({
       limit: Math.ceil(limit / 2),
       order: [['created_at', 'DESC']],
@@ -170,7 +156,6 @@ exports.getRecentActivities = async (req, res, next) => {
       ]
     });
 
-    // Get recent submissions
     const recentSubmissions = await AttemptAnswer.findAll({
       limit: Math.ceil(limit / 2),
       order: [['answered_at', 'DESC']],
@@ -197,9 +182,7 @@ exports.getRecentActivities = async (req, res, next) => {
       ]
     });
 
-    // Format activities
     const activities = [];
-    
     recentExams.forEach(exam => {
       activities.push({
         id: `exam-${exam.id}`,
@@ -224,7 +207,6 @@ exports.getRecentActivities = async (req, res, next) => {
       });
     });
 
-    // Sort by timestamp descending
     activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
     res.json({
@@ -236,9 +218,6 @@ exports.getRecentActivities = async (req, res, next) => {
   }
 };
 
-/**
- * Get system overview for dashboard
- */
 exports.getSystemOverview = async (req, res, next) => {
   try {
     const now = new Date();
@@ -246,7 +225,6 @@ exports.getSystemOverview = async (req, res, next) => {
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
-    // Get stats
     const [
       totalQuestions,
       questionsThisMonth,
@@ -325,7 +303,6 @@ exports.getSystemOverview = async (req, res, next) => {
       }),
     ]);
 
-    // Get recent activities
     const [recentExams, recentSubmissions] = await Promise.all([
       Exam.findAll({
         limit: 3,
@@ -364,9 +341,7 @@ exports.getSystemOverview = async (req, res, next) => {
       })
     ]);
 
-    // Format activities
     const activities = [];
-    
     recentExams.forEach(exam => {
       activities.push({
         id: `exam-${exam.id}`,
@@ -391,10 +366,8 @@ exports.getSystemOverview = async (req, res, next) => {
       });
     });
 
-    // Sort by timestamp descending
     activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-    // Build overview response
     const questionChange = questionsThisMonth - questionsLastMonth;
     const examChange = examsThisMonth - examsLastMonth;
     const userChange = usersThisMonth - usersLastMonth;

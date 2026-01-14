@@ -1,3 +1,22 @@
+/**
+ * =================================================================
+ * TEACHER ROUTES - ĐỊNH TUYẾN GIÁO VIÊN
+ * =================================================================
+ * 
+ * File này quản lý các route dành cho giáo viên và admin:
+ * - Dashboard và thống kê
+ * - Quản lý câu hỏi (CRUD)
+ * - Quản lý bài thi (CRUD, publish/unpublish)
+ * - Quản lý tiêu chí chấm điểm AI
+ * - Review và chấm điểm bài thi
+ * - Báo cáo và thống kê
+ * 
+ * Tất cả routes yêu cầu:
+ * - authMiddleware: Đã đăng nhập
+ * - isTeacherOrAdmin: Có role teacher hoặc admin
+ * =================================================================
+ */
+
 const express = require('express');
 const router = express.Router();
 const questionController = require('../controllers/teacherController/questionController');
@@ -16,7 +35,11 @@ const {
 } = require('../middleware/validation');
 const { apiLimiter } = require('../middleware/rateLimiter');
 
-// Dashboard routes
+// =====================================
+// DASHBOARD - BẢNG ĐIỀU KHIỂN
+// =====================================
+
+// GET /teacher/dashboard/stats - Thống kê dashboard cho giáo viên
 router.get(
   '/dashboard/stats',
   authMiddleware,
@@ -24,6 +47,7 @@ router.get(
   dashboardController.getDashboardStats,
 );
 
+// GET /teacher/dashboard/activities - Hoạt động gần đây
 router.get(
   '/dashboard/activities',
   authMiddleware,
@@ -31,6 +55,7 @@ router.get(
   dashboardController.getRecentActivities,
 );
 
+// GET /teacher/dashboard/overview - Tổng quan hệ thống
 router.get(
   '/dashboard/overview',
   authMiddleware,
@@ -38,7 +63,11 @@ router.get(
   dashboardController.getSystemOverview,
 );
 
-// Question routes
+// =====================================
+// QUESTION ROUTES - QUẢN LÝ CÂU HỎI
+// =====================================
+
+// POST /teacher/questions - Tạo câu hỏi mới
 router.post(
   '/questions',
   authMiddleware,
@@ -47,6 +76,7 @@ router.post(
   questionController.createQuestion,
 );
 
+// GET /teacher/questions - Lấy danh sách câu hỏi
 router.get(
   '/questions',
   authMiddleware,
@@ -55,6 +85,7 @@ router.get(
   questionController.getQuestions,
 );
 
+// GET /teacher/questions/filter-options - Lấy các tùy chọn filter
 router.get(
   '/questions/filter-options',
   authMiddleware,
@@ -62,6 +93,7 @@ router.get(
   questionController.getFilterOptions,
 );
 
+// GET /teacher/questions/:questionId - Chi tiết câu hỏi
 router.get(
   '/questions/:questionId',
   authMiddleware,
@@ -69,6 +101,7 @@ router.get(
   questionController.getQuestionDetails,
 );
 
+// PUT /teacher/questions/:questionId - Cập nhật câu hỏi
 router.put(
   '/questions/:questionId',
   authMiddleware,
@@ -77,6 +110,7 @@ router.put(
   questionController.updateQuestion,
 );
 
+// DELETE /teacher/questions/:questionId - Xóa câu hỏi
 router.delete(
   '/questions/:questionId',
   authMiddleware,
@@ -84,6 +118,7 @@ router.delete(
   questionController.deleteQuestion,
 );
 
+// GET /teacher/questions/:questionId/usage - Xem câu hỏi được sử dụng ở đâu
 router.get(
   '/questions/:questionId/usage',
   authMiddleware,
@@ -91,7 +126,11 @@ router.get(
   questionController.getQuestionUsage,
 );
 
-// Exam routes
+// =====================================
+// EXAM ROUTES - QUẢN LÝ BÀI THI
+// =====================================
+
+// POST /teacher/exams - Tạo bài thi mới
 router.post(
   '/exams',
   authMiddleware,
@@ -100,6 +139,7 @@ router.post(
   examController.createExam,
 );
 
+// PUT /teacher/exams/:examId - Cập nhật bài thi
 router.put(
   '/exams/:examId',
   authMiddleware,
@@ -108,6 +148,7 @@ router.put(
   examController.updateExam,
 );
 
+// DELETE /teacher/exams/:examId - Xóa bài thi
 router.delete(
   '/exams/:examId',
   authMiddleware,
@@ -115,6 +156,7 @@ router.delete(
   examController.deleteExam,
 );
 
+// POST /teacher/exams/:examId/sections - Thêm section vào bài thi
 router.post(
   '/exams/:examId/sections',
   authMiddleware,
@@ -123,6 +165,7 @@ router.post(
   examController.addSection,
 );
 
+// PUT /teacher/exams/:examId/sections/:sectionId - Cập nhật section
 router.put(
   '/exams/:examId/sections/:sectionId',
   authMiddleware,
@@ -131,6 +174,7 @@ router.put(
   examController.updateSection,
 );
 
+// POST /teacher/exams/:examId/sections/:sectionId/questions - Thêm câu hỏi vào section
 router.post(
   '/exams/:examId/sections/:sectionId/questions',
   authMiddleware,
@@ -139,6 +183,7 @@ router.post(
   examController.addQuestionToSection,
 );
 
+// DELETE /teacher/exams/:examId/sections/:sectionId/questions/:questionId - Xóa câu hỏi khỏi section
 router.delete(
   '/exams/:examId/sections/:sectionId/questions/:questionId',
   authMiddleware,
@@ -146,6 +191,7 @@ router.delete(
   examController.removeQuestionFromSection,
 );
 
+// PUT /teacher/exams/:examId/sections/:sectionId/questions/:questionId - Cập nhật thứ tự câu hỏi
 router.put(
   '/exams/:examId/sections/:sectionId/questions/:questionId',
   authMiddleware,
@@ -154,12 +200,16 @@ router.put(
   examController.updateQuestionInSection,
 );
 
+// POST /teacher/exams/:examId/publish - Publish bài thi (đưa vào sử dụng)
 router.post('/exams/:examId/publish', authMiddleware, isTeacherOrAdmin, examController.publishExam);
 
+// POST /teacher/exams/:examId/unpublish - Unpublish bài thi (ngừng sử dụng)
 router.post('/exams/:examId/unpublish', authMiddleware, isTeacherOrAdmin, examController.unpublishExam);
 
+// GET /teacher/exams/:examId - Chi tiết bài thi
 router.get('/exams/:examId', authMiddleware, isTeacherOrAdmin, examController.getExamById);
 
+// DELETE /teacher/exams/:examId/sections/:sectionId - Xóa section
 router.delete(
   '/exams/:examId/sections/:sectionId',
   authMiddleware,
@@ -167,9 +217,14 @@ router.delete(
   examController.removeSection,
 );
 
+// GET /teacher/exams - Lấy danh sách bài thi của giáo viên
 router.get('/exams', authMiddleware, isTeacherOrAdmin, apiLimiter, examController.getMyExams);
 
-// AI Criteria routes
+// =====================================
+// AI CRITERIA ROUTES - QUẢN LÝ TIÊU CHÍ AI
+// =====================================
+
+// POST /teacher/criteria - Tạo tiêu chí chấm điểm AI mới
 router.post(
   '/criteria',
   authMiddleware,
@@ -178,6 +233,7 @@ router.post(
   criteriaController.createCriteria,
 );
 
+// GET /teacher/criteria - Lấy danh sách các tiêu chí
 router.get(
   '/criteria',
   authMiddleware,
@@ -186,6 +242,7 @@ router.get(
   criteriaController.getCriteriaList,
 );
 
+// GET /teacher/criteria/question-types - Lấy question types để gán criteria
 router.get(
   '/criteria/question-types',
   authMiddleware,
@@ -193,7 +250,8 @@ router.get(
   criteriaController.getQuestionTypesForCriteria,
 );
 
-// Individual criteria route (must come AFTER specific routes like /question-types)
+// GET /teacher/criteria/:criteriaId - Chi tiết tiêu chí
+// Route này phải đặt SAU các specific routes như /question-types
 router.get(
   '/criteria/:criteriaId',
   authMiddleware,
@@ -201,12 +259,13 @@ router.get(
   criteriaController.getCriteriaById,
 );
 
-// Public endpoint for testing (remove in production)
+// GET /teacher/criteria/question-types/public - Public endpoint cho testing (xóa trong production)
 router.get(
   '/criteria/question-types/public',
   criteriaController.getQuestionTypesForCriteria,
 );
 
+// PUT /teacher/criteria/:criteriaId - Cập nhật tiêu chí
 router.put(
   '/criteria/:criteriaId',
   authMiddleware,
@@ -215,6 +274,7 @@ router.put(
   criteriaController.updateCriteria,
 );
 
+// DELETE /teacher/criteria/:criteriaId - Xóa tiêu chí
 router.delete(
   '/criteria/:criteriaId',
   authMiddleware,
@@ -222,6 +282,7 @@ router.delete(
   criteriaController.deleteCriteria,
 );
 
+// GET /teacher/criteria/:criteriaId/preview - Xem trước tiêu chí
 router.get(
   '/criteria/:criteriaId/preview',
   authMiddleware,
@@ -229,7 +290,11 @@ router.get(
   criteriaController.previewCriteria,
 );
 
-// Review routes
+// =====================================
+// REVIEW ROUTES - ĐÁNH GIÁ VÀ CHẤM ĐIỂM
+// =====================================
+
+// GET /teacher/review/pending - Lấy danh sách bài cần review
 router.get(
   '/review/pending',
   authMiddleware,
@@ -238,6 +303,7 @@ router.get(
   reviewController.getPendingReviews,
 );
 
+// GET /teacher/review/answers/:answerId - Lấy chi tiết câu trả lời để review
 router.get(
   '/review/answers/:answerId',
   authMiddleware,
@@ -245,6 +311,7 @@ router.get(
   reviewController.getAnswerForReview,
 );
 
+// PUT /teacher/review/answers/:answerId - Nộp kết quả review
 router.put(
   '/review/answers/:answerId',
   authMiddleware,
@@ -252,6 +319,7 @@ router.put(
   reviewController.submitReview,
 );
 
+// GET /teacher/review/exam/:examId - Lấy reviews theo bài thi
 router.get(
   '/review/exam/:examId',
   authMiddleware,
@@ -260,7 +328,11 @@ router.get(
   reviewController.getReviewsByExam,
 );
 
-// Submission review routes
+// =====================================
+// SUBMISSION REVIEW ROUTES - ĐÁNH GIÁ BÀI NỘP
+// =====================================
+
+// GET /teacher/submissions - Lấy danh sách submissions cần chấm
 router.get(
   '/submissions',
   authMiddleware,
@@ -269,6 +341,7 @@ router.get(
   reviewController.getSubmissions,
 );
 
+// GET /teacher/submissions/:attemptId - Chi tiết submission
 router.get(
   '/submissions/:attemptId',
   authMiddleware,
@@ -276,6 +349,7 @@ router.get(
   reviewController.getSubmissionDetail,
 );
 
+// PUT /teacher/answers/:answerId/review - Review câu trả lời cụ thể
 router.put(
   '/answers/:answerId/review',
   authMiddleware,
@@ -283,6 +357,7 @@ router.put(
   reviewController.submitAnswerReview,
 );
 
+// PUT /teacher/answers/:answerId/score - Cập nhật điểm câu trả lời
 router.put(
   '/answers/:answerId/score',
   authMiddleware,
@@ -290,6 +365,7 @@ router.put(
   reviewController.updateAnswerScore,
 );
 
+// POST /teacher/attempts/:attemptId/review - Review toàn bộ lượt thi
 router.post(
   '/attempts/:attemptId/review',
   authMiddleware,
@@ -297,7 +373,11 @@ router.post(
   reviewController.submitAttemptReview,
 );
 
-// New submission management routes
+// =====================================
+// QUẢN LÝ SUBMISSION NÂNG CAO
+// =====================================
+
+// POST /teacher/submissions/regrade - Chấm lại submissions
 router.post(
   '/submissions/regrade',
   authMiddleware,
@@ -305,6 +385,7 @@ router.post(
   reviewController.regradeSubmissions,
 );
 
+// POST /teacher/submissions/bulk-update - Cập nhật hàng loạt trạng thái
 router.post(
   '/submissions/bulk-update',
   authMiddleware,
@@ -312,6 +393,7 @@ router.post(
   reviewController.bulkUpdateStatus,
 );
 
+// GET /teacher/submissions/stats - Thống kê chấm điểm
 router.get(
   '/submissions/stats',
   authMiddleware,
@@ -319,7 +401,11 @@ router.get(
   reviewController.getGradingStats,
 );
 
-// Report routes
+// =====================================
+// REPORT ROUTES - BÁO CÁO VÀ THỐNG KÊ
+// =====================================
+
+// GET /teacher/reports/exam-statistics/:examId - Thống kê chi tiết bài thi
 router.get(
   '/reports/exam-statistics/:examId',
   authMiddleware,
@@ -327,6 +413,7 @@ router.get(
   reportController.getExamStatistics,
 );
 
+// GET /teacher/reports/student-statistics - Thống kê học sinh
 router.get(
   '/reports/student-statistics',
   authMiddleware,
@@ -335,6 +422,7 @@ router.get(
   reportController.getStudentStatistics,
 );
 
+// GET /teacher/reports/student/:studentId - Báo cáo chi tiết học sinh
 router.get(
   '/reports/student/:studentId',
   authMiddleware,
@@ -342,6 +430,7 @@ router.get(
   reportController.getStudentReport,
 );
 
+// GET /teacher/reports/export - Xuất báo cáo thống kê
 router.get('/reports/export', authMiddleware, isTeacherOrAdmin, reportController.exportStatistics);
 
 module.exports = router;

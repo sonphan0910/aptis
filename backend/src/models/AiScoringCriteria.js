@@ -1,6 +1,10 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 
+/**
+ * Model AiScoringCriteria - Tiêu chí chấm điểm bằng AI
+ * Lưu trữ các tiêu chí, trọng số và rubric để AI sử dụng khi chấm điểm bài làm
+ */
 const AiScoringCriteria = sequelize.define(
   'AiScoringCriteria',
   {
@@ -10,6 +14,7 @@ const AiScoringCriteria = sequelize.define(
       autoIncrement: true,
     },
     aptis_type_id: {
+      // Loại kỳ thi APTIS (VnIC, General, Core...)
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
@@ -18,6 +23,7 @@ const AiScoringCriteria = sequelize.define(
       },
     },
     question_type_id: {
+      // Loại câu hỏi (multiple choice, essay, speaking...)
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {
@@ -26,27 +32,22 @@ const AiScoringCriteria = sequelize.define(
       },
     },
     criteria_name: {
+      // Tên tiêu chí chấm điểm (VD: Grammar, Vocabulary, Fluency...)
       type: DataTypes.STRING(255),
       allowNull: false,
     },
-    weight: {
-      type: DataTypes.DECIMAL(5, 2),
-      allowNull: false,
-      defaultValue: 1.0,
-    },
     description: {
+      // Mô tả chi tiết về tiêu chí này
       type: DataTypes.TEXT,
       allowNull: true,
     },
     rubric_prompt: {
+      // Prompt gửi cho AI để chấm điểm theo tiêu chí này
       type: DataTypes.TEXT,
       allowNull: false,
     },
-    max_score: {
-      type: DataTypes.DECIMAL(5, 2),
-      allowNull: false,
-    },
     created_by: {
+      // ID của admin/teacher người tạo tiêu chí này
       type: DataTypes.INTEGER,
       allowNull: false,
       references: {

@@ -1,45 +1,47 @@
+// ============================================================
+// Middleware xác thực JWT cho các route cần đăng nhập
+// ============================================================
 const jwt = require('jsonwebtoken');
 const JWT_CONFIG = require('../config/jwt');
 const { User } = require('../models');
 const { UnauthorizedError } = require('../utils/errors');
 
 /**
- * Middleware to verify JWT token
+ * Middleware bắt buộc: kiểm tra token JWT hợp lệ
+ * Nếu hợp lệ sẽ gán thông tin user vào req.user
+ * Nếu không hợp lệ sẽ ném UnauthorizedError
  */
 const authMiddleware = async (req, res, next) => {
   try {
-    // Get token from Authorization header
+    // Lấy token từ header Authorization (định dạng: "Bearer <token>")
     const authHeader = req.headers.authorization;
-    console.log('[AuthMiddleware] Checking auth for:', req.path, 'Header:', authHeader ? 'present' : 'missing');
-
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedError('No token provided');
+      throw new UnauthorizedError('Không tìm thấy token');
     }
 
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-    console.log('[AuthMiddleware] Token extracted, length:', token.length);
+    // Cắt chuỗi 'Bearer ' (7 ký tự) để lấy token thực sự
+    const token = authHeader.substring(7);
 
-    // Verify token
+    // Giải mã (decode) và xác thực (verify) token bằng secret key
     const decoded = jwt.verify(token, JWT_CONFIG.secret);
-    console.log('[AuthMiddleware] Token verified for user:', decoded.userId, 'type:', decoded.type);
 
-    // Check token type
+    // Kiểm tra loại token (chỉ chấp nhận access token, không chấp nhận refresh token)
     if (decoded.type !== JWT_CONFIG.tokenTypes.ACCESS) {
-      throw new UnauthorizedError('Invalid token type');
+      throw new UnauthorizedError('Token không hợp lệ');
     }
 
-    // Get user from database
+    // Tìm user trong database theo userId lưu trong token
     const user = await User.findByPk(decoded.userId);
-
     if (!user) {
-      throw new UnauthorizedError('User not found');
+      throw new UnauthorizedError('Không tìm thấy người dùng');
     }
 
+    // Kiểm tra user có hoạt động hay không
     if (user.status !== 'active') {
-      throw new UnauthorizedError('User account is not active');
+      throw new UnauthorizedError('Tài khoản đã bị khoá hoặc chưa kích hoạt');
     }
 
-    // Attach user to request
+    // Gán thông tin user vào request object để các middleware/route sau sử dụng
     req.user = {
       userId: user.id,
       email: user.email,
@@ -49,6 +51,7 @@ const authMiddleware = async (req, res, next) => {
 
     next();
   } catch (error) {
+    // Xử lý các lỗi JWT cụ thể
     if (error.name === 'JsonWebTokenError') {
       next(new UnauthorizedError('Invalid token'));
     } else if (error.name === 'TokenExpiredError') {
@@ -60,12 +63,14 @@ const authMiddleware = async (req, res, next) => {
 };
 
 /**
- * Optional auth - doesn't fail if no token provided
+ * Optional auth - không yêu cầu token nhưng sẽ lấy thông tin user nếu có token hợp lệ
+ * Dùng cho các route công khai nhưng có tính năng khác nhau cho user đã đăng nhập
  */
 const optionalAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
+    // Nếu không có token thì bỏ qua
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return next();
     }
@@ -73,9 +78,11 @@ const optionalAuth = async (req, res, next) => {
     const token = authHeader.substring(7);
     const decoded = jwt.verify(token, JWT_CONFIG.secret);
 
+    // Chỉ lấy thông tin user nếu token là access token hợp lệ
     if (decoded.type === JWT_CONFIG.tokenTypes.ACCESS) {
       const user = await User.findByPk(decoded.userId);
 
+      // Chỉ gán user nếu tài khoản đang hoạt động
       if (user && user.status === 'active') {
         req.user = {
           userId: user.id,
@@ -88,7 +95,7 @@ const optionalAuth = async (req, res, next) => {
 
     next();
   } catch (error) {
-    // Ignore token errors in optional auth
+    // Bỏ qua lỗi token trong optional auth, vẫn cho phép request tiếp tục
     next();
   }
 };

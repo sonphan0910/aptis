@@ -1,58 +1,67 @@
-const rateLimit = require('express-rate-limit');
+// ============================================================
+// Middleware giới hạn tốc độ truy cập API (rate limit)
+// ============================================================
+const rateLimit = require('express-rate-limit'); // Thư viện express-rate-limit
 
 /**
- * General API rate limiter
- * 100 requests per 15 minutes per IP
+ * Giới hạn tốc độ truy cập API chung
+ * Mỗi IP chỉ được gửi tối đa 10.000 request mỗi 15 phút
+ * Thường dùng cho toàn bộ API (middleware global)
+ * Tránh DDoS attack và bảo vệ server
  */
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10000,
+  windowMs: 15 * 60 * 1000, // 15 phút
+  max: 10000, // Tối đa 10.000 request
   message: {
     success: false,
     error: {
-      message: 'Too many requests, please try again later',
+      message: 'Bạn gửi quá nhiều yêu cầu, vui lòng thử lại sau',
       code: 'RATE_LIMIT_EXCEEDED',
     },
   },
-  standardHeaders: true,
-  legacyHeaders: false,
+  standardHeaders: true, // Trả về header RateLimit-*
+  legacyHeaders: false, // Không trả về header X-RateLimit-*
 });
 
 /**
- * Auth endpoints rate limiter
- * 100 requests per 15 minutes per IP (development mode)
+ * Giới hạn tốc độ cho các endpoint xác thực (login, register, forgot password...)
+ * Mỗi IP chỉ được gửi tối đa 10.000 request mỗi 15 phút (chủ yếu cho dev/test)
+ * Các request thành công sẽ không bị tính vào limit (giúp user thử lại khi nhập đúng)
+ * Ngăn chặn brute force attack
  */
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10000, // Increased for development/testing
+  windowMs: 15 * 60 * 1000, // 15 phút
+  max: 10000, // Tối đa 10.000 request
   message: {
     success: false,
     error: {
-      message: 'Too many authentication attempts, please try again later',
+      message: 'Bạn thực hiện xác thực quá nhiều lần, vui lòng thử lại sau',
       code: 'AUTH_RATE_LIMIT_EXCEEDED',
     },
   },
-  skipSuccessfulRequests: true, // Don't count successful requests
+  skipSuccessfulRequests: true, // Không tính các request thành công (HTTP 2xx)
   standardHeaders: true,
   legacyHeaders: false,
 });
 
 /**
- * File upload rate limiter
- * 10 uploads per hour per user
+ * Giới hạn tốc độ upload file
+ * Mỗi user chỉ được upload tối đa 10 file mỗi giờ
+ * Nếu chưa đăng nhập thì tính theo IP
+ * Ngăn chặn spam upload
  */
 const uploadLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10,
+  windowMs: 60 * 60 * 1000, // 1 giờ
+  max: 10, // Tối đa 10 file
   message: {
     success: false,
     error: {
-      message: 'Too many file uploads, please try again later',
+      message: 'Bạn upload file quá nhiều, vui lòng thử lại sau',
       code: 'UPLOAD_RATE_LIMIT_EXCEEDED',
     },
   },
   keyGenerator: (req) => {
-    // Use user ID if authenticated, otherwise IP
+    // Ưu tiên lấy userId nếu đã đăng nhập, nếu không thì lấy IP
     return req.user ? `user_${req.user.userId}` : req.ip;
   },
   standardHeaders: true,
@@ -60,21 +69,23 @@ const uploadLimiter = rateLimit({
 });
 
 /**
- * Exam submission rate limiter
- * Prevent rapid submission attempts
- * 3 submissions per minute per user
+ * Giới hạn tốc độ nộp bài thi
+ * Mỗi user chỉ được nộp tối đa 3 lần mỗi phút
+ * Nếu chưa đăng nhập thì tính theo IP
+ * Ngăn chặn user spam submit answer liên tục
  */
 const submissionLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 300,
+  windowMs: 60 * 1000, // 1 phút
+  max: 30, // Tối đa 30 lần submit
   message: {
     success: false,
     error: {
-      message: 'Too many submission attempts, please slow down',
+      message: 'Bạn nộp bài quá nhanh, vui lòng chờ rồi thử lại',
       code: 'SUBMISSION_RATE_LIMIT_EXCEEDED',
     },
   },
   keyGenerator: (req) => {
+    // Tính theo user ID nếu đã login, nếu không thì tính theo IP
     return req.user ? `user_${req.user.userId}` : req.ip;
   },
   standardHeaders: true,

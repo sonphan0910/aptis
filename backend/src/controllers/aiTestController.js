@@ -1,9 +1,6 @@
 const { AttemptAnswer, AiScoringCriteria, Question } = require('../models');
 const AiScoringService = require('../services/AiScoringService');
 
-/**
- * Health check with AI services status
- */
 exports.getAiStatus = async (req, res, next) => {
   try {
     const status = {
@@ -17,7 +14,6 @@ exports.getAiStatus = async (req, res, next) => {
       details: {},
     };
 
-    // Check database
     try {
       const criteria = await AiScoringCriteria.count();
       status.services.database = 'online';
@@ -27,10 +23,9 @@ exports.getAiStatus = async (req, res, next) => {
       status.details.database_error = e.message;
     }
 
-    // Check Gemini API
     try {
       const testResult = await AiScoringService.scoreWriting(
-        548, // Test with real answer if exists
+        548, 
         'This is a test sentence to check if AI API is working properly.'
       );
       status.services.gemini_api = testResult ? 'online' : 'error';
@@ -43,7 +38,6 @@ exports.getAiStatus = async (req, res, next) => {
       }
     }
 
-    // Count pending scoring jobs
     try {
       const pendingCount = await AttemptAnswer.count({
         where: { score: null, ai_graded_at: null },
@@ -59,9 +53,6 @@ exports.getAiStatus = async (req, res, next) => {
   }
 };
 
-/**
- * Test AI scoring with a sample answer
- */
 exports.testAiScoring = async (req, res, next) => {
   try {
     const { text_answer = 'Social media has become an integral part of modern society.' } = req.body;
@@ -80,9 +71,8 @@ exports.testAiScoring = async (req, res, next) => {
     };
 
     try {
-      // Try to score with Writing service
       const feedback = await AiScoringService.scoreWriting(
-        999, // Dummy answer ID
+        999, 
         text_answer
       );
 
@@ -108,9 +98,6 @@ exports.testAiScoring = async (req, res, next) => {
   }
 };
 
-/**
- * Get AI scoring queue status
- */
 exports.getQueueStatus = async (req, res, next) => {
   try {
     const status = {
@@ -126,7 +113,6 @@ exports.getQueueStatus = async (req, res, next) => {
     };
 
     try {
-      // Count pending (no score yet)
       status.queue.pending = await AttemptAnswer.count({
         where: {
           score: null,
@@ -134,7 +120,6 @@ exports.getQueueStatus = async (req, res, next) => {
         },
       });
 
-      // Count completed (has score)
       status.queue.completed = await AttemptAnswer.count({
         where: {
           score: { [require('sequelize').Op.not]: null },
@@ -142,12 +127,10 @@ exports.getQueueStatus = async (req, res, next) => {
         },
       });
 
-      // Count needs_review (failed attempts)
       status.queue.failed = await AttemptAnswer.count({
         where: { needs_review: true },
       });
 
-      // Get sample pending answers
       const samples = await AttemptAnswer.findAll({
         where: { score: null, ai_graded_at: null },
         attributes: ['id', 'attempt_id', 'question_id', 'answered_at'],
@@ -171,9 +154,6 @@ exports.getQueueStatus = async (req, res, next) => {
   }
 };
 
-/**
- * Get AI criteria available
- */
 exports.getAiCriteria = async (req, res, next) => {
   try {
     const { aptis_type_id = 1, question_type_id } = req.query;
@@ -196,7 +176,6 @@ exports.getAiCriteria = async (req, res, next) => {
       order: [['question_type_id', 'ASC'], ['criteria_name', 'ASC']],
     });
 
-    // Group by question type
     const grouped = {};
     criteria.forEach(c => {
       if (!grouped[c.question_type_id]) {
@@ -218,16 +197,12 @@ exports.getAiCriteria = async (req, res, next) => {
     next(error);
   }
 };
-/**
- * Requeue pending answers for AI scoring (now with synchronous scoring)
- */
 exports.requeuPendingAnswers = async (req, res, next) => {
   try {
-    const { limit = 100 } = req.query; // Score max 100 at a time
+    const { limit = 100 } = req.query; 
     const AiScoringService = require('../services/AiScoringService');
     const { Question, QuestionType } = require('../models');
 
-    // Find pending answers
     const pendingAnswers = await AttemptAnswer.findAll({
       where: {
         score: null,
@@ -262,7 +237,6 @@ exports.requeuPendingAnswers = async (req, res, next) => {
         const isWriting = questionType.includes('WRITING');
 
         if (isWriting && answer.text_answer && answer.text_answer.trim()) {
-          // Score Writing answer synchronously
           try {
             const result = await AiScoringService.scoreWriting(answer.id);
             scored.push({
@@ -279,14 +253,12 @@ exports.requeuPendingAnswers = async (req, res, next) => {
             });
           }
         } else if (!isWriting) {
-          // Skip Speaking (requires transcription first)
           skipped.push({
             answer_id: answer.id,
             question_type: questionType,
             reason: 'Speaking answers require transcription first',
           });
         } else {
-          // Skip - no text answer
           skipped.push({
             answer_id: answer.id,
             question_type: questionType,

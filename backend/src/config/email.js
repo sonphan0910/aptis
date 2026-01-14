@@ -1,19 +1,21 @@
+
+// Cấu hình gửi email sử dụng nodemailer
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-// SMTP configuration
+// Thông tin cấu hình SMTP (lấy từ biến môi trường hoặc giá trị mặc định)
 const EMAIL_CONFIG = {
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT) || 587,
-  secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+  host: process.env.SMTP_HOST || 'smtp.gmail.com', // Địa chỉ SMTP server
+  port: parseInt(process.env.SMTP_PORT) || 587,    // Cổng SMTP
+  secure: process.env.SMTP_SECURE === 'true',      // true nếu dùng SSL (cổng 465), false nếu không
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASSWORD,
+    user: process.env.SMTP_USER,                   // Tài khoản email
+    pass: process.env.SMTP_PASSWORD,               // Mật khẩu ứng dụng/email
   },
-  from: process.env.EMAIL_FROM || 'noreply@aptis.com',
+  from: process.env.EMAIL_FROM || 'noreply@aptis.com', // Địa chỉ gửi mặc định
 };
 
-// Create reusable transporter
+// Tạo transporter để gửi email (có thể tái sử dụng)
 const transporter = nodemailer.createTransport({
   host: EMAIL_CONFIG.host,
   port: EMAIL_CONFIG.port,
@@ -21,65 +23,73 @@ const transporter = nodemailer.createTransport({
   auth: EMAIL_CONFIG.auth,
 });
 
-// Verify transporter connection
+/**
+ * Hàm kiểm tra kết nối SMTP
+ * Nếu thành công sẽ log ra console, nếu lỗi sẽ báo lỗi
+ */
 const verifyEmailConnection = async () => {
   try {
     await transporter.verify();
-    console.log('✅ Email service is ready to send messages');
+    console.log('✅ Dịch vụ email đã sẵn sàng gửi mail');
   } catch (error) {
-    console.error('❌ Email service error:', error);
+    console.error('❌ Lỗi dịch vụ email:', error);
   }
 };
 
-// Email templates
+// Các mẫu email (template) sử dụng cho các chức năng hệ thống
 const EMAIL_TEMPLATES = {
+  // Mẫu email chào mừng tài khoản mới
   welcome: {
-    subject: 'Welcome to APTIS Exam System',
+    subject: 'Chào mừng bạn đến với hệ thống thi APTIS',
     html: (data) => `
-      <h1>Welcome ${data.fullName}!</h1>
-      <p>Your account has been created successfully.</p>
-      <p>Email: ${data.email}</p>
-      <p>Password: ${data.password}</p>
-      <p>Please change your password after first login.</p>
+      <h1>Chào mừng ${data.fullName}!</h1>
+      <p>Tài khoản của bạn đã được tạo thành công.</p>
+      <p>Email đăng nhập: <b>${data.email}</b></p>
+      <p>Mật khẩu: <b>${data.password}</b></p>
+      <p>Vui lòng đổi mật khẩu sau khi đăng nhập lần đầu.</p>
     `,
   },
 
+  // Mẫu email reset mật khẩu
   resetPassword: {
-    subject: 'Reset Your Password',
+    subject: 'Yêu cầu đặt lại mật khẩu',
     html: (data) => `
-      <h1>Reset Password Request</h1>
-      <p>You requested to reset your password.</p>
-      <p>Click the link below to reset your password:</p>
-      <a href="${data.resetLink}">Reset Password</a>
-      <p>This link will expire in 1 hour.</p>
-      <p>If you didn't request this, please ignore this email.</p>
+      <h1>Yêu cầu đặt lại mật khẩu</h1>
+      <p>Bạn vừa yêu cầu đặt lại mật khẩu cho tài khoản của mình.</p>
+      <p>Nhấn vào liên kết bên dưới để đặt lại mật khẩu:</p>
+      <a href="${data.resetLink}">Đặt lại mật khẩu</a>
+      <p>Liên kết này sẽ hết hạn sau 1 giờ.</p>
+      <p>Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email này.</p>
     `,
   },
 
+  // Mẫu email thông báo có bài thi mới
   examPublished: {
-    subject: 'New Exam Available',
+    subject: 'Có bài thi mới được mở',
     html: (data) => `
-      <h1>New Exam Published</h1>
-      <p>A new exam "${data.examTitle}" is now available.</p>
-      <p>Duration: ${data.duration} minutes</p>
-      <p>Log in to start your attempt.</p>
+      <h1>Bài thi mới đã được mở</h1>
+      <p>Bài thi "${data.examTitle}" đã sẵn sàng cho bạn.</p>
+      <p>Thời gian làm bài: ${data.duration} phút</p>
+      <p>Đăng nhập để bắt đầu làm bài ngay.</p>
     `,
   },
 
+  // Mẫu email thông báo đã chấm điểm xong
   examGraded: {
-    subject: 'Your Exam Has Been Graded',
+    subject: 'Bài thi của bạn đã được chấm điểm',
     html: (data) => `
-      <h1>Exam Graded</h1>
-      <p>Your exam "${data.examTitle}" has been graded.</p>
-      <p>Total Score: ${data.totalScore} / ${data.maxScore}</p>
-      <p>Log in to view detailed results.</p>
+      <h1>Bài thi đã được chấm điểm</h1>
+      <p>Bài thi "${data.examTitle}" của bạn đã được chấm điểm.</p>
+      <p>Tổng điểm: ${data.totalScore} / ${data.maxScore}</p>
+      <p>Đăng nhập để xem chi tiết kết quả.</p>
     `,
   },
 };
 
+// Export các thành phần cấu hình email
 module.exports = {
-  EMAIL_CONFIG,
-  transporter,
-  verifyEmailConnection,
-  EMAIL_TEMPLATES,
+  EMAIL_CONFIG,           // Thông tin cấu hình SMTP
+  transporter,            // Đối tượng gửi email
+  verifyEmailConnection,  // Hàm kiểm tra kết nối SMTP
+  EMAIL_TEMPLATES,        // Các mẫu email hệ thống
 };
