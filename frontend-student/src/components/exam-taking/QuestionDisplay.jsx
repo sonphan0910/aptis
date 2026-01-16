@@ -12,7 +12,7 @@ import ListeningStatementMatchingQuestion from './listening/ListeningStatementMa
 import ListeningMultiMCQQuestion from './listening/ListeningMultiMCQQuestion';
 import WritingQuestion from './WritingQuestion';
 import WritingQuestionDisplay from './writing/WritingQuestionDisplay';
-import SpeakingQuestion from './SpeakingQuestion';
+import SpeakingQuestion from './speaking/SpeakingQuestion';
 
 export default function QuestionDisplay({ 
   question, 

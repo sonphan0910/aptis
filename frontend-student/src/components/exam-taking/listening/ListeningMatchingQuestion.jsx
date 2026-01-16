@@ -16,11 +16,9 @@ import {
 } from '@mui/material';
 import {
   PlayArrow,
-  Pause,
-  VolumeUp,
-  Warning,
-  Repeat,
+  Stop,
 } from '@mui/icons-material';
+import { useAudioPlay } from '@/contexts/AudioPlayContext';
 
 /**
  * Listening Speaker Matching Component
@@ -33,8 +31,11 @@ export default function ListeningMatchingQuestion({
 }) {
   const [selectedAnswers, setSelectedAnswers] = useState({});
   const [playingIndex, setPlayingIndex] = useState(null);
-  const [playCount, setPlayCount] = useState({});
   const audioRefs = useRef({});
+  
+  // Use global audio play context
+  const { getItemPlayCount, incrementItemPlayCount } = useAudioPlay();
+  const questionId = question.id;
 
   // Initialize answer from question.answer_data
   useEffect(() => {
@@ -83,9 +84,9 @@ export default function ListeningMatchingQuestion({
 
   const handlePlayAudio = (index, audioUrl) => {
     // Check if already at max plays (2)
-    const currentCount = playCount[index] || 0;
-    if (currentCount >= 2 && playingIndex !== index) {
-      return; // Don't allow playing if max plays reached
+    const currentCount = getItemPlayCount(questionId, index);
+    if (currentCount >= 2) {
+      return; // Don't allow if max plays reached
     }
 
     // Stop all other audio first
@@ -98,18 +99,21 @@ export default function ListeningMatchingQuestion({
 
     const audio = audioRefs.current[index];
     if (audio) {
-      if (playingIndex === index) {
-        audio.pause();
-        setPlayingIndex(null);
-      } else {
-        audio.play();
-        setPlayingIndex(index);
-        // Increment play count
-        setPlayCount(prev => ({
-          ...prev,
-          [index]: (prev[index] || 0) + 1
-        }));
-      }
+      // Only increment play count when play button is clicked
+      incrementItemPlayCount(questionId, index);
+
+      // Play audio from beginning
+      audio.currentTime = 0;
+      audio.play();
+      setPlayingIndex(index);
+    }
+  };
+
+  const handlePauseAudio = (index) => {
+    const audio = audioRefs.current[index];
+    if (audio) {
+      audio.pause();
+      setPlayingIndex(null);
     }
   };
 
@@ -149,7 +153,7 @@ export default function ListeningMatchingQuestion({
         {items.map((item, index) => {
           const audioUrl = getAudioUrl(item);
           const speakerLabel = item.content || `Speaker ${index + 1}`;
-          const currentPlayCount = playCount[index] || 0;
+          const currentPlayCount = getItemPlayCount(questionId, index);
           const canPlay = currentPlayCount < 2;
 
           // Local state for progress
@@ -259,16 +263,25 @@ export default function ListeningMatchingQuestion({
 
                 {/* Audio Controls */}
                 <Box display="flex" alignItems="center" gap={2} position="relative" zIndex={1} mt={2}>
-                  {/* Play/Pause Button */}
+                  {/* Play/Stop Button */}
                   <IconButton
-                    onClick={() => handlePlayAudio(index, audioUrl)}
-                    disabled={!canPlay}
+                    onClick={() => {
+                      const canClickButton = currentPlayCount < 2 || playingIndex === index;
+                      if (!canClickButton) return;
+                      
+                      if (playingIndex === index) {
+                        handlePauseAudio(index);
+                      } else {
+                        handlePlayAudio(index, audioUrl);
+                      }
+                    }}
+                    disabled={currentPlayCount >= 2 && playingIndex !== index}
                     sx={{
-                      backgroundColor: canPlay ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+                      backgroundColor: (currentPlayCount < 2 || playingIndex === index) ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)',
                       color: 'white',
                       border: '2px solid rgba(255, 255, 255, 0.5)',
                       '&:hover': {
-                        backgroundColor: canPlay ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.1)',
+                        backgroundColor: (currentPlayCount < 2 || playingIndex === index) ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.1)',
                       },
                       '&:disabled': {
                         color: 'rgba(255, 255, 255, 0.5)',
@@ -279,7 +292,7 @@ export default function ListeningMatchingQuestion({
                     }}
                   >
                     {playingIndex === index ? (
-                      <Pause sx={{ fontSize: '2rem' }} />
+                      <Stop sx={{ fontSize: '2rem' }} />
                     ) : (
                       <PlayArrow sx={{ fontSize: '2rem' }} />
                     )}
@@ -288,17 +301,16 @@ export default function ListeningMatchingQuestion({
                   {/* Progress Bar */}
                   <Box sx={{ flex: 1 }}>
                     <Box
-                      onClick={canPlay ? handleProgressClick : undefined}
                       sx={{
                         width: '100%',
                         height: 6,
                         backgroundColor: 'rgba(255, 255, 255, 0.2)',
                         borderRadius: 3,
-                        cursor: canPlay ? 'pointer' : 'not-allowed',
+                        cursor: 'not-allowed',
                         position: 'relative',
                         mb: 1,
                         overflow: 'hidden',
-                        opacity: canPlay ? 1 : 0.6
+                        opacity: 0.6
                       }}
                     >
                       <Box
@@ -320,33 +332,7 @@ export default function ListeningMatchingQuestion({
                     </Box>
                   </Box>
 
-                  {/* Replay Button */}
-                  <IconButton
-                    onClick={() => {
-                      if (!canPlay) return;
-                      const audio = audioRefs.current[index];
-                      if (audio) {
-                        audio.currentTime = 0;
-                        audio.play();
-                        setPlayingIndex(index);
-                        setPlayCount(prev => ({ ...prev, [index]: (prev[index] || 0) + 1 }));
-                      }
-                    }}
-                    disabled={!canPlay}
-                    sx={{
-                      color: 'white',
-                      border: '2px solid rgba(255, 255, 255, 0.5)',
-                      '&:hover': {
-                        backgroundColor: canPlay ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
-                      },
-                      '&:disabled': {
-                        color: 'rgba(255, 255, 255, 0.5)',
-                      },
-                      flexShrink: 0
-                    }}
-                  >
-                    <Repeat />
-                  </IconButton>
+
 
                   {/* Hidden Audio Element */}
                   <audio

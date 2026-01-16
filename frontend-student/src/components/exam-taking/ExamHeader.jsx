@@ -29,6 +29,7 @@ export default function ExamHeader({
   questionsLength,
   autoSaveStatus,
   timeRemaining,
+  skillTimeRemaining,
   timerInitialized,
   isNavigationDisabled,
   setDrawerOpen,
@@ -40,7 +41,8 @@ export default function ExamHeader({
   hideHeader,
   currentSkillIndex,
   totalSkills,
-  showSkillIntro = false
+  showSkillIntro = false,
+  currentSkillName
 }) {
   if (hideHeader) return null;
 
@@ -118,9 +120,10 @@ export default function ExamHeader({
           {/* Timer - Hidden when skill intro is showing */}
           {!showSkillIntro && (
             <ExamTimer 
-              timeRemaining={timeRemaining}
-              totalTime={currentAttempt.exam.duration_minutes * 60}
+              timeRemaining={skillTimeRemaining || timeRemaining}
+              totalTime={45 * 60}
               isRunning={timerInitialized}
+              skillName={currentSkillName}
             />
           )}
           

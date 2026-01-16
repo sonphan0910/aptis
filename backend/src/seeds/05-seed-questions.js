@@ -823,60 +823,135 @@ async function seedWritingQuestions(aptisType, teacher) {
 // Focus: Sustainability - ability to sustain CEFR level throughout response
 // ========================================
 async function seedSpeakingQuestions(aptisType, teacher) {
-  console.log('[Seed] Seeding 4 Speaking tasks...');
+  console.log('[Seed] Seeding 10 Speaking questions across 4 sections...');
 
   const speakingPersonalType = await QuestionType.findOne({ where: { code: 'SPEAKING_INTRO' } });
-  const speakingCompareType = await QuestionType.findOne({ where: { code: 'SPEAKING_COMPARISON' } });
-  const speakingPictureType = await QuestionType.findOne({ where: { code: 'SPEAKING_DESCRIPTION' } });
+  const speakingDescriptionType = await QuestionType.findOne({ where: { code: 'SPEAKING_DESCRIPTION' } });
+  const speakingComparisonType = await QuestionType.findOne({ where: { code: 'SPEAKING_COMPARISON' } });
   const speakingDiscussionType = await QuestionType.findOne({ where: { code: 'SPEAKING_DISCUSSION' } });
 
-  // Task 1: Personal information (30s prep + 1 min speak)
+  // ===== SECTION 1: Personal Introduction (3 questions) =====
+  // Q1: Tell about yourself
   await Question.create({
     question_type_id: speakingPersonalType.id,
     aptis_type_id: aptisType.id,
     difficulty: 'easy',
-    content: 'Tell me about yourself:\n- Name and where you\'re from\n- Work or studies\n- Hobbies and interests\n\n30 seconds to prepare, 1 minute to speak.',
+    content: 'Tell me about yourself:\n- Name and where you\'re from\n- What you do (work or studies)\n- Your hobbies and interests\n\n30 seconds to prepare, 1 minute to speak.',
     duration_seconds: 90,
     created_by: teacher.id,
     status: 'active',
   });
 
-  // Task 2: Describe and compare (1 min prep + 1.5 min speak)
+  // Q2: Describe your daily routine
   await Question.create({
-    question_type_id: speakingCompareType.id,
+    question_type_id: speakingPersonalType.id,
+    aptis_type_id: aptisType.id,
+    difficulty: 'easy',
+    content: 'Describe your typical day:\n- When you wake up and go to sleep\n- Your main activities\n- What you enjoy most\n\n30 seconds to prepare, 1 minute to speak.',
+    duration_seconds: 90,
+    created_by: teacher.id,
+    status: 'active',
+  });
+
+  // Q3: Talk about your family
+  await Question.create({
+    question_type_id: speakingPersonalType.id,
+    aptis_type_id: aptisType.id,
+    difficulty: 'easy',
+    content: 'Tell me about your family:\n- Who your family members are\n- What they do\n- Something special about your family\n\n30 seconds to prepare, 1 minute to speak.',
+    duration_seconds: 90,
+    created_by: teacher.id,
+    status: 'active',
+  });
+
+  // ===== SECTION 2: Picture Description (3 questions) =====
+  // Q4: Describe a park scene
+  await Question.create({
+    question_type_id: speakingDescriptionType.id,
     aptis_type_id: aptisType.id,
     difficulty: 'medium',
-    content: 'Look at two pictures (traveling by car vs train).\n\nCompare them:\n- Differences\n- Which you prefer and why\n\n1 minute to prepare, 1.5 minutes to speak.',
-    media_url: '/images/speaking_task2.jpg',
+    content: 'Look at the picture of a park.\n\nDescribe:\n- The people and what they are doing\n- The buildings and nature\n- The overall atmosphere and season\n\n1 minute to prepare, 1.5 minutes to speak.',
+    media_url: 'https://picsum.photos/640/480?random=1',
     duration_seconds: 150,
     created_by: teacher.id,
     status: 'active',
   });
 
-  // Task 3: Describe picture (1 min prep + 2 min speak)
+  // Q5: Describe a busy street
   await Question.create({
-    question_type_id: speakingPictureType.id,
+    question_type_id: speakingDescriptionType.id,
     aptis_type_id: aptisType.id,
     difficulty: 'medium',
-    content: 'Look at a busy city street picture.\n\nDescribe:\n- People and their activities\n- Buildings and environment\n- Overall atmosphere\n\n1 minute to prepare, 2 minutes to speak.',
-    media_url: '/images/speaking_task3.jpg',
-    duration_seconds: 180,
+    content: 'Look at the picture of a busy city street.\n\nDescribe:\n- The people and their activities\n- The vehicles and buildings\n- The time of day and weather\n\n1 minute to prepare, 1.5 minutes to speak.',
+    media_url: 'https://picsum.photos/640/480?random=2',
+    duration_seconds: 150,
     created_by: teacher.id,
     status: 'active',
   });
 
-  // Task 4: Discussion (1 min prep + 2 min speak)
+  // Q6: Describe a restaurant scene
+  await Question.create({
+    question_type_id: speakingDescriptionType.id,
+    aptis_type_id: aptisType.id,
+    difficulty: 'medium',
+    content: 'Look at the picture of a restaurant.\n\nDescribe:\n- What people are doing\n- The interior and decoration\n- The type of food or service you see\n\n1 minute to prepare, 1.5 minutes to speak.',
+    media_url: 'https://picsum.photos/640/480?random=3',
+    duration_seconds: 150,
+    created_by: teacher.id,
+    status: 'active',
+  });
+
+  // ===== SECTION 3: Comparison (3 questions) =====
+  // Q7: Compare transportation methods
+  await Question.create({
+    question_type_id: speakingComparisonType.id,
+    aptis_type_id: aptisType.id,
+    difficulty: 'medium',
+    content: 'Look at the two pictures showing different ways to travel.\n\nCompare them:\n- What are the similarities and differences?\n- Which method is faster and why?\n- Which would you prefer and why?\n\n1 minute to prepare, 1.5 minutes to speak.',
+    media_url: 'https://picsum.photos/640/480?random=4',
+    duration_seconds: 150,
+    created_by: teacher.id,
+    status: 'active',
+  });
+
+  // Q8: Compare two ways of working
+  await Question.create({
+    question_type_id: speakingComparisonType.id,
+    aptis_type_id: aptisType.id,
+    difficulty: 'medium',
+    content: 'Look at the two pictures showing different work environments.\n\nCompare them:\n- Describe what you see in each picture\n- What are the advantages and disadvantages of each?\n- Which would you prefer and why?\n\n1 minute to prepare, 1.5 minutes to speak.',
+    media_url: 'https://picsum.photos/640/480?random=5',
+    duration_seconds: 150,
+    created_by: teacher.id,
+    status: 'active',
+  });
+
+  // Q9: Compare two leisure activities
+  await Question.create({
+    question_type_id: speakingComparisonType.id,
+    aptis_type_id: aptisType.id,
+    difficulty: 'medium',
+    content: 'Look at the two pictures showing different leisure activities.\n\nCompare them:\n- What are people doing in each picture?\n- What are the benefits of each activity?\n- Which activity would you enjoy more and why?\n\n1 minute to prepare, 1.5 minutes to speak.',
+    media_url: 'https://picsum.photos/640/480?random=6',
+    duration_seconds: 150,
+    created_by: teacher.id,
+    status: 'active',
+  });
+
+  // ===== SECTION 4: Topic Discussion (1 question) =====
+  // Q10: Discuss technology in education
   await Question.create({
     question_type_id: speakingDiscussionType.id,
     aptis_type_id: aptisType.id,
     difficulty: 'hard',
-    content: 'Topic: Technology in education\n\nDiscuss:\n- How has technology changed learning?\n- Advantages and disadvantages of online learning\n- Future of education\n\n1 minute to prepare, 2 minutes to speak.',
+    content: 'Topic: Technology in Education\n\nDiscuss:\n- How has technology changed the way people learn?\n- What are the advantages and disadvantages of online learning?\n- What will be the future of education?\n\n1 minute to prepare, 2 minutes to speak.',
+    media_url: 'https://picsum.photos/640/480?random=7',
     duration_seconds: 180,
     created_by: teacher.id,
     status: 'active',
   });
 
-  console.log(`[Seed] ✓ 4 Speaking tasks created (4 x 12.5 = 50 điểm)`);
+  console.log(`[Seed] ✓ 10 Speaking questions created (3+3+3+1 sections = 50 điểm tổng)`);
 }
 
 // Run if called directly

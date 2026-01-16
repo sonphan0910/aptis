@@ -51,7 +51,7 @@ function TabPanel({ children, value, index, ...other }) {
 }
 
 export default function ResultDetailPage() {
-  const [tabValue, setTabValue] = useState(0);
+  const [selectedSkill, setSelectedSkill] = useState(null); // Track selected skill for question details
   const { attemptId } = useParams();
   const router = useRouter();
   const dispatch = useDispatch();
@@ -72,6 +72,10 @@ export default function ResultDetailPage() {
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
+  };
+
+  const handleSkillClick = (skillName) => {
+    setSelectedSkill(skillName === selectedSkill ? null : skillName); // Toggle selection
   };
 
   const handleRetakeExam = () => {
@@ -176,6 +180,14 @@ export default function ResultDetailPage() {
   // Create questionResults array from attempt
   // Backend returns this in attemptResults.answers array
   const questionResults = attemptResults.answers || [];
+  
+  // Debug log to see what data we have
+  console.log('[Results Debug] attemptResults:', attemptResults);
+  console.log('[Results Debug] questionResults:', questionResults);
+  console.log('[Results Debug] questionResults.length:', questionResults.length);
+  if (questionResults.length > 0) {
+    console.log('[Results Debug] Sample question:', questionResults[0]);
+  }
 
   // Create overallStats object with safe values
   // For skill_practice attempts, calculate based on selected skill only
@@ -287,113 +299,79 @@ export default function ResultDetailPage() {
         overallStats={overallStats}
       />
 
-      {/* Skills Performance - only show if multiple skills */}
-      {skillScores.length > 1 && (
+      {/* Skills Performance - 2 columns layout */}
+      {skillScores.length > 0 && (
         <>
           <Typography variant="h5" gutterBottom sx={{ mt: 2, mb: 2 }}>
             Phân tích theo kỹ năng
           </Typography>
           <Grid container spacing={2} sx={{ mb: 3 }}>
             {skillScores.map((skill) => (
-              <Grid item xs={12} sm={6} md={4} key={skill.skillName}>
-                <SkillScoreCard skill={skill} />
+              <Grid item xs={12} sm={6} key={skill.skillName}>
+                <Card 
+                  sx={{ 
+                    cursor: 'pointer', 
+                    transition: 'all 0.3s ease',
+                    border: selectedSkill === skill.skillName ? '2px solid #1976d2' : '1px solid #e0e0e0',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: 3
+                    }
+                  }}
+                  onClick={() => handleSkillClick(skill.skillName)}
+                >
+                  <SkillScoreCard skill={skill} />
+                </Card>
               </Grid>
             ))}
           </Grid>
         </>
       )}
 
-      {/* Radar Chart */}
-      {skillScores.length >= 3 && (
+      {/* Question Details for Selected Skill */}
+      {selectedSkill && (
         <Card sx={{ mb: 3 }}>
           <CardContent>
-            <Typography variant="h6" gutterBottom>
-              Biểu đồ radar - So sánh kỹ năng
-            </Typography>
-            <RadarChart skillScores={skillScores} />
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6">
+                Chi tiết câu hỏi - {selectedSkill}
+              </Typography>
+              <Button 
+                size="small" 
+                onClick={() => setSelectedSkill(null)}
+                sx={{ minWidth: 'auto' }}
+              >
+                ✕
+              </Button>
+            </Box>
+            
+            {/* Debug info */}
+            <Box sx={{ mb: 2, p: 1, bgcolor: 'grey.100', borderRadius: 1, fontSize: '12px' }}>
+              <Typography variant="caption">
+                Debug: Total questions: {questionResults.length}, Selected skill: {selectedSkill}
+              </Typography>
+            </Box>
+            
+            <QuestionFeedback 
+              questionResults={questionResults.filter(answer => {
+                console.log('[Question Filter] Checking answer:', {
+                  id: answer.id,
+                  question: answer.question,
+                  questionType: answer.question?.questionType
+                });
+                
+                // Filter questions by skill using the correct path
+                const questionSkill = answer.question?.questionType?.skillType?.skill_type_name || 'Unknown';
+                
+                console.log('[Question Filter] Found skill:', questionSkill, 'Target:', selectedSkill);
+                return questionSkill === selectedSkill;
+              })}
+              attemptId={attemptId}
+              showDetailedScoring={true}
+            />
           </CardContent>
         </Card>
       )}
-
-      {/* Detailed Feedback Tabs */}
-      <Card>
-        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-          <Tabs value={tabValue} onChange={handleTabChange}>
-            <Tab label="Tổng quan" />
-            <Tab label="Chi tiết câu hỏi" />
-            {hasTeacherReview && <Tab label="Nhận xét giáo viên" />}
-          </Tabs>
-        </Box>
-
-        <TabPanel value={tabValue} index={0}>
-          <Typography variant="h6" gutterBottom>
-            Phân tích tổng quan
-          </Typography>
-          
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={6}>
-              <Typography variant="subtitle1" gutterBottom>
-                Thông tin bài thi
-              </Typography>
-              <Typography variant="body2" paragraph>
-                <strong>Loại:</strong> {attempt.attempt_type === 'full_exam' ? 'Toàn bộ bài thi' : 'Luyện tập kỹ năng'}<br/>
-                {attempt.attempt_type === 'skill_practice' && skillScores.length > 0 && (
-                  <>
-                    <strong>Kỹ năng:</strong> {skillScores[0].skillName || skillScores[0].skill_type || 'Unknown'}<br/>
-                  </>
-                )}
-                <strong>Số câu đã trả lời:</strong> {attemptResults.answered_questions ?? '-'}/{attemptResults.questions_count ?? '-'}<br/>
-                <strong>Tỷ lệ đúng:</strong> {overallStats.accuracy_percentage ?? 0}%
-              </Typography>
-            </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <Typography variant="subtitle1" gutterBottom>
-                Điểm chi tiết
-              </Typography>
-              {attempt.attempt_type === 'skill_practice' && skillScores.length === 1 ? (
-                <Typography variant="body2">
-                  <strong>{skillScores[0].skillName || 'Unknown'}:</strong> {overallStats.totalScore || 0}/{overallStats.maxScore || 0} 
-                  ({overallStats.percentage ?? 0}%)
-                </Typography>
-              ) : (
-                skillScores.map((skill) => (
-                  <Typography key={skill.skillName || 'unknown'} variant="body2">
-                    <strong>{skill.skillName || 'Unknown'}:</strong> {skill.score || 0}/{skill.maxScore || 0} 
-                    ({skill.percentage ?? 0}%)
-                    {skill.sectionCount > 1 && (
-                      <span style={{ fontSize: '0.85em', color: '#666' }}> ({skill.sectionCount} phần)</span>
-                    )}
-                  </Typography>
-                ))
-              )}
-            </Grid>
-          </Grid>
-        </TabPanel>
-
-        <TabPanel value={tabValue} index={1}>
-          <QuestionFeedback 
-            questionResults={questionResults}
-            attemptId={attemptId}
-          />
-        </TabPanel>
-
-        {hasTeacherReview && (
-          <TabPanel value={tabValue} index={hasTeacherReview ? 2 : 1}>
-            <Typography variant="h6" gutterBottom>
-              Nhận xét từ giáo viên
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Xem xét vào: {new Date(attempt.reviewed_at).toLocaleDateString('vi-VN')}
-            </Typography>
-            
-            {/* Teacher feedback will be shown here */}
-            <Alert severity="info" sx={{ mt: 2 }}>
-              Tính năng nhận xét giáo viên sẽ được triển khai trong phiên bản tiếp theo.
-            </Alert>
-          </TabPanel>
-        )}
-      </Card>
     </Container>
   );
 }

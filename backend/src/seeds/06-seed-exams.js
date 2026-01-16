@@ -108,11 +108,15 @@ async function createFullExam(aptisType, teacher, skills) {
   await createWritingSection(exam.id, skills.writingSkill, sectionOrder++, 'WRITING_LONG', 'Task 3: Chat Responses (B1)', 10, 15, 2); // 2 câu
   await createWritingSection(exam.id, skills.writingSkill, sectionOrder++, 'WRITING_EMAIL', 'Task 4: Email Writing (B2)', 30, 20, 2); // 2 câu
 
-  // Section 14-17: Nói (4 task riêng biệt, tổng 50 điểm)
-  await createSpeakingTaskSection(exam.id, skills.speakingSkill, sectionOrder++, 'SPEAKING_INTRO', 'Task 1: Personal Introduction', 3, 5);
-  await createSpeakingTaskSection(exam.id, skills.speakingSkill, sectionOrder++, 'SPEAKING_DESCRIPTION', 'Task 2: Picture Description', 3, 10);
-  await createSpeakingTaskSection(exam.id, skills.speakingSkill, sectionOrder++, 'SPEAKING_COMPARISON', 'Task 3: Comparison', 3, 15);
-  await createSpeakingTaskSection(exam.id, skills.speakingSkill, sectionOrder++, 'SPEAKING_DISCUSSION', 'Task 4: Topic Discussion', 3, 20);
+  // Section 14-17: Nói (4 section, tổng 50 điểm)
+  // Section 1: 3 questions x 5 điểm = 15 điểm
+  await createSpeakingPartSection(exam.id, skills.speakingSkill, sectionOrder++, 1, 'SPEAKING_INTRO', 'Section 1: Personal Introduction', 3, 3, 5);
+  // Section 2: 3 questions x 5 điểm = 15 điểm
+  await createSpeakingPartSection(exam.id, skills.speakingSkill, sectionOrder++, 2, 'SPEAKING_DESCRIPTION', 'Section 2: Picture Description', 3, 3, 5);
+  // Section 3: 3 questions x 5 điểm = 15 điểm
+  await createSpeakingPartSection(exam.id, skills.speakingSkill, sectionOrder++, 3, 'SPEAKING_COMPARISON', 'Section 3: Comparison', 3, 3, 5);
+  // Section 4: 1 question x 5 điểm = 5 điểm
+  await createSpeakingPartSection(exam.id, skills.speakingSkill, sectionOrder++, 4, 'SPEAKING_DISCUSSION', 'Section 4: Topic Discussion', 3, 1, 5);
 
   console.log(`[Seed] ✓ Đã tạo đủ 17 section theo chuẩn APTIS (5 Đọc + 4 Nghe + 4 Viết + 4 Nói)`);
 }
@@ -199,8 +203,8 @@ async function createListeningPartSection(examId, skillType, sectionOrder, partN
   console.log(`[Seed]   - Nghe hiểu ${sectionTitle}: ${questionLimit} câu x ${maxScore} = ${totalScore} điểm`);
 }
 
-// Tạo section riêng cho từng task Nói
-async function createSpeakingTaskSection(examId, skillType, sectionOrder, questionTypeCode, sectionTitle, durationMinutes, maxScore = 12) {
+// Tạo section riêng cho từng phần Nói
+async function createSpeakingPartSection(examId, skillType, sectionOrder, partNumber, questionTypeCode, sectionTitle, durationMinutes, questionLimit, maxScore) {
   const section = await ExamSection.create({
     exam_id: examId,
     skill_type_id: skillType.id,
@@ -209,22 +213,34 @@ async function createSpeakingTaskSection(examId, skillType, sectionOrder, questi
     instruction: `${sectionTitle}: Record your response clearly within the time limit.`,
   });
 
+  let questionOrder = 1;
   const questionType = await QuestionType.findOne({ where: { code: questionTypeCode } });
-  const questions = await Question.findAll({
+  
+  let questions;
+  // Get all questions of this type first
+  const allQuestions = await Question.findAll({
     where: { question_type_id: questionType.id },
-    limit: 1,
   });
+  
+  // Take only the required number of questions (0-3 for sections 1-3, or just 1 for section 4)
+  questions = allQuestions.slice(0, questionLimit);
+  
+  // If not enough questions, log a warning
+  if (questions.length < questionLimit) {
+    console.warn(`[Seed] Warning: Expected ${questionLimit} questions for ${questionTypeCode}, but only found ${questions.length}`);
+  }
 
-  if (questions.length > 0) {
+  for (const q of questions) {
     await ExamSectionQuestion.create({
       exam_section_id: section.id,
-      question_id: questions[0].id,
-      question_order: 1,
+      question_id: q.id,
+      question_order: questionOrder++,
       max_score: maxScore,
     });
   }
 
-  console.log(`[Seed]   - Nói ${sectionTitle}: 1 task = ${maxScore} điểm (CEFR-based)`);
+  const totalScore = questionLimit * maxScore;
+  console.log(`[Seed]   - Nói ${sectionTitle}: ${questions.length} câu x ${maxScore} = ${questions.length * maxScore} điểm`);
 }
 
 

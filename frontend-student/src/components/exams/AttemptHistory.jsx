@@ -24,6 +24,7 @@ import {
   Cancel,
 } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
+import { useNavigation } from '@/hooks/useNavigation';
 
 const getStatusColor = (status) => {
   switch (status) {
@@ -71,13 +72,14 @@ const formatAttemptDate = (dateString) => {
 
 export default function AttemptHistory({ attempts, examId }) {
   const router = useRouter();
+  const { navigateToResult, navigateToExamTake } = useNavigation();
 
   const handleViewResult = (attemptId) => {
-    router.push(`/results/${attemptId}`);
+    navigateToResult(attemptId);
   };
 
   const handleContinue = (attemptId) => {
-    router.push(`/exams/${examId}/take?attemptId=${attemptId}`);
+    navigateToExamTake(examId, attemptId);
   };
 
   // Lọc chỉ hiển thị những bài thi đã nộp (submitted)

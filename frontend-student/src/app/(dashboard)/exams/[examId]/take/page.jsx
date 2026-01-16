@@ -20,6 +20,7 @@ import ExamModeDialog from '@/components/exam-taking/ExamModeDialog';
 import ExamHeader from '@/components/exam-taking/ExamHeader';
 import ExamNavigation from '@/components/exam-taking/ExamNavigation';
 import SkillIntroduction from '@/components/exam-taking/SkillIntroduction';
+import SkillTransitionConfirmDialog from '@/components/exam-taking/SkillTransitionConfirmDialog';
 import attemptService from '@/services/attemptService';
 import { useExamState } from '@/hooks/useExamState';
 import { getFallbackSkills } from '@/components/exam-taking/ExamHelpers';
@@ -39,6 +40,20 @@ export default function TakeExamPage() {
   // Additional state for skill-based navigation
   const [currentSkillIndex, setCurrentSkillIndex] = useState(0);
   const [showSkillIntro, setShowSkillIntro] = useState(false);
+  const [skillTransitionDialogOpen, setSkillTransitionDialogOpen] = useState(false);
+
+  // Skill-specific time limits (in seconds) - APTIS General standards
+  const SKILL_DURATIONS = {
+    'Reading': 45 * 60,      // 45 minutes
+    'Listening': 34 * 60,    // 34 minutes
+    'Writing': 45 * 60,      // 45 minutes
+    'Speaking': 12 * 60      // 12 minutes
+  };
+
+  // State for skill-based timer
+  const [skillTimeRemaining, setSkillTimeRemaining] = useState(0);
+  const [skillTimerStarted, setSkillTimerStarted] = useState(false);
+  const skillTimerRef = useRef(null);
 
   // Use custom hook for state management
   const {
@@ -67,6 +82,48 @@ export default function TakeExamPage() {
   } = useExamState(examId, attemptId, attemptType, selectedSkill);
 
   const timerRef = useRef(null);
+
+  // Initialize skill timer when skill intro is closed
+  useEffect(() => {
+    if (currentAttempt && !showSkillIntro && attemptType === 'full_exam') {
+      const currentSkill = availableSkills[currentSkillIndex];
+      if (currentSkill && !skillTimerStarted) {
+        const skillDuration = SKILL_DURATIONS[currentSkill.skill?.skill_type_name] || 45 * 60;
+        setSkillTimeRemaining(skillDuration);
+        setSkillTimerStarted(true);
+        console.log(`[TakeExamPage] Started timer for ${currentSkill.skill?.skill_type_name}: ${skillDuration / 60} minutes`);
+      }
+    }
+  }, [currentAttempt, showSkillIntro, currentSkillIndex, attemptType, availableSkills, skillTimerStarted, SKILL_DURATIONS]);
+
+  // Skill-based timer management - count down for current skill
+  useEffect(() => {
+    if (currentAttempt && skillTimerStarted && skillTimeRemaining > 0 && !showSkillIntro) {
+      skillTimerRef.current = setInterval(() => {
+        setSkillTimeRemaining(prev => {
+          if (prev <= 1) {
+            // Time up for this skill - move to next skill
+            console.log('[TakeExamPage] Skill time up, moving to next skill');
+            handleTimeUpForSkill();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      
+      return () => {
+        if (skillTimerRef.current) clearInterval(skillTimerRef.current);
+      };
+    }
+  }, [currentAttempt, skillTimerStarted, skillTimeRemaining, showSkillIntro]);
+
+  // Reset skill timer when transitioning to next skill
+  useEffect(() => {
+    if (skillTimerStarted && showSkillIntro) {
+      setSkillTimerStarted(false);
+      setSkillTimeRemaining(0);
+    }
+  }, [currentSkillIndex]);
 
   // Timer management - update timer every second
   useEffect(() => {
@@ -163,6 +220,20 @@ export default function TakeExamPage() {
     if (currentAttempt) {
       await dispatch(submitAttempt(currentAttempt.id));
       router.push(`/results/${currentAttempt.id}`);
+    }
+  };
+
+  // Handle skill time up - move to next skill or submit
+  const handleTimeUpForSkill = () => {
+    const currentSkill = availableSkills[currentSkillIndex];
+    console.log(`[TakeExamPage] Time up for ${currentSkill?.skill?.skill_type_name}`);
+    
+    if (currentSkillIndex < availableSkills.length - 1) {
+      // Move to next skill
+      handleNextSkill();
+    } else {
+      // Last skill completed, submit exam
+      handleSubmit();
     }
   };
 
@@ -263,6 +334,16 @@ export default function TakeExamPage() {
     setCurrentQuestionIndex(0);
   };
 
+  // Handle skill transition confirmation
+  const handleSkillTransitionConfirm = () => {
+    setSkillTransitionDialogOpen(false);
+    handleNextSkill();
+  };
+
+  const handleSkillTransitionCancel = () => {
+    setSkillTransitionDialogOpen(false);
+  };
+
   if (loading) return <LoadingSpinner />;
   if (error) {
     return (
@@ -361,21 +442,8 @@ export default function TakeExamPage() {
   const getCurrentSkillData = () => {
     if (attemptType === 'full_exam' && availableSkills.length > 0) {
       const currentSkill = availableSkills[currentSkillIndex];
-      console.log('[TakeExamPage] Getting skill data for index:', currentSkillIndex, 'skill:', currentSkill);
-      console.log('[TakeExamPage] Total questions:', questions.length);
-      console.log('[TakeExamPage] First question raw structure:', questions[0]);
-      console.log('[TakeExamPage] Sample questions structure:', questions.slice(0, 3).map(q => ({ 
-        id: q.question?.id, 
-        skill_type_id: q.question?.questionType?.skill_type_id, 
-        type: q.question?.questionType?.code,
-        // Try alternative paths
-        alt_id: q.id,
-        alt_skill_type_id: q.skill_type_id,
-        alt_question_type_id: q.question_type_id,
-        hasQuestion: !!q.question,
-        hasQuestionType: !!q.question?.questionType,
-        keys: Object.keys(q)
-      })));
+      console.log('[TakeExamPage] Getting skill data for index:', currentSkillIndex, 'skill:', currentSkill?.skill_type_name);
+      console.log('[TakeExamPage] Total questions loaded:', questions.length);
       
       if (currentSkill) {
         // Filter questions for this skill - questions are answers with nested question object
@@ -383,11 +451,22 @@ export default function TakeExamPage() {
           const skillTypeId = q.question?.questionType?.skill_type_id;
           return skillTypeId === currentSkill.id;
         });
-        console.log('[TakeExamPage] Skill questions for skill id', currentSkill.id, ':', skillQuestions.length);
+        
+        console.log(`[TakeExamPage] Skill: ${currentSkill.skill_type_name} (ID: ${currentSkill.id})`);
+        console.log(`[TakeExamPage] Questions found for this skill: ${skillQuestions.length}`);
         
         if (skillQuestions.length === 0 && questions.length > 0) {
-          console.warn('[TakeExamPage] No questions found for skill', currentSkill.skill_type_name, '- this is a problem!');
-          console.log('[TakeExamPage] Available skill_type_ids in questions:', [...new Set(questions.map(q => q.question?.questionType?.skill_type_id))]);
+          console.warn('[TakeExamPage] WARNING: No questions found for skill', currentSkill.skill_type_name);
+          console.log('[TakeExamPage] Available skill types in questions:', [...new Set(questions.map(q => q.question?.questionType?.skill_type_name))]);
+          console.log('[TakeExamPage] First 5 questions for debugging:');
+          questions.slice(0, 5).forEach((q, idx) => {
+            console.log(`  Q${idx+1}:`, {
+              id: q.question?.id,
+              type: q.question?.questionType?.code,
+              skill_id: q.question?.questionType?.skill_type_id,
+              skill_name: q.question?.questionType?.skill_type_name
+            });
+          });
         }
         
         return {
@@ -396,7 +475,7 @@ export default function TakeExamPage() {
         };
       }
     }
-    console.log('[TakeExamPage] Using default questions:', { questionsLength: questions.length });
+    console.log('[TakeExamPage] Using default questions (non-full_exam mode):', { questionsLength: questions.length });
     return { skill: null, questions: questions };
   };
   
@@ -404,9 +483,11 @@ export default function TakeExamPage() {
   const displayQuestions = attemptType === 'full_exam' ? currentSkillData.questions : questions;
   const displayCurrentQuestion = displayQuestions[currentQuestionIndex];
   
-  // Check if current question is a listening question
-  const isListeningQuestion = displayCurrentQuestion?.question?.questionType?.code?.includes('LISTENING');
-  const canNavigateBackward = !isListeningQuestion && currentQuestionIndex > 0;
+  // Skill-specific backward navigation rules:
+  // - Listening/Reading/Writing: Allow backward navigation
+  // - Speaking: Block backward navigation
+  const skillType = currentSkillData?.skill?.skill_type_name;
+  const canNavigateBackward = currentQuestionIndex > 0 && skillType !== 'Speaking';
   
   // Get current answer - find the actual answer data from answers array
   // displayCurrentQuestion is an answer object, but we need the most up-to-date answer from Redux store
@@ -469,8 +550,8 @@ export default function TakeExamPage() {
         handleNextQuestion();
       } else {
         // End of current skill, move to next skill
-        console.log('[TakeExamPage] End of skill, moving to next skill');
-        handleNextSkill();
+        console.log('[TakeExamPage] End of skill - showing confirmation dialog');
+        setSkillTransitionDialogOpen(true);
       }
     } else {
       handleNextQuestion();
@@ -484,12 +565,7 @@ export default function TakeExamPage() {
       return;
     }
 
-    // Check if current question is a Listening question - prevent backward navigation
-    const currentQuestion = displayCurrentQuestion?.question;
-    if (currentQuestion?.questionType?.code?.includes('LISTENING')) {
-      console.log('[TakeExamPage] Navigation blocked - cannot navigate backward in Listening section');
-      return;
-    }
+    // Allow backward navigation for all question types including Listening
     
     if (attemptType === 'full_exam') {
       if (currentQuestionIndex > 0) {
@@ -528,8 +604,9 @@ export default function TakeExamPage() {
         currentQuestionIndex={currentQuestionIndex}
         questionsLength={displayQuestions.length}
         autoSaveStatus={autoSaveStatus}
-        timeRemaining={timeRemaining}
-        timerInitialized={timerInitialized}
+        timeRemaining={skillTimeRemaining}
+        skillTimeRemaining={skillTimeRemaining}
+        timerInitialized={skillTimerStarted}
         isNavigationDisabled={isNavigationDisabled}
         setDrawerOpen={setDrawerOpen}
         setSubmitDialogOpen={setSubmitDialogOpen}
@@ -541,6 +618,7 @@ export default function TakeExamPage() {
         currentSkillIndex={currentSkillIndex + 1}
         totalSkills={availableSkills.length}
         showSkillIntro={showSkillIntro}
+        currentSkillName={currentSkillData.skill?.skill_type_name}
       />
 
       {/* Progress Bar */}
@@ -582,7 +660,6 @@ export default function TakeExamPage() {
                 variant="contained"
                 onClick={handleSkillBasedPreviousQuestion}
                 disabled={!canNavigateBackward || isNavigationDisabled}
-                title={isListeningQuestion ? 'Không thể quay lại câu Listening' : ''}
                 size="large"
               >
                 Câu trước
@@ -659,6 +736,23 @@ export default function TakeExamPage() {
         onQuestionNavigation={handleQuestionNavigation}
         getQuestionStatus={getQuestionStatus}
         skillMode={true}
+      />
+
+      {/* Skill Transition Confirmation Dialog */}
+      <SkillTransitionConfirmDialog
+        open={skillTransitionDialogOpen}
+        currentSkill={currentSkillData.skill}
+        nextSkill={currentSkillIndex < availableSkills.length - 1 ? availableSkills[currentSkillIndex + 1] : null}
+        currentQuestionIndex={currentQuestionIndex}
+        totalQuestionsInSkill={displayQuestions.length}
+        skillAnswersSummary={
+          currentSkillData.skill ? {
+            answered: answers.filter(a => a.question?.skill_id === currentSkillData.skill.id && (a.selected_option_id || a.text_answer || a.audio_url)).length,
+            unanswered: displayQuestions.length - answers.filter(a => a.question?.skill_id === currentSkillData.skill.id && (a.selected_option_id || a.text_answer || a.audio_url)).length
+          } : null
+        }
+        onConfirm={handleSkillTransitionConfirm}
+        onCancel={handleSkillTransitionCancel}
       />
     </Box>
   );

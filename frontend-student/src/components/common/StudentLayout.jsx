@@ -3,29 +3,27 @@
 import { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useRouter, usePathname } from 'next/navigation';
-import {
-  Box,
-  AppBar,
-  Toolbar,
-  Typography,
-  IconButton,
-  Badge,
-  Button,
-  Menu,
-  MenuItem,
-  Avatar,
-  Divider,
-  BottomNavigation,
-  BottomNavigationAction,
-  useMediaQuery,
-  useTheme,
-  Drawer,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  ListItemButton,
-} from '@mui/material';
+import Box from '@mui/material/Box';
+import AppBar from '@mui/material/AppBar';
+import Toolbar from '@mui/material/Toolbar';
+import Typography from '@mui/material/Typography';
+import IconButton from '@mui/material/IconButton';
+import Badge from '@mui/material/Badge';
+import Button from '@mui/material/Button';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import Avatar from '@mui/material/Avatar';
+import Divider from '@mui/material/Divider';
+import BottomNavigation from '@mui/material/BottomNavigation';
+import BottomNavigationAction from '@mui/material/BottomNavigationAction';
+import useMediaQuery from '@mui/material/useMediaQuery';
+import { useTheme } from '@mui/material/styles';
+import Drawer from '@mui/material/Drawer';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import ListItemButton from '@mui/material/ListItemButton';
 import {
   Home,
   Assessment,
@@ -39,7 +37,10 @@ import {
   School,
 } from '@mui/icons-material';
 import { clearAuth } from '@/store/slices/authSlice';
+import LoadingSpinner from './LoadingSpinner';
 import Footer from './Footer';
+import PageTransition from './PageTransition';
+import { useNavigation } from '@/hooks/useNavigation';
 
 const bottomNavItems = [
   { label: 'Trang chủ', icon: <Home />, path: '/home' },
@@ -63,6 +64,7 @@ export default function StudentLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
   const dispatch = useDispatch();
+  const { navigate, isNavigating } = useNavigation();
   
   const { user } = useSelector((state) => state.auth);
   
@@ -84,7 +86,7 @@ export default function StudentLayout({ children }) {
   };
 
   const handleNavigation = (path) => {
-    router.push(path);
+    navigate(path);
     setDrawerOpen(false);
   };
 
@@ -182,7 +184,33 @@ export default function StudentLayout({ children }) {
   );
 
   return (
-    <Box sx={{ minHeight: '100vh', backgroundColor: 'background.default' }}>
+    <Box sx={{ 
+      display: 'flex',
+      flexDirection: 'column',
+      minHeight: '100vh',
+      backgroundColor: 'background.default',
+      position: 'relative'
+    }}>
+      {/* Navigation Loading Overlay */}
+      {isNavigating && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(255, 255, 255, 0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+          }}
+        >
+          <LoadingSpinner message="Đang chuyển trang..." />
+        </Box>
+      )}
+      
       {/* Top App Bar */}
       <AppBar position="fixed" elevation={1}>
         <Toolbar>
@@ -258,12 +286,19 @@ export default function StudentLayout({ children }) {
       <Box
         component="main"
         sx={{
-          flexGrow: 1,
-          pt: 8, // AppBar height
-          pb: isMobile ? 7 : 0, // Bottom navigation height on mobile
+          flex: '1 1 auto',
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 'calc(100vh)',
+          pt: 8,
+          pb: isMobile ? 7 : 0,
         }}
       >
-        {children}
+        <Box sx={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column' }}>
+          <PageTransition>
+            {children}
+          </PageTransition>
+        </Box>
       </Box>
 
       {/* Bottom Navigation for Mobile */}
@@ -271,7 +306,7 @@ export default function StudentLayout({ children }) {
         <BottomNavigation
           value={getCurrentBottomNavValue()}
           onChange={(event, newValue) => {
-            router.push(bottomNavItems[newValue].path);
+            navigate(bottomNavItems[newValue].path);
           }}
           sx={{
             position: 'fixed',
@@ -293,8 +328,10 @@ export default function StudentLayout({ children }) {
         </BottomNavigation>
       )}
 
-      {/* Footer */}
-      <Footer />
+      {/* Footer - Always at bottom */}
+      <Box component="footer" sx={{ marginTop: 'auto', flexShrink: 0 }}>
+        <Footer />
+      </Box>
     </Box>
   );
 }

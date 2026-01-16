@@ -24,11 +24,13 @@ import {
   Schedule,
 } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
+import { useNavigation } from '@/hooks/useNavigation';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 
 export default function RecentAttempts({ attempts, showActions = false, maxItems = 5 }) {
   const router = useRouter();
+  const { navigateToResult, navigateToExamTake } = useNavigation();
   const [expanded, setExpanded] = useState(false);
   
   const displayAttempts = expanded ? attempts : attempts.slice(0, maxItems);
@@ -94,11 +96,11 @@ export default function RecentAttempts({ attempts, showActions = false, maxItems
   };
 
   const handleViewResults = (attemptId) => {
-    router.push(`/results/${attemptId}`);
+    navigateToResult(attemptId);
   };
 
   const handleContinueAttempt = (attemptId) => {
-    router.push(`/exams/take/${attemptId}`);
+    navigateToExamTake(null, attemptId);
   };
 
   if (!attempts || attempts.length === 0) {

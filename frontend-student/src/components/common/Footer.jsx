@@ -15,7 +15,8 @@ export default function Footer() {
         backgroundColor: '#1565C0',
         color: 'white',
         py: 4,
-        mt: 6,
+        mt: 'auto',
+        flexShrink: 0,
       }}
     >
       <Container maxWidth="lg">

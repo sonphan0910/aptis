@@ -5,7 +5,6 @@ import {
   Box,
   Typography,
   TextField,
-  Grid,
 } from '@mui/material';
 
 export default function WritingChatQuestion({ question, onAnswerChange }) {
@@ -165,66 +164,65 @@ export default function WritingChatQuestion({ question, onAnswerChange }) {
         {questionData.title}
       </Typography>
 
-      {/* Chat Context - Read Only */}
-      {questionData.contextMessages && questionData.contextMessages.length > 0 && (
-        <Box sx={{ mb: 4, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1, bgcolor: 'grey.50' }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 2, color: 'text.secondary' }}>
-            Chat Context:
-          </Typography>
-          {questionData.contextMessages.map((msg, index) => (
-            <Box key={`context-${index}`} sx={{ mb: 2 }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main' }}>
-                {msg.user}:
-              </Typography>
-              <Typography variant="body2" sx={{ ml: 2, color: 'text.primary' }}>
-                {msg.message}
-              </Typography>
-            </Box>
-          ))}
-        </Box>
-      )}
+      {/* Chat Conversation - Continuous Format with Inline Input Fields */}
+      <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1, bgcolor: 'grey.50' }}>
+        {questionData.contextMessages && questionData.contextMessages.length > 0 ? (
+          <Box>
+            {questionData.contextMessages.map((msg, index) => {
+              const replyPromptIndex = questionData.replyPrompts.findIndex(p => p.user === msg.user);
+              const hasReplyPrompt = replyPromptIndex !== -1;
+              
+              return (
+                <Box key={`message-${index}`} sx={{ mb: 3 }}>
+                  {/* Chat message */}
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main' }}>
+                      {msg.user}:
+                    </Typography>
+                    <Typography variant="body2" sx={{ ml: 2, color: 'text.primary' }}>
+                      {msg.message}
+                    </Typography>
+                  </Box>
 
-      {/* Reply Prompts - Input Fields */}
-      <Box>
-        <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 2, color: 'text.secondary' }}>
-          Your Replies:
-        </Typography>
-        
-        <Grid container spacing={3}>
-          {questionData.replyPrompts.map((prompt, index) => {
-            const answerKey = index === 0 ? 'personA' : 'personB';
-            const answerText = answers[answerKey] || '';
-            const wordCount = countWords(answerText);
-            
-            return (
-              <Grid item xs={12} key={`reply-${index}-${answerKey}`}>
-                <Box sx={{ mb: 3, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1, bgcolor: 'background.paper' }}>
-                  <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold', mb: 2, color: 'primary.main' }}>
-                    Reply to {prompt.user}:
-                  </Typography>
-                  
-                  <TextField
-                    multiline
-                    fullWidth
-                    rows={4}
-                    value={answerText}
-                    onChange={(e) => handleAnswerChange(answerKey, e.target.value)}
-                    variant="outlined"
-                    placeholder={`Type your reply here (30-40 words recommended)...`}
-                    helperText={`${wordCount} words ${wordCount >= 30 && wordCount <= 40 ? '✓' : wordCount < 30 ? '(need more)' : '(too many)'}`}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        fontSize: '0.95rem',
-                        lineHeight: 1.5,
-                        backgroundColor: 'white'
-                      }
-                    }}
-                  />
+                  {/* Inline reply input */}
+                  {hasReplyPrompt && (
+                    <Box sx={{ ml: 2, mb: 2 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: 'secondary.main', mb: 1 }}>
+                        You:
+                      </Typography>
+                      <Box>
+                        <TextField
+                          multiline
+                          fullWidth
+                          rows={2}
+                          value={answers[replyPromptIndex === 0 ? 'personA' : 'personB'] || ''}
+                          onChange={(e) => handleAnswerChange(replyPromptIndex === 0 ? 'personA' : 'personB', e.target.value)}
+                          variant="outlined"
+                          placeholder="Nhập câu trả lời..."
+                          helperText={`${countWords(answers[replyPromptIndex === 0 ? 'personA' : 'personB'] || '')} từ`}
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              fontSize: '0.95rem',
+                              lineHeight: 1.5,
+                              backgroundColor: 'white'
+                            }
+                          }}
+                        />
+                      </Box>
+                    </Box>
+                  )}
+
+                  {/* Divider between conversation exchanges */}
+                  {index < questionData.contextMessages.length - 1 && (
+                    <Box sx={{ my: 2, borderBottom: '1px solid', borderColor: 'divider' }} />
+                  )}
                 </Box>
-              </Grid>
-            );
-          })}
-        </Grid>
+              );
+            })}
+          </Box>
+        ) : (
+          <Typography color="textSecondary">Không có nội dung hội thoại</Typography>
+        )}
       </Box>
     </Box>
   );

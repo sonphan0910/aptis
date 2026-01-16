@@ -119,6 +119,24 @@ exports.getResults = async (req, res, next) => {
               model: QuestionType,
               as: 'questionType',
               attributes: ['id', 'code', 'question_type_name', 'scoring_method'],
+              include: [
+                {
+                  model: SkillType,
+                  as: 'skillType',
+                  attributes: ['id', 'code', 'skill_type_name'],
+                },
+              ],
+            },
+            // Include question items and options for complex questions
+            {
+              model: QuestionItem,
+              as: 'items',
+              attributes: ['id', 'item_text', 'correct_answer', 'correct_position', 'correct_option_text'],
+            },
+            {
+              model: QuestionOption,
+              as: 'options',
+              attributes: ['id', 'option_text', 'is_correct'],
             },
           ],
         },

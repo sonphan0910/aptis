@@ -98,8 +98,18 @@ export default function QuestionFeedback({ questionResults, attemptId, showDetai
   if (!questionResults || questionResults.length === 0) {
     return (
       <Box>
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          <Typography variant="body2" sx={{ mb: 1 }}>
+            <strong>Debug Info:</strong> No questions found for this skill
+          </Typography>
+          <Typography variant="body2" sx={{ fontSize: '12px', fontFamily: 'monospace' }}>
+            • questionResults: {questionResults ? `Array[${questionResults.length}]` : 'null'}<br/>
+            • This might indicate data structure issue or filtering problem
+          </Typography>
+        </Alert>
         <Alert severity="info">
-          Dữ liệu chi tiết câu hỏi sẽ được cập nhật sau. Hiện tại bạn có thể xem điểm tổng quan ở tab "Tổng quan".
+          Expected: Questions should appear here after filtering by skill. 
+          If this persists, check API data structure and filtering logic.
         </Alert>
       </Box>
     );
