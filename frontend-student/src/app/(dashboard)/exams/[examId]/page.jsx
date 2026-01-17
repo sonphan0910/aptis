@@ -184,7 +184,6 @@ export default function ExamDetailPage() {
               },
             }}
           >
-            <Tab label="Tổng quan" />
             <Tab label="Phần thi" />
             <Tab label="Lịch sử làm bài" />
           </Tabs>
@@ -197,38 +196,8 @@ export default function ExamDetailPage() {
           <Typography paragraph>
             {exam.description || 'Không có mô tả chi tiết.'}
           </Typography>
-          
           <Divider sx={{ my: 2 }} />
-          
-          <Typography variant="h6" gutterBottom>
-            Kỹ năng đánh giá
-          </Typography>
-          <Box display="flex" gap={1} flexWrap="wrap">
-            {(() => {
-              if (!exam.sections || exam.sections.length === 0) {
-                return <Typography color="textSecondary">Không có kỹ năng đánh giá</Typography>;
-              }
-              // Lấy danh sách skill_type_name duy nhất
-              const uniqueSkills = Array.from(
-                new Set(
-                  exam.sections
-                    .map(section => section.skillType?.skill_type_name)
-                    .filter(Boolean)
-                )
-              );
-              return uniqueSkills.map((skill, idx) => (
-                <Chip
-                  key={skill || idx}
-                  label={skill || 'N/A'}
-                  size="small"
-                  variant="outlined"
-                />
-              ));
-            })()}
-          </Box>
-        </TabPanel>
-
-        <TabPanel value={tabValue} index={1}>
+          {/* Exam structure below */}
           <Box>
             <Typography variant="h6" gutterBottom sx={{ fontWeight: 600, mb: 3 }}>
               Cấu trúc bài thi
@@ -237,7 +206,6 @@ export default function ExamDetailPage() {
               if (!exam.sections || exam.sections.length === 0) {
                 return <Typography color="textSecondary">Không có thông tin chi tiết về cấu trúc bài thi.</Typography>;
               }
-              
               // Gộp sections theo skill
               const groupedBySkill = exam.sections.reduce((acc, section, idx) => {
                 const skillName = section.skillType?.skill_type_name || 'N/A';
@@ -363,7 +331,7 @@ export default function ExamDetailPage() {
           </Box>
         </TabPanel>
 
-        <TabPanel value={tabValue} index={2}>
+        <TabPanel value={tabValue} index={1}>
           <AttemptHistory attempts={userAttempts} examId={examId} />
         </TabPanel>
       </Card>

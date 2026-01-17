@@ -269,13 +269,7 @@ export const QUESTION_TYPES = {
     supportedMedia: ['audio'],
   },
 
-  // Writing Questions - 3 tasks per APTIS Technical Report
-    scoringMethod: 'manual',
-    timeLimit: 1800, // 30 minutes
-    difficulty: ['medium', 'hard'],
-    supportedMedia: ['text', 'image'],
-    wordLimit: { min: 150, max: 250 },
-  },
+
   WRITING_REPORT: {
     id: 'writing_report',
     name: 'Writing Report',

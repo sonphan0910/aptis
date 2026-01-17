@@ -5,14 +5,19 @@ import Providers from '@/components/providers/Providers';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata = {
-  title: 'APTIS Student Portal',
-  description: 'Online APTIS exam practice platform for students',
+  title: 'APTIS Master - Luyện thi APTIS trực tuyến',
+  description: 'Nền tảng luyện thi APTIS hàng đầu với kho đề thi phong phú, giáo viên chuyên nghiệp và công cụ học tập hiện đại',
+  keywords: ['APTIS', 'luyện thi', 'tiếng Anh', 'thi thử'],
+  openGraph: {
+    title: 'APTIS Master',
+    description: 'Luyện thi APTIS trực tuyến chuyên nghiệp',
+  },
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="vi" style={{ height: '100%' }}>
+      <body className={inter.className} style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', margin: 0, padding: 0 }}>
         <Providers>
           {children}
         </Providers>

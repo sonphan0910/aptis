@@ -240,8 +240,8 @@ export default function ExamsPage() {
       <Breadcrumb />
 
       {/* Page Header */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 600 }}>
+      <Box sx={{ mb: 4, textAlign: 'center' }}>
+        <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 600, display: 'inline-block' }}>
           Danh sách bài thi
         </Typography>
       </Box>
@@ -272,11 +272,18 @@ export default function ExamsPage() {
                     display: 'flex',
                     flexDirection: 'column',
                     transition: 'transform 0.2s, box-shadow 0.2s',
+                    cursor: 'pointer',
+                    border: '2px solid transparent',
                     '&:hover': {
                       transform: 'translateY(-4px)',
                       boxShadow: 3,
+                      borderColor: '#1976d2',
                     },
                   }}
+                  onClick={() => handleStartExam(exam.id)}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Xem chi tiết bài thi ${exam.title}`}
                 >
                   <CardContent sx={{ flexGrow: 1 }}>
                     {/* Header: Title */}
@@ -336,17 +343,7 @@ export default function ExamsPage() {
 
                   </CardContent>
 
-                  <CardActions sx={{ pt: 0 }}>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      endIcon={<PlayArrow />}
-                      fullWidth
-                      onClick={() => handleStartExam(exam.id)}
-                    >
-                      Bắt đầu bài thi
-                    </Button>
-                  </CardActions>
+                  {/* CardActions removed: click entire card to view details */}
                 </Card>
               </Grid>
             ))}

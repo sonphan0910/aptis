@@ -1,23 +1,10 @@
-'use client';
+import HomePageClient from './page-client';
 
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+export const metadata = {
+  title: 'APTIS Master - Luyện thi APTIS trực tuyến',
+  description: 'Nền tảng luyện thi APTIS hàng đầu với kho đề thi phong phú',
+};
 
 export default function HomePage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    // Check if user is logged in
-    const token = localStorage.getItem('token');
-    
-    if (token) {
-      // Redirect to dashboard if logged in
-      router.push('/home');
-    } else {
-      // Redirect to login if not logged in
-      router.push('/login');
-    }
-  }, [router]);
-
-  return null;
+  return <HomePageClient />;
 }

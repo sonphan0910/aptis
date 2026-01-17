@@ -15,9 +15,9 @@ import {
 } from '@mui/material';
 import {
   PlayArrow,
-  Pause,
-  Repeat,
+  Stop,
 } from '@mui/icons-material';
+import { useAudioPlay } from '@/contexts/AudioPlayContext';
 
 /**
  * Listening Multi-Question MCQ Component
@@ -31,10 +31,14 @@ export default function ListeningMultiMCQQuestion({
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
-  const [playCount, setPlayCount] = useState(0);
   
   const audioRef = useRef(null);
   const audioUrlRef = useRef(null);
+  
+  // Use global audio play context
+  const { getPlayCount, incrementPlayCount } = useAudioPlay();
+  const questionId = question.id;
+  const playCount = getPlayCount(questionId);
 
   // Reset audio state when question changes
   useEffect(() => {
@@ -48,7 +52,6 @@ export default function ListeningMultiMCQQuestion({
     setIsPlaying(false);
     setDuration(0);
     setCurrentTime(0);
-    setPlayCount(0);
   }, [question.id]);
 
   // Initialize answer from question.answer_data
@@ -115,32 +118,23 @@ export default function ListeningMultiMCQQuestion({
   };
 
   const canPlay = playCount < 2;
+  const canClickButton = playCount < 2 || isPlaying; // Allow stopping if audio is playing
 
   const handlePlayPause = () => {
-    if (!canPlay) return;
+    if (!canClickButton) return;
     
     if (audioRef.current) {
       if (isPlaying) {
+        // Stop - don't count
         audioRef.current.pause();
         setIsPlaying(false);
-      } else {
+      } else if (playCount < 2) {
+        // Play only if we haven't hit the limit
+        incrementPlayCount(questionId);
+        audioRef.current.currentTime = 0;
         audioRef.current.play();
         setIsPlaying(true);
-        if (audioRef.current.currentTime === 0) {
-          setPlayCount(prev => prev + 1);
-        }
       }
-    }
-  };
-
-  const handleReplay = () => {
-    if (!canPlay) return;
-    
-    if (audioRef.current) {
-      audioRef.current.currentTime = 0;
-      audioRef.current.play();
-      setIsPlaying(true);
-      setPlayCount(prev => prev + 1);
     }
   };
 
@@ -228,13 +222,13 @@ export default function ListeningMultiMCQQuestion({
           <Box display="flex" alignItems="center" gap={2} position="relative" zIndex={1}>
             <IconButton
               onClick={handlePlayPause}
-              disabled={!canPlay}
+              disabled={!canClickButton}
               sx={{
-                backgroundColor: canPlay ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)',
+                backgroundColor: canClickButton ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)',
                 color: 'white',
                 border: '2px solid rgba(255, 255, 255, 0.5)',
                 '&:hover': {
-                  backgroundColor: canPlay ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.1)',
+                  backgroundColor: canClickButton ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.1)',
                 },
                 '&:disabled': {
                   color: 'rgba(255, 255, 255, 0.5)',
@@ -244,22 +238,21 @@ export default function ListeningMultiMCQQuestion({
                 flexShrink: 0
               }}
             >
-              {isPlaying ? <Pause sx={{ fontSize: '2rem' }} /> : <PlayArrow sx={{ fontSize: '2rem' }} />}
+              {isPlaying ? <Stop sx={{ fontSize: '2rem' }} /> : <PlayArrow sx={{ fontSize: '2rem' }} />}
             </IconButton>
 
             <Box sx={{ flex: 1 }}>
               <Box
-                onClick={canPlay ? handleProgressClick : undefined}
                 sx={{
                   width: '100%',
                   height: 6,
                   backgroundColor: 'rgba(255, 255, 255, 0.2)',
                   borderRadius: 3,
-                  cursor: canPlay ? 'pointer' : 'not-allowed',
+                  cursor: 'not-allowed',
                   position: 'relative',
                   mb: 1,
                   overflow: 'hidden',
-                  opacity: canPlay ? 1 : 0.6
+                  opacity: 0.6
                 }}
               >
                 <Box
@@ -280,24 +273,6 @@ export default function ListeningMultiMCQQuestion({
                 </Typography>
               </Box>
             </Box>
-
-            <IconButton 
-              onClick={handleReplay} 
-              disabled={!canPlay}
-              sx={{ 
-                flexShrink: 0,
-                color: 'white',
-                border: '2px solid rgba(255, 255, 255, 0.5)',
-                '&:hover': {
-                  backgroundColor: canPlay ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
-                },
-                '&:disabled': {
-                  color: 'rgba(255, 255, 255, 0.5)',
-                }
-              }}
-            >
-              <Repeat />
-            </IconButton>
           </Box>
 
           {playCount > 0 && (

@@ -121,9 +121,9 @@ export default function ExamNavigation({
                 grouped[skill].push({ ...q, displayIndex: index + 1 });
               });
 
-              // Check if skill allows clicking (only Reading and Writing)
+              // Check if skill allows clicking (all skills now allowed)
               const isClickableSkill = (skillName) => {
-                return skillName === 'Reading' || skillName === 'Writing';
+                return true; // Allow all skills including Listening
               };
 
               return Object.entries(grouped).map(([skillName, skillQuestions]) => {
@@ -147,7 +147,7 @@ export default function ExamNavigation({
                           >
                             <ListItemButton
                               onClick={() => {
-                                // Only allow navigation for Reading and Writing
+                                // Allow navigation for all skills
                                 if (canClick) {
                                   onQuestionNavigation(questionIndex);
                                   setDrawerOpen(false);

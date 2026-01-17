@@ -15,7 +15,8 @@ export default function Footer() {
         backgroundColor: '#1565C0',
         color: 'white',
         py: 4,
-        mt: 6,
+        mt: 'auto',
+        flexShrink: 0,
       }}
     >
       <Container maxWidth="lg">
@@ -23,29 +24,29 @@ export default function Footer() {
           {/* Company Information */}
           <Grid item xs={12} md={8}>
             <Typography variant="h6" sx={{ mb: 1, fontWeight: 'bold' }}>
-              CÔNG TY TNHH THƯƠNG MẠI VÀ PHÁT TRIỂN GIÁO DỤC VIỆT NAM
+              APTIS Master
             </Typography>
             <Typography variant="body2" sx={{ mb: 1, fontWeight: '500' }}>
-              VIET NAM TRADING AND DEVELOPMENT EDUCATION COMPANY LIMITED (VTED)
+              Nền tảng luyện thi APTIS trực tuyến hàng đầu
             </Typography>
             
             <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <LocationOn sx={{ fontSize: '1rem' }} />
                 <Typography variant="body2">
-                  Địa chỉ: 188 Cầu Giấy, Quận Cầu Giấy, Hà Nội
+                  Địa chỉ: [Địa chỉ công ty]
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Email sx={{ fontSize: '1rem' }} />
                 <Typography variant="body2">
-                  Email: info.vted@gmail.com | admin@aptistests.vn
+                  Email: [Email liên hệ]
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Phone sx={{ fontSize: '1rem' }} />
                 <Typography variant="body2">
-                  Hotline: 091.242.1116 - 032.521.4191
+                  Hotline: [Số điện thoại]
                 </Typography>
               </Box>
             </Box>
@@ -55,13 +56,13 @@ export default function Footer() {
           <Grid item xs={12} md={4}>
             <Box sx={{ textAlign: { xs: 'left', md: 'right' } }}>
               <Typography variant="h6" sx={{ mb: 1, fontWeight: 'bold' }}>
-                Số người đang thi thử trực tuyến: 129
+                Người đang học: [Số người]
               </Typography>
               
               {/* Development Credit */}
               <Box sx={{ mt: 3, textAlign: { xs: 'left', md: 'right' } }}>
                 <Typography variant="caption" sx={{ opacity: 0.8 }}>
-                  Phát triển bởi HCmedia
+                  © 2024 APTIS Master. Tất cả các quyền được bảo lưu.
                 </Typography>
               </Box>
             </Box>

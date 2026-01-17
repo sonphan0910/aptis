@@ -6,149 +6,280 @@ import {
   CardContent,
   Typography,
   Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
   Grid,
-  CircularProgress,
-  LinearProgress,
 } from '@mui/material';
-import {
-  CheckCircle,
-  Schedule,
-} from '@mui/icons-material';
+
+// CERF Level mapping based on APTIS score (0-50 scale per skill)
+const getCERFLevel = (score) => {
+  if (score >= 45) return { level: 'C', label: 'C', color: '#E63946' };
+  if (score >= 40) return { level: 'B2', label: 'B2', color: '#E63946' };
+  if (score >= 35) return { level: 'B1', label: 'B1', color: '#FF6600' };
+  if (score >= 30) return { level: 'A2', label: 'A2', color: '#FF9900' };
+  if (score >= 25) return { level: 'A1', label: 'A1', color: '#FFCC00' };
+  return { level: 'A0', label: 'A0', color: '#CCCCCC' };
+};
 
 export default function ResultsSummary({ attempt, exam, skillScores, overallStats }) {
-  // Validate input data - use overallStats first, then fallback to calculations
+  // Validate input data
   const totalScore = Number(overallStats?.totalScore ?? attempt?.total_score ?? 0);
-  const maxScore = Number(overallStats?.maxScore ?? exam?.total_score ?? 100);
+  const maxScore = Number(overallStats?.maxScore ?? exam?.total_score ?? 200);
   const timeSpent = attempt?.time_spent ?? 0;
   const isSkillPractice = overallStats?.isSkillPractice || attempt?.attempt_type === 'skill_practice';
 
-  // Safe calculations - percentage should be exact, not capped
-  const progressPercentage = maxScore > 0 ? (totalScore / maxScore) * 100 : 0;
-  const displayPercentage = Math.round(progressPercentage);
+  // Prepare skill data with CERF mapping
+  const skillsWithCERF = skillScores.map(skill => {
+    const skillMaxScore = skill.max_score ?? skill.maxScore ?? 50;
+    const skillScore = skill.score ?? 0;
+    // Normalize to 50-point scale
+    const normalizedScore = skillMaxScore > 0 ? (skillScore / skillMaxScore) * 50 : 0;
+    const cerf = getCERFLevel(normalizedScore);
+    
+    return {
+      name: skill.skillName || skill.skill_type || 'Unknown',
+      score: Math.round(skillScore),
+      maxScore: Math.round(skillMaxScore),
+      normalizedScore: Math.round(normalizedScore),
+      cerf
+    };
+  });
+
+  // Calculate overall CERF level (average of all skills)
+  const averageNormalizedScore = skillsWithCERF.length > 0 
+    ? skillsWithCERF.reduce((sum, s) => sum + s.normalizedScore, 0) / skillsWithCERF.length
+    : 0;
+  const overallCERF = getCERFLevel(averageNormalizedScore);
+
+  const displayPercentage = maxScore > 0 ? Math.round((totalScore / maxScore) * 100) : 0;
 
   return (
-    <Card sx={{ mb: 3, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
-      <CardContent sx={{ p: 4 }}>
-        {isSkillPractice && skillScores.length > 0 && (
-          <Box sx={{ mb: 2, textAlign: 'center' }}>
-            <Chip 
-              label={`Luyện tập: ${skillScores[0].skillName || skillScores[0].skill_type || 'Kỹ năng'}`}
-              sx={{ 
-                backgroundColor: 'rgba(255,255,255,0.2)', 
-                color: 'white',
-                fontWeight: 600,
-                fontSize: '0.9rem'
-              }}
-            />
-          </Box>
-        )}
-        <Grid container spacing={3} alignItems="center">
-          {/* Overall Score */}
-          <Grid item xs={12} md={4}>
-            <Box textAlign="center">
-              <Box position="relative" display="inline-flex" mb={2}>
-                <CircularProgress
-                  variant="determinate"
-                  value={Math.min(progressPercentage, 100)}
-                  size={120}
-                  thickness={6}
-                  sx={{
-                    color: 'white',
-                    '& .MuiCircularProgress-circle': {
-                      strokeLinecap: 'round',
-                    },
-                  }}
-                />
-                <Box
-                  sx={{
-                    top: 0,
-                    left: 0,
-                    bottom: 0,
-                    right: 0,
-                    position: 'absolute',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexDirection: 'column',
-                  }}
-                >
-                  <Typography variant="h4" component="div" color="white" fontWeight="bold">
-                    {totalScore}
-                  </Typography>
-                  <Typography variant="body2" color="white" sx={{ opacity: 0.8 }}>
-                    / {maxScore}
-                  </Typography>
-                </Box>
-              </Box>
+    <Card sx={{ mb: 3, border: '4px solid #002E5C', borderRadius: 2 }}>
+      <CardContent sx={{ p: 4, backgroundColor: '#ffffff' }}>
+        {/* Title */}
+        <Typography 
+          variant="h5" 
+          sx={{ 
+            color: '#E63946', 
+            fontWeight: 'bold', 
+            mb: 3,
+            fontSize: '1.5rem'
+          }}
+        >
+          Overall CERF level:
+        </Typography>
 
-            </Box>
+        {/* 2-Column Layout */}
+        <Grid container spacing={4}>
+          {/* LEFT COLUMN: Scale Score Table */}
+          <Grid item xs={12} md={6}>
+            <Typography 
+              variant="h6" 
+              sx={{ 
+                fontWeight: 'bold', 
+                color: '#002E5C',
+                mb: 2,
+                fontSize: '1.1rem'
+              }}
+            >
+              Scale score
+            </Typography>
+
+            <TableContainer component={Paper} sx={{ boxShadow: 'none', border: '1px solid #ddd' }}>
+              <Table>
+                <TableHead sx={{ backgroundColor: '#002E5C' }}>
+                  <TableRow>
+                    <TableCell sx={{ color: 'white', fontWeight: 'bold', fontSize: '0.9rem' }}>
+                      Skill name
+                    </TableCell>
+                    <TableCell align="center" sx={{ color: 'white', fontWeight: 'bold', fontSize: '0.9rem' }}>
+                      Skill score
+                    </TableCell>
+                    <TableCell align="center" sx={{ color: 'white', fontWeight: 'bold', fontSize: '0.9rem' }}>
+                      CERF grade
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {skillsWithCERF.map((skill, idx) => (
+                    <TableRow key={idx} sx={{ '&:nth-of-type(even)': { backgroundColor: '#f9f9f9' } }}>
+                      <TableCell sx={{ fontWeight: 500, fontSize: '0.9rem' }}>
+                        {skill.name}
+                      </TableCell>
+                      <TableCell align="center" sx={{ fontWeight: 'bold', color: '#002E5C', fontSize: '0.9rem' }}>
+                        {skill.score}/{skill.maxScore}
+                      </TableCell>
+                      <TableCell align="center">
+                        <Box
+                          sx={{
+                            width: 50,
+                            height: 30,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: skill.cerf.color,
+                            color: 'white',
+                            fontWeight: 'bold',
+                            fontSize: '0.9rem',
+                            borderRadius: 0.5,
+                            mx: 'auto'
+                          }}
+                        >
+                          {skill.cerf.label}
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  
+                  {/* Final Score Row */}
+                  <TableRow sx={{ backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
+                    <TableCell sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>
+                      Final scale score
+                    </TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 'bold', color: '#002E5C', fontSize: '0.9rem' }}>
+                      {Math.round(totalScore)}
+                    </TableCell>
+                    <TableCell align="center">
+                      <Box
+                        sx={{
+                          width: 50,
+                          height: 30,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: overallCERF.color,
+                          color: 'white',
+                          fontWeight: 'bold',
+                          fontSize: '0.9rem',
+                          borderRadius: 0.5,
+                          mx: 'auto'
+                        }}
+                      >
+                        {overallCERF.label}
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </TableContainer>
           </Grid>
 
-          {/* Stats */}
-          <Grid item xs={12} md={8}>
-            <Grid container spacing={2}>
-              <Grid item xs={6} sm={6}>
-                <Box display="flex" alignItems="center" mb={1}>
-                  <CheckCircle sx={{ mr: 1, opacity: 0.8 }} />
-                  <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                    Độ chính xác
-                  </Typography>
+          {/* RIGHT COLUMN: CERF Skill Profile Chart */}
+          <Grid item xs={12} md={6}>
+            <Typography 
+              variant="h6" 
+              sx={{ 
+                fontWeight: 'bold', 
+                color: '#002E5C',
+                mb: 2,
+                fontSize: '1.1rem'
+              }}
+            >
+              CERF skill profile
+            </Typography>
+
+            <Box sx={{ p: 2, backgroundColor: 'white', border: '1px solid #ddd', borderRadius: 1, overflowX: 'auto' }}>
+              <Box display="flex" gap={0.5} minWidth="500px">
+                {/* Y-axis labels */}
+                <Box sx={{ minWidth: 50 }}>
+                  <Box sx={{ height: 25, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 'bold', color: '#666' }}>
+                    CERF
+                  </Box>
+                  {['C', 'B2', 'B1', 'A2', 'A1', 'A0'].map((level) => (
+                    <Box 
+                      key={level}
+                      sx={{ 
+                        height: 28, 
+                        display: 'flex', 
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 'bold',
+                        color: '#333',
+                        fontSize: '0.8rem',
+                        borderBottom: '1px solid #ddd'
+                      }}
+                    >
+                      {level}
+                    </Box>
+                  ))}
                 </Box>
-                <Typography variant="h5" fontWeight="bold">
-                  {displayPercentage}%
-                </Typography>
-              </Grid>
-              
-              <Grid item xs={6} sm={6}>
-                <Box display="flex" alignItems="center" mb={1}>
-                  <Schedule sx={{ mr: 1, opacity: 0.8 }} />
-                  <Typography variant="body2" sx={{ opacity: 0.8 }}>
-                    Thời gian làm bài
-                  </Typography>
-                </Box>
-                <Typography variant="h5" fontWeight="bold">
-                  {Math.round((attempt?.time_spent || 0) / 60) || 0} phút
-                </Typography>
-              </Grid>
-            </Grid>
-            
-            {/* Progress by skill - only show if multiple skills */}
-            {skillScores.length > 1 && (
-              <Box mt={3}>
-                <Typography variant="body2" sx={{ opacity: 0.8, mb: 1 }}>
-                  Tiến độ từng kỹ năng:
-                </Typography>
-                {skillScores.map((skill) => {
-                const skillMaxScore = skill.max_score ?? skill.maxScore ?? 1;
-                const skillScore = skill.score ?? 0;
-                const skillPercentage = skillMaxScore > 0 ? (skillScore / skillMaxScore) * 100 : 0;
-                return (
-                  <Box key={skill.skillName || skill.skill_type || 'unknown'} mb={1}>
-                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
-                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                        {skill.skillName || skill.skill_type || 'Unknown'}
-                      </Typography>
-                      <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                        {skillScore}/{skillMaxScore}
+
+                {/* Skill columns */}
+                {skillsWithCERF.map((skill, idx) => (
+                  <Box key={idx} sx={{ minWidth: 65 }}>
+                    {/* Skill name at top */}
+                    <Box sx={{ height: 25, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Typography variant="caption" sx={{ fontWeight: 'bold', textAlign: 'center', color: '#333', fontSize: '0.75rem' }}>
+                        {skill.name.split(' ')[0]}
                       </Typography>
                     </Box>
-                    <LinearProgress
-                      variant="determinate"
-                      value={Math.min(skillPercentage, 100)}
-                      sx={{
-                        height: 6,
-                        borderRadius: 3,
-                        backgroundColor: 'rgba(255,255,255,0.2)',
-                        '& .MuiLinearProgress-bar': {
-                          backgroundColor: 'white',
-                        },
-                      }}
-                    />
+
+                    {/* Bar chart - 6 rows for CERF levels */}
+                    {['C', 'B2', 'B1', 'A2', 'A1', 'A0'].map((level) => {
+                      const isReached = skill.cerf.label === level;
+                      return (
+                        <Box
+                          key={level}
+                          sx={{
+                            height: 28,
+                            backgroundColor: isReached ? skill.cerf.color : '#ffffff',
+                            border: '1px solid #999',
+                            transition: 'all 0.3s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}
+                        >
+                          {isReached && (
+                            <Typography sx={{ color: 'white', fontWeight: 'bold', fontSize: '0.7rem' }}>
+                              {skill.normalizedScore}
+                            </Typography>
+                          )}
+                        </Box>
+                      );
+                    })}
                   </Box>
-                );
-              })}
+                ))}
+
+                {/* Overall CERF column */}
+                <Box sx={{ minWidth: 100 }}>
+                  <Box sx={{ height: 25, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Typography variant="caption" sx={{ fontWeight: 'bold', textAlign: 'center', color: '#333', fontSize: '0.75rem' }}>
+                      Overall<br/>CERF grade
+                    </Typography>
+                  </Box>
+
+                  {['C', 'B2', 'B1', 'A2', 'A1', 'A0'].map((level) => {
+                    const isReached = overallCERF.label === level;
+                    return (
+                      <Box
+                        key={level}
+                        sx={{
+                          height: 28,
+                          backgroundColor: isReached ? overallCERF.color : '#ffffff',
+                          border: '1px solid #999',
+                          transition: 'all 0.3s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        {isReached && (
+                          <Typography sx={{ color: 'white', fontWeight: 'bold', fontSize: '0.7rem' }}>
+                            {Math.round(averageNormalizedScore)}
+                          </Typography>
+                        )}
+                      </Box>
+                    );
+                  })}
+                </Box>
               </Box>
-            )}
+            </Box>
           </Grid>
         </Grid>
       </CardContent>

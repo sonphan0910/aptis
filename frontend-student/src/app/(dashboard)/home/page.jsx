@@ -15,20 +15,22 @@ import {
   Alert,
   List,
   ListItem,
-  ListItemText,
   LinearProgress,
   Paper,
+  Divider,
 } from '@mui/material';
 import {
   School,
   Assessment,
   TrendingUp,
   LocalFireDepartment,
-  PlayArrow,
-  Lightbulb,
   CheckCircle,
-  EmojiEvents,
   History,
+  PlayArrow,
+  Star,
+  Schedule,
+  EmojiEvents,
+  BookmarkBorder,
 } from '@mui/icons-material';
 import { fetchDashboardData } from '@/store/slices/dashboardSlice';
 import { useRouter } from 'next/navigation';
@@ -41,6 +43,12 @@ export default function HomePage() {
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
   const { stats, recentAttempts, isLoading, error } = useSelector((state) => state.dashboard);
+
+  // Debug: Log stats data
+  useEffect(() => {
+    console.log('Dashboard stats:', stats);
+    console.log('Recent attempts:', recentAttempts);
+  }, [stats, recentAttempts]);
 
   useEffect(() => {
     if (user?.id) {
@@ -77,242 +85,380 @@ export default function HomePage() {
     return 'error';
   };
 
+  const quickActions = [
+    {
+      title: 'Thi thử nhanh',
+      description: 'Làm bài thi mô phỏng đầy đủ 4 kỹ năng',
+      icon: <PlayArrow sx={{ fontSize: 24 }} />,
+      color: '#1976d2',
+      action: () => router.push('/exams')
+    },
+    {
+      title: 'Ôn tập',
+      description: 'Ôn tập theo kỹ năng với các bài tập đa dạng',
+      icon: <BookmarkBorder sx={{ fontSize: 24 }} />,
+      color: '#2e7d32',
+      action: () => router.push('/practice')
+    },
+    {
+      title: 'Xem kết quả',
+      description: 'Phân tích chi tiết điểm số và tiến độ',
+      icon: <TrendingUp sx={{ fontSize: 24 }} />,
+      color: '#ed6c02',
+      action: () => router.push('/results')
+    }
+  ];
+
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      {/* Welcome Header */}
-      <Box sx={{ mb: 4 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-          <Avatar 
-            sx={{ 
-              bgcolor: 'primary.main', 
-              mr: 2,
-              width: 56,
-              height: 56,
-              fontSize: '1.5rem'
-            }}
-          >
-            {user?.full_name?.charAt(0)?.toUpperCase() || 'S'}
-          </Avatar>
-          <Box>
-            <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 600 }}>
+    <Box sx={{ minHeight: '100vh', backgroundColor: '#fafafa' }}>
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
+
+        {/* Hero Section */}
+        <Box sx={{ mb: 5 }}>
+          <Box sx={{ textAlign: 'center', mb: 4 }}>
+            <Typography 
+              variant="h3" 
+              component="h1" 
+              sx={{ 
+                fontWeight: 700, 
+                color: '#1a1a1a',
+                mb: 2,
+                fontSize: { xs: '2rem', md: '3rem' }
+              }}
+            >
               {getGreeting()}, {user?.full_name?.split(' ')[0] || 'Bạn'}!
             </Typography>
-            <Typography variant="body1" color="text.secondary">
-              Hãy tiếp tục hành trình luyện thi APTIS của bạn
+            <Typography 
+              variant="h6" 
+              color="text.secondary" 
+              sx={{ 
+                maxWidth: 600, 
+                mx: 'auto',
+                fontWeight: 400,
+                lineHeight: 1.6
+              }}
+            >
+              Chào mừng bạn trở lại với APTIS Master. Hãy tiếp tục hành trình chinh phục kỳ thi APTIS của bạn.
             </Typography>
           </Box>
+
+          {getStreak() > 0 && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
+              <Chip
+                icon={<LocalFireDepartment />}
+                label={`Chuỗi học liên tiếp ${getStreak()} ngày! Tuyệt vời!`}
+                sx={{
+                  backgroundColor: '#fff3e0',
+                  color: '#e65100',
+                  fontWeight: 600,
+                  py: 2,
+                  px: 1,
+                  '& .MuiChip-icon': {
+                    color: '#e65100'
+                  }
+                }}
+              />
+            </Box>
+          )}
         </Box>
-        
-        {getStreak() > 0 && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <LocalFireDepartment sx={{ color: '#ff6b6b', fontSize: 24 }} />
-            <Chip
-              label={`Chuỗi liên tiếp ${getStreak()} ngày!`}
-              color="warning"
-              variant="filled"
-              size="medium"
-              sx={{ fontWeight: 600 }}
-            />
-          </Box>
-        )}
-      </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
-        </Alert>
-      )}
-
-      {/* Statistics Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatsCard
-            title="Tổng số bài thi"
-            value={stats?.totalExams || 0}
-            icon={<Assessment />}
-            color="primary"
-          />
-        </Grid>
-        
-        <Grid item xs={12} sm={6} md={3}>
-          <StatsCard
-            title="Điểm trung bình"
-            value={`${getAverageScore().toFixed(1)}%`}
-            icon={<TrendingUp />}
-            color="success"
-            subtitle={stats?.totalAttempts ? `${stats.totalAttempts} lần làm` : 'Chưa làm bài'}
-          />
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <StatsCard
-            title="Chuỗi học liên tiếp"
-            value={`${getStreak()} ngày`}
-            icon={<LocalFireDepartment />}
-            color="warning"
-          />
-        </Grid>
-
-        <Grid item xs={12} sm={6} md={3}>
-          <StatsCard
-            title="Thời gian luyện tập"
-            value={stats?.totalTime || '0h'}
-            icon={<School />}
-            color="info"
-          />
-        </Grid>
-      </Grid>
-
-      {/* Main Content Grid */}
-      <Grid container spacing={3}>
-        {/* Recent Attempts */}
-        <Grid item xs={12}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent>
-              <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 600, mb: 2 }}>
-                <History sx={{ fontSize: 24 }} />
-                Hoạt động gần đây
-              </Typography>
-              
-              {hasAttempts ? (
-                <Box>
-                  <List disablePadding>
-                    {displayAttempts.map((attempt, index) => (
-                      <Box key={attempt.id}>
-                        <ListItem
-                          sx={{
-                            py: 1.5,
-                            px: 0,
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'flex-start',
-                          }}
-                        >
-                          <Box sx={{ flex: 1 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                              <CheckCircle sx={{ fontSize: 20, color: 'success.main' }} />
-                              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                {attempt.examTitle || 'Unknown Exam'}
-                              </Typography>
-                            </Box>
-                            <Typography variant="body2" color="text.secondary" sx={{ ml: 3.5, mb: 0.5 }}>
-                              Điểm: <strong>{attempt.percentage}%</strong> ({attempt.score}/{attempt.maxScore})
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary" sx={{ ml: 3.5 }}>
-                              {formatDistanceToNow(new Date(attempt.startedAt), { addSuffix: true })}
-                            </Typography>
-                          </Box>
-                          <Chip
-                            label={`${attempt.percentage}%`}
-                            color={getScoreColor(attempt.percentage)}
-                            variant="filled"
-                            size="small"
-                            sx={{ ml: 1 }}
-                          />
-                        </ListItem>
-                        {index < displayAttempts.length - 1 && (
-                          <Box sx={{ borderBottom: '1px solid #e0e0e0', my: 1 }} />
-                        )}
-                      </Box>
-                    ))}
-                  </List>
-                  {attemptsArray.length > 3 && (
-                    <Box sx={{ mt: 2, textAlign: 'center' }}>
-                      <Button
-                        size="small"
-                        onClick={() => router.push('/results')}
-                      >
-                        Xem tất cả kết quả
-                      </Button>
-                    </Box>
-                  )}
-                </Box>
-              ) : (
-                <Box sx={{ textAlign: 'center', py: 4 }}>
-                  <Assessment sx={{ fontSize: 48, color: 'text.secondary', mb: 2, opacity: 0.5 }} />
-                  <Typography variant="body1" color="text.secondary" gutterBottom>
-                    Bạn chưa làm bài thi nào
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                    Bắt đầu hành trình luyện thi APTIS của bạn
-                  </Typography>
-                  <Button
-                    variant="contained"
-                    onClick={() => router.push('/exams')}
-                  >
-                    Làm bài thi đầu tiên
-                  </Button>
-                </Box>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Practice Recommendations */}
-      {stats?.weakestSkills && stats.weakestSkills.length > 0 && (
-        <Card sx={{ mt: 3 }}>
-          <CardContent>
-            <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 600, mb: 2 }}>
-              <Lightbulb color="warning" />
-              Gợi ý luyện tập
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Dựa trên kết quả gần đây, chúng tôi khuyến nghị bạn tập trung vào các kỹ năng sau:
-            </Typography>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2 }}>
-              {stats.weakestSkills.map((skill, index) => (
-                <Paper
-                  key={index}
-                  elevation={3}
-                  sx={{
-                    p: 2,
-                    bgcolor: '#fff',
-                    borderRadius: 2,
-                    flex: '1 1 260px',
-                    minWidth: '220px',
-                    boxShadow: '0 2px 12px 0 rgba(0,0,0,0.06)',
-                    border: '1px solid #f3f3f3',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-start',
-                    transition: 'box-shadow 0.2s',
+        {/* Quick Actions */}
+        <Box sx={{ mb: 5 }}>
+          <Typography variant="h5" sx={{ fontWeight: 600, mb: 3, textAlign: 'center' }}>
+            Bắt đầu luyện tập ngay
+          </Typography>
+          <Grid container spacing={3}>
+            {quickActions.map((action, index) => (
+              <Grid item xs={12} md={4} key={index}>
+                <Card 
+                  sx={{ 
+                    height: '100%', 
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    border: '1px solid #e0e0e0',
                     '&:hover': {
-                      boxShadow: '0 4px 20px 0 rgba(0,0,0,0.10)',
-                      borderColor: 'primary.light',
-                    },
+                      transform: 'translateY(-4px)',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                      borderColor: action.color
+                    }
+                  }}
+                  onClick={action.action}
+                >
+                  <CardContent sx={{ p: 3, textAlign: 'center' }}>
+                    <Box sx={{ 
+                      display: 'inline-flex',
+                      p: 2,
+                      borderRadius: '12px',
+                      backgroundColor: action.color + '15',
+                      color: action.color,
+                      mb: 2
+                    }}>
+                      {action.icon}
+                    </Box>
+                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
+                      {action.title}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {action.description}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+
+        {/* Stats Overview */}
+        <Box sx={{ mb: 5 }}>
+          <Typography variant="h5" sx={{ fontWeight: 600, mb: 3, textAlign: 'center' }}>
+            Tiến độ học tập của bạn
+          </Typography>
+          {isLoading ? (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <Typography color="text.secondary">Đang tải dữ liệu...</Typography>
+            </Box>
+          ) : (
+            <Grid container spacing={3}>
+              <Grid item xs={12} sm={6} md={3}>
+                <Paper 
+                  elevation={0}
+                  sx={{ 
+                    p: 3, 
+                    textAlign: 'center',
+                    border: '1px solid #e0e0e0',
+                    backgroundColor: '#fff'
                   }}
                 >
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'primary.main', mb: 0.5, letterSpacing: 0.2 }}>
-                    {skill.skill}
+                  <Assessment sx={{ fontSize: 40, color: '#1976d2', mb: 1 }} />
+                  <Typography variant="h4" sx={{ fontWeight: 700, color: '#1976d2' }}>
+                    {stats?.totalExams ?? 0}
                   </Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
-                    <LinearProgress
-                      variant="determinate"
-                      value={skill.percentage}
-                      sx={{ flex: 1, height: 8, borderRadius: 4, background: '#f5f5f5',
-                        '& .MuiLinearProgress-bar': {
-                          background: 'linear-gradient(90deg, #ff9800 0%, #ffc107 100%)',
-                        }
-                      }}
-                    />
-                    <Typography variant="caption" sx={{ fontWeight: 700, minWidth: '38px', color: 'primary.main' }}>
-                      {skill.percentage.toFixed(0)}%
-                    </Typography>
-                  </Box>
+                  <Typography variant="body2" color="text.secondary">
+                    Tổng số bài thi
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                    {stats?.totalAttempts ?? 0} lần làm
+                  </Typography>
                 </Paper>
-              ))}
-            </Box>
-            <Button
-              variant="contained"
-              startIcon={<Lightbulb />}
-              onClick={() => router.push('/exams')}
-            >
-              Tìm bài tập luyện
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-    </Container>
+              </Grid>
+              
+              <Grid item xs={12} sm={6} md={3}>
+                <Paper 
+                  elevation={0}
+                  sx={{ 
+                    p: 3, 
+                    textAlign: 'center',
+                    border: '1px solid #e0e0e0',
+                    backgroundColor: '#fff'
+                  }}
+                >
+                  <TrendingUp sx={{ fontSize: 40, color: '#2e7d32', mb: 1 }} />
+                  <Typography variant="h4" sx={{ fontWeight: 700, color: '#2e7d32' }}>
+                    {getAverageScore().toFixed(1)}%
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Điểm trung bình
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                    {stats?.totalAttempts ?? 0} bài đã làm
+                  </Typography>
+                </Paper>
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={3}>
+                <Paper 
+                  elevation={0}
+                  sx={{ 
+                    p: 3, 
+                    textAlign: 'center',
+                    border: '1px solid #e0e0e0',
+                    backgroundColor: '#fff'
+                  }}
+                >
+                  <LocalFireDepartment sx={{ fontSize: 40, color: '#ed6c02', mb: 1 }} />
+                  <Typography variant="h4" sx={{ fontWeight: 700, color: '#ed6c02' }}>
+                    {getStreak() ?? 0}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Ngày liên tiếp
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                    Giữ chuỗi học tập
+                  </Typography>
+                </Paper>
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={3}>
+                <Paper 
+                  elevation={0}
+                  sx={{ 
+                    p: 3, 
+                    textAlign: 'center',
+                    border: '1px solid #e0e0e0',
+                    backgroundColor: '#fff'
+                  }}
+                >
+                  <Schedule sx={{ fontSize: 40, color: '#9c27b0', mb: 1 }} />
+                  <Typography variant="h4" sx={{ fontWeight: 700, color: '#9c27b0' }}>
+                    {stats?.totalTime || '0h'}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Thời gian luyện
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                    Tổng cộng
+                  </Typography>
+                </Paper>
+              </Grid>
+            </Grid>
+          )}
+        </Box>
+
+        {/* Recent Activity */}
+        <Grid container spacing={4}>
+          <Grid item xs={12} md={8}>
+            <Card sx={{ border: '1px solid #e0e0e0' }}>
+              <CardContent sx={{ p: 4 }}>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <History sx={{ color: '#1976d2' }} />
+                  Hoạt động gần đây
+                </Typography>
+                
+                {hasAttempts ? (
+                  <Box>
+                    <List disablePadding>
+                      {displayAttempts.map((attempt, index) => (
+                        <Box key={attempt.id}>
+                          <ListItem sx={{ px: 0, py: 2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                              <Box sx={{ 
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                width: 48,
+                                height: 48,
+                                borderRadius: '12px',
+                                backgroundColor: '#e3f2fd',
+                                mr: 3
+                              }}>
+                                <CheckCircle sx={{ color: '#1976d2' }} />
+                              </Box>
+                              <Box sx={{ flex: 1 }}>
+                                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                  {attempt.examTitle || 'Unknown Exam'}
+                                </Typography>
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center', mb: 0.5 }}>
+                                  {attempt.skills && Array.isArray(attempt.skills) && attempt.skills.length > 0 ? (
+                                    attempt.skills.map((skill, idx) => (
+                                      <Typography key={skill.name} variant="body2" color="text.secondary">
+                                        {skill.name}: {parseInt(skill.score, 10)}/{parseInt(skill.maxScore, 10)}
+                                      </Typography>
+                                    ))
+                                  ) : (
+                                    <Typography variant="body2" color="text.secondary">
+                                      Điểm tổng: {parseInt(attempt.score, 10)}/{parseInt(attempt.maxScore, 10)}
+                                    </Typography>
+                                  )}
+                                </Box>
+                                <Typography variant="caption" color="text.secondary">
+                                  {formatDistanceToNow(new Date(attempt.startedAt), { addSuffix: true })}
+                                </Typography>
+                              </Box>
+                            </Box>
+                          </ListItem>
+                          {index < displayAttempts.length - 1 && <Divider />}
+                        </Box>
+                      ))}
+                    </List>
+                    {attemptsArray.length > 3 && (
+                      <Box sx={{ mt: 3, textAlign: 'center' }}>
+                        <Button 
+                          variant="outlined"
+                          onClick={() => router.push('/results')}
+                        >
+                          Xem tất cả kết quả
+                        </Button>
+                      </Box>
+                    )}
+                  </Box>
+                ) : (
+                  <Box sx={{ textAlign: 'center', py: 4 }}>
+                    <Assessment sx={{ fontSize: 64, color: '#bdbdbd', mb: 2 }} />
+                    <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
+                      Chưa có hoạt động nào
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                      Hãy bắt đầu với bài thi đầu tiên để theo dõi tiến độ của bạn
+                    </Typography>
+                    <Button
+                      variant="contained"
+                      startIcon={<PlayArrow />}
+                      onClick={() => router.push('/exams')}
+                    >
+                      Bắt đầu ngay
+                    </Button>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+
+          <Grid item xs={12} md={4}>
+            <Card sx={{ border: '1px solid #e0e0e0', mb: 3 }}>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <EmojiEvents sx={{ color: '#ffd700' }} />
+                  Mục tiêu tuần này
+                </Typography>
+                <Box sx={{ mb: 2 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                    <Typography variant="body2">Hoàn thành bài thi</Typography>
+                    <Typography variant="body2">2/5</Typography>
+                  </Box>
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={40} 
+                    sx={{ 
+                      height: 8, 
+                      borderRadius: 4,
+                      backgroundColor: '#f5f5f5',
+                      '& .MuiLinearProgress-bar': {
+                        backgroundColor: '#4caf50'
+                      }
+                    }} 
+                  />
+                </Box>
+                <Typography variant="body2" color="text.secondary">
+                  Còn 3 bài thi nữa để đạt mục tiêu tuần này
+                </Typography>
+              </CardContent>
+            </Card>
+
+            <Card sx={{ border: '1px solid #e0e0e0' }}>
+              <CardContent sx={{ p: 3 }}>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
+                  Lời khuyên hôm nay
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  "Thành công trong APTIS đến từ việc luyện tập đều đặn mỗi ngày. Hãy dành ít nhất 30 phút mỗi ngày để cải thiện kỹ năng của bạn."
+                </Typography>
+                <Button 
+                  variant="text" 
+                  size="small"
+                  onClick={() => router.push('/practice')}
+                >
+                  Bắt đầu luyện tập
+                </Button>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      </Container>
+    </Box>
   );
 }

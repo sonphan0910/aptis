@@ -97,9 +97,20 @@ export default function QuestionList({
       label: 'Tên câu hỏi',
       render: (row) => (
         <Box>
-          <Typography variant="body2" fontWeight="bold">
-            {row.title}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+            <Typography variant="body2" fontWeight="bold">
+              {row.title}
+            </Typography>
+            {row.is_used_in_exam && (
+              <Chip
+                label="Đã thêm"
+                size="small"
+                color="success"
+                variant="filled"
+                sx={{ height: 20 }}
+              />
+            )}
+          </Box>
           <Typography variant="caption" color="text.secondary">
             {row.description}
           </Typography>
@@ -144,7 +155,15 @@ export default function QuestionList({
     {
       id: 'usage_count',
       label: 'Số lần dùng',
-      align: 'center'
+      align: 'center',
+      render: (row) => (
+        <Chip 
+          label={`${row.usage_count} lần`} 
+          size="small"
+          variant={row.usage_count > 0 ? 'filled' : 'outlined'}
+          color={row.usage_count > 0 ? 'success' : 'default'}
+        />
+      )
     },
     {
       id: 'updated_at',

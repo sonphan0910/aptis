@@ -26,69 +26,113 @@ const SkillIntroduction = ({ open, skill, onClose, onStartSkill, questionsLoaded
   
   const getSkillInfo = (skillName) => {
     const skillMap = {
-      'Grammar & Vocabulary': {
-        description: 'Kiểm tra khả năng ngữ pháp và từ vựng của bạn',
-        icon: '�',
-        instructions: [
-          'Đọc kỹ từng câu hỏi trước khi chọn đáp án',
-          'Chú ý đến ngữ cảnh của câu',
-          'Không được sử dụng từ điển hoặc tài liệu tham khảo'
-        ],
-        timePerQuestion: '1-2 phút',
-        tips: 'Hãy tin vào kiến thức đầu tiên của bạn, đừng thay đổi đáp án quá nhiều lần.'
-      },
       'Reading': {
-        description: 'Đánh giá khả năng đọc hiểu văn bản tiếng Anh',
+        title: 'Phần Đọc Hiểu (Reading)',
+        description: 'Đánh giá khả năng đọc hiểu và xử lý thông tin từ các loại văn bản khác nhau',
         icon: '📖',
-        instructions: [
-          'Đọc lướt toàn bộ văn bản trước',
-          'Đọc kỹ câu hỏi để hiểu yêu cầu',
-          'Quay lại văn bản để tìm thông tin cụ thể'
+        duration: '35 phút',
+        totalPoints: '50 điểm',
+        structure: [
+          'Part 1: Gap Filling - 1 câu',
+          'Part 2: Ordering - 2 câu',
+          'Part 3: Matching - 1 câu',
+          'Part 4: Matching Headings - 1 câu'
         ],
-        timePerQuestion: '2-3 phút',
-        tips: 'Quản lý thời gian hiệu quả - không dành quá nhiều thời gian cho một câu hỏi.'
+        instructions: [
+          'Đọc lướt toàn bộ văn bản để hiểu ý chính',
+          'Đọc kỹ câu hỏi để hiểu yêu cầu cụ thể',
+          'Quay lại tìm các chi tiết hỗ trợ cho câu trả lời',
+          'Quản lý thời gian - dành ~8 phút cho mỗi phần'
+        ],
+        tips: '⏱️ Không dành quá nhiều thời gian cho một phần. Bỏ qua câu khó và quay lại sau nếu còn thời gian.',
+        warnings: []
       },
       'Listening': {
-        description: 'Kiểm tra khả năng nghe hiểu tiếng Anh',
+        title: 'Phần Nghe Hiểu (Listening)',
+        description: 'Đánh giá khả năng hiểu nội dung từ các tài liệu nghe tiếng Anh đa dạng',
         icon: '🎧',
-        instructions: [
-          'Đọc câu hỏi trước khi nghe',
-          'Tập trung hoàn toàn trong suốt quá trình nghe',
-          'Ghi chú những từ khóa quan trọng'
+        duration: '40 phút',
+        totalPoints: '50 điểm',
+        structure: [
+          'Part 1: Multiple Choice - 13 câu',
+          'Part 2: Speaker Matching - 4 câu',
+          'Part 3: Statement Matching - 4 câu',
+          'Part 4: Extended MCQ - 2 câu'
         ],
-        timePerQuestion: 'Theo audio',
-        tips: 'Audio chỉ phát một lần duy nhất, hãy tập trung cao độ.'
+        instructions: [
+          'Đọc câu hỏi kỹ lưỡng TRƯỚC khi nghe',
+          'Tập trung cao độ - audio chỉ phát một lần',
+          'Ghi chú những từ khóa và thông tin quan trọng',
+          'Đừng lo nếu bỏ lỡ một phần - hãy tập trung vào câu tiếp theo'
+        ],
+        tips: '🎵 Audio phát một lần duy nhất. Hãy chuẩn bị tinh thần và tập trung hoàn toàn trước khi bắt đầu.',
+        warnings: [
+          '⚠️ Kiểm tra loa hoặc tai nghe của bạn trước khi bắt đầu',
+          '⚠️ Tìm môi trường yên tĩnh để nghe rõ nhất'
+        ]
       },
       'Writing': {
-        description: 'Đánh giá kỹ năng viết và diễn đạt bằng tiếng Anh',
+        title: 'Phần Viết (Writing)',
+        description: 'Đánh giá khả năng viết các loại text khác nhau với ngữ pháp, từ vựng và tổ chức ý tưởng hợp lý',
         icon: '✍️',
-        instructions: [
-          'Đọc kỹ yêu cầu của từng bài viết',
-          'Lập dàn ý trước khi bắt đầu viết',
-          'Kiểm tra lại ngữ pháp và chính tả'
+        duration: '50 phút',
+        totalPoints: '50 điểm',
+        structure: [
+          'Task 1: Form Filling - 1 câu',
+          'Task 2: Short Response - 1 câu',
+          'Task 3: Chat Responses - 1 câu',
+          'Task 4: Email Writing - 1 câu'
         ],
-        timePerQuestion: '10-15 phút',
-        tips: 'Viết rõ ràng, mạch lạc và phù hợp với yêu cầu đề bài.'
+        instructions: [
+          'Đọc kỹ hướng dẫn và yêu cầu của từng task',
+          'Lập dàn ý trước - không viết liền liền',
+          'Kiểm tra chính tả và ngữ pháp sau khi hoàn thành',
+          'Tuân thủ độ dài yêu cầu (nếu có)'
+        ],
+        tips: '📝 Bắt đầu với các task dễ hơn (Task 1-2) để xây dựng tự tin trước khi làm Task 3-4 phức tạp hơn.',
+        warnings: [
+          '⚠️ Task 4 dành nhiều thời gian nhất - đây là phần quan trọng',
+          '⚠️ Chất lượng viết (ngữ pháp, từ vựng) ảnh hưởng đến điểm'
+        ]
       },
       'Speaking': {
-        description: 'Kiểm tra khả năng nói và phát âm tiếng Anh',
+        title: 'Phần Nói (Speaking)',
+        description: 'Đánh giá khả năng nói tiếng Anh từ những tình huống giao tiếp đơn giản đến phức tạp',
         icon: '🎤',
-        instructions: [
-          'Kiểm tra micro trước khi bắt đầu',
-          'Nói rõ ràng và với tốc độ vừa phải',
-          'Suy nghĩ trong vài giây trước khi trả lời'
+        duration: '10 phút',
+        totalPoints: '50 điểm',
+        structure: [
+          'Part 1: Personal Introduction - 3 câu',
+          'Part 2: Picture Description - 3 câu',
+          'Part 3: Comparison - 3 câu',
+          'Part 4: Topic Discussion - 1 câu'
         ],
-        timePerQuestion: '30-60 giây',
-        tips: 'Đừng lo lắng về phát âm hoàn hảo, hãy tập trung vào việc truyền đạt ý tưởng.'
+        instructions: [
+          'Nói rõ ràng, với tốc độ vừa phải - không quá nhanh hay quá chậm',
+          'Suy nghĩ trong 10-15 giây trước khi trả lời',
+          'Trả lời đầy đủ - không chỉ "yes" hoặc "no"',
+          'Part 4 dài nhất - chuẩn bị ý tưởng chi tiết'
+        ],
+        tips: '🎙️ Part 4 quan trọng nhất với 14 điểm. Đảm bảo bạn nói rõ ràng, logic và phát triển ý tưởng của mình.',
+        warnings: [
+          '⚠️ Kiểm tra microphone hoạt động tốt TRƯỚC khi bắt đầu',
+          '⚠️ Tìm môi trường yên tĩnh, tránh tiếng ồn nền',
+          '⚠️ Mỗi câu hỏi chỉ ghi âm một lần - không thể quay lại',
+          '⚠️ Không được tạm dừng hoặc sửa lại sau khi bắt đầu nói'
+        ]
       }
     };
 
     return skillMap[skillName] || {
+      title: 'Phần Thi',
       description: 'Kỹ năng tiếng Anh',
       icon: '📝',
+      duration: 'N/A',
+      totalPoints: 'N/A',
+      structure: [],
       instructions: ['Làm theo hướng dẫn'],
-      timePerQuestion: 'Không giới hạn',
-      tips: 'Hãy cố gắng hết sức!'
+      tips: '💪 Hãy cố gắng hết sức của bạn!',
+      warnings: []
     };
   };
 
@@ -104,7 +148,11 @@ const SkillIntroduction = ({ open, skill, onClose, onStartSkill, questionsLoaded
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={(event, reason) => {
+        // Chỉ cho phép đóng dialog nếu lý do không phải là click backdrop
+        if (reason && reason === 'backdropClick') return;
+        if (onClose) onClose(event, reason);
+      }}
       maxWidth="md"
       fullWidth
       disableEscapeKeyDown
@@ -122,10 +170,10 @@ const SkillIntroduction = ({ open, skill, onClose, onStartSkill, questionsLoaded
           </Typography>
           <Box>
             <Typography variant="h5" component="div" sx={{ fontWeight: 'bold' }}>
-              {skill.skill_type_name}
+              {skillInfo.title}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Chuẩn bị bắt đầu phần thi
+              {skillInfo.totalPoints} • {skillInfo.duration}
             </Typography>
           </Box>
         </Box>
@@ -138,13 +186,37 @@ const SkillIntroduction = ({ open, skill, onClose, onStartSkill, questionsLoaded
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
               <Info />
               <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                Giới thiệu
+                Mô tả
               </Typography>
             </Box>
             <Typography variant="body1">
               {skillInfo.description}
             </Typography>
           </Paper>
+
+          {/* Structure */}
+          {skillInfo.structure.length > 0 && (
+            <Box>
+              <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: 1 }}>
+                📋 Cấu trúc phần thi
+              </Typography>
+              <List sx={{ bgcolor: 'background.paper', borderRadius: 1, border: 1, borderColor: 'divider' }}>
+                {skillInfo.structure.map((item, index) => (
+                  <ListItem key={index} sx={{ py: 1.5 }}>
+                    <ListItemIcon sx={{ minWidth: 32 }}>
+                      <Typography variant="body2" color="primary" sx={{ fontWeight: 'bold' }}>
+                        {index + 1}.
+                      </Typography>
+                    </ListItemIcon>
+                    <ListItemText 
+                      primary={item}
+                      primaryTypographyProps={{ variant: 'body2' }}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            </Box>
+          )}
 
           {/* Instructions */}
           <Box>
@@ -154,51 +226,38 @@ const SkillIntroduction = ({ open, skill, onClose, onStartSkill, questionsLoaded
             </Typography>
             <List sx={{ bgcolor: 'background.paper', borderRadius: 1, border: 1, borderColor: 'divider' }}>
               {skillInfo.instructions.map((instruction, index) => (
-                <ListItem key={index}>
-                  <ListItemIcon>
-                    <Typography variant="h6" color="primary">
+                <ListItem key={index} sx={{ py: 1 }}>
+                  <ListItemIcon sx={{ minWidth: 32 }}>
+                    <Typography variant="body2" color="primary" sx={{ fontWeight: 'bold' }}>
                       {index + 1}.
                     </Typography>
                   </ListItemIcon>
-                  <ListItemText primary={instruction} />
+                  <ListItemText 
+                    primary={instruction}
+                    primaryTypographyProps={{ variant: 'body2' }}
+                  />
                 </ListItem>
               ))}
             </List>
           </Box>
 
-          {/* Time and Tips */}
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <Paper sx={{ p: 2, flex: 1, textAlign: 'center' }}>
-              <Timer color="primary" sx={{ fontSize: 32, mb: 1 }} />
-              <Typography variant="subtitle2" color="text.secondary">
-                Thời gian mỗi câu
-              </Typography>
-              <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                {skillInfo.timePerQuestion}
-              </Typography>
-            </Paper>
-            <Paper sx={{ p: 2, flex: 2 }}>
-              <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                💡 Mẹo nhỏ:
-              </Typography>
-              <Typography variant="body2">
-                {skillInfo.tips}
-              </Typography>
-            </Paper>
-          </Box>
+          {/* Tips */}
+          <Paper sx={{ p: 2.5, backgroundColor: '#f5f5f5', border: 1, borderColor: 'divider' }}>
+            <Typography variant="body2">
+              {skillInfo.tips}
+            </Typography>
+          </Paper>
 
-          {/* Warning for Speaking */}
-          {skill.skill_type_name === 'Speaking' && (
-            <Paper sx={{ p: 2, backgroundColor: 'warning.light', border: 1, borderColor: 'warning.main' }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>
-                ⚠️ Lưu ý quan trọng cho phần Speaking:
-              </Typography>
-              <Typography variant="body2">
-                • Đảm bảo microphone hoạt động tốt<br/>
-                • Tìm môi trường yên tĩnh<br/>
-                • Không được tạm dừng khi đã bắt đầu ghi âm<br/>
-                • Mỗi câu hỏi chỉ có một lần ghi âm
-              </Typography>
+          {/* Warnings */}
+          {skillInfo.warnings.length > 0 && (
+            <Paper sx={{ p: 2.5, backgroundColor: 'warning.light', border: 1, borderColor: 'warning.main' }}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {skillInfo.warnings.map((warning, index) => (
+                  <Typography key={index} variant="body2">
+                    {warning}
+                  </Typography>
+                ))}
+              </Box>
             </Paper>
           )}
         </Box>

@@ -432,51 +432,6 @@ J. A notice about cleaning`,
     status: 'active',
   });
 
-  // Create description options (A-J)
-  const descriptions = [
-    { text: 'A warning about vehicle removal', label: 'A' },
-    { text: 'A request for quiet behavior', label: 'B' },
-    { text: 'Safety instructions for students', label: 'C' },
-    { text: 'Information about equipment failure', label: 'D' },
-    { text: 'Rules about borrowed items', label: 'E' },
-    { text: 'A ban on smoking', label: 'F' },
-    { text: 'Instructions for audience members', label: 'G' },
-    { text: 'Directions to another location', label: 'H' },
-    { text: 'Information about opening hours', label: 'I' },
-    { text: 'A notice about cleaning', label: 'J' }
-  ];
-
-  const optionMap = {};
-  for (let k = 0; k < descriptions.length; k++) {
-    const option = await QuestionOption.create({
-      question_id: question5.id,
-      item_id: null,
-      option_text: descriptions[k].text,
-      option_order: k + 1,
-      is_correct: false,
-    });
-    optionMap[descriptions[k].label] = option.id;
-  }
-
-  // Create 7 matching items with correct answers
-  const matchingItems = [
-    { text: 'No parking sign', correctAnswer: 'A' },
-    { text: 'Lab safety rule', correctAnswer: 'C' },
-    { text: 'Noise complaint', correctAnswer: 'B' },
-    { text: 'Library notice', correctAnswer: 'E' },
-    { text: 'Elevator notice', correctAnswer: 'D' },
-    { text: 'Smoking ban', correctAnswer: 'F' },
-    { text: 'Theater rule', correctAnswer: 'G' }
-  ];
-
-  for (let j = 0; j < 7; j++) {
-    const item = await QuestionItem.create({
-      question_id: question5.id,
-      item_order: j + 1,
-      item_text: matchingItems[j].text,
-      correct_option_id: optionMap[matchingItems[j].correctAnswer],
-    });
-  }
 }
 
 // ========================================
@@ -779,9 +734,9 @@ async function seedWritingQuestions(aptisType, teacher) {
     });
   }
 
-  // Task 3 (B1): Chat Responses - 2 câu hỏi
+  // Task 3 (B1): Chat Responses - 1 câu hỏi (3 chat exchanges)
   const task3Questions = [
-    "Chat about your weekend\n\nReply to chat messages (30-40 words each):\n\nAlex: Hi! Did you do anything fun last weekend?\nYour reply: _______\n\nSam: What's your favorite thing to do on weekends?\nYour reply: _______",
+    "Chat about your weekend\n\nReply to chat messages (30-40 words each):\n\nAlex: Hi! Did you do anything fun last weekend?\nYour reply: _______\n\nSam: What's your favorite thing to do on weekends?\nYour reply: _______\n\nJordan: Did you go anywhere during the weekend?\nYour reply: _______",
   ];
 
   for (let i = 0; i < 1; i++) {
@@ -795,9 +750,9 @@ async function seedWritingQuestions(aptisType, teacher) {
     });
   }
   
-  // Task 4 (B2): Email Writing - 2 câu hỏi
+  // Task 4 (B2): Email Writing - 1 câu hỏi (3 email replies với độ khó tăng dần)
   const task4Questions = [
-    "Email about a class trip\n\nRead the email from your teacher:\n\nFrom: Teacher <teacher@school.com>\nSubject: School trip to the museum\n\nDear student,\n\nWe are planning a class trip to the museum. Do you want to go? What do you want to see there?\n\nPlease write back with your answer.\n\nTeacher\n\n---\n\nWrite TWO emails:\n\n1. Email to a friend (50 words):\n_______\n\n2. Reply to teacher (100-120 words):\n_______",
+    "Email discussion about a class trip\n\nRead the email from your teacher:\n\nFrom: Teacher <teacher@school.com>\nSubject: School trip to the museum\n\nDear student,\n\nWe are planning a class trip to the museum. Do you want to go? What do you want to see there?\n\nPlease write back with your answer.\n\nTeacher\n\n---\n\nWrite THREE emails:\n\n1. Email to a friend (50 words) - EASY:\n_______\n\n2. Email to school manager (80-100 words) - MEDIUM:\n_______\n\n3. Formal discussion email (120-150 words) - HARD:\n_______",
   ];
 
   for (let i = 0; i < 1; i++) {
@@ -823,60 +778,135 @@ async function seedWritingQuestions(aptisType, teacher) {
 // Focus: Sustainability - ability to sustain CEFR level throughout response
 // ========================================
 async function seedSpeakingQuestions(aptisType, teacher) {
-  console.log('[Seed] Seeding 4 Speaking tasks...');
+  console.log('[Seed] Seeding 10 Speaking questions across 4 sections...');
 
   const speakingPersonalType = await QuestionType.findOne({ where: { code: 'SPEAKING_INTRO' } });
-  const speakingCompareType = await QuestionType.findOne({ where: { code: 'SPEAKING_COMPARISON' } });
-  const speakingPictureType = await QuestionType.findOne({ where: { code: 'SPEAKING_DESCRIPTION' } });
+  const speakingDescriptionType = await QuestionType.findOne({ where: { code: 'SPEAKING_DESCRIPTION' } });
+  const speakingComparisonType = await QuestionType.findOne({ where: { code: 'SPEAKING_COMPARISON' } });
   const speakingDiscussionType = await QuestionType.findOne({ where: { code: 'SPEAKING_DISCUSSION' } });
 
-  // Task 1: Personal information (30s prep + 1 min speak)
+  // ===== SECTION 1: Personal Introduction (3 questions) =====
+  // Q1: Tell about yourself
   await Question.create({
     question_type_id: speakingPersonalType.id,
     aptis_type_id: aptisType.id,
     difficulty: 'easy',
-    content: 'Tell me about yourself:\n- Name and where you\'re from\n- Work or studies\n- Hobbies and interests\n\n30 seconds to prepare, 1 minute to speak.',
+    content: 'Tell me about yourself:\n- Name and where you\'re from\n- What you do (work or studies)\n- Your hobbies and interests\n\n30 seconds to prepare, 1 minute to speak.',
     duration_seconds: 90,
     created_by: teacher.id,
     status: 'active',
   });
 
-  // Task 2: Describe and compare (1 min prep + 1.5 min speak)
+  // Q2: Describe your daily routine
   await Question.create({
-    question_type_id: speakingCompareType.id,
+    question_type_id: speakingPersonalType.id,
+    aptis_type_id: aptisType.id,
+    difficulty: 'easy',
+    content: 'Describe your typical day:\n- When you wake up and go to sleep\n- Your main activities\n- What you enjoy most\n\n30 seconds to prepare, 1 minute to speak.',
+    duration_seconds: 90,
+    created_by: teacher.id,
+    status: 'active',
+  });
+
+  // Q3: Talk about your family
+  await Question.create({
+    question_type_id: speakingPersonalType.id,
+    aptis_type_id: aptisType.id,
+    difficulty: 'easy',
+    content: 'Tell me about your family:\n- Who your family members are\n- What they do\n- Something special about your family\n\n30 seconds to prepare, 1 minute to speak.',
+    duration_seconds: 90,
+    created_by: teacher.id,
+    status: 'active',
+  });
+
+  // ===== SECTION 2: Picture Description (3 questions) =====
+  // Q4: Describe a park scene
+  await Question.create({
+    question_type_id: speakingDescriptionType.id,
     aptis_type_id: aptisType.id,
     difficulty: 'medium',
-    content: 'Look at two pictures (traveling by car vs train).\n\nCompare them:\n- Differences\n- Which you prefer and why\n\n1 minute to prepare, 1.5 minutes to speak.',
-    media_url: '/images/speaking_task2.jpg',
+    content: 'Look at the picture of a park.\n\nDescribe:\n- The people and what they are doing\n- The buildings and nature\n- The overall atmosphere and season\n\n1 minute to prepare, 1.5 minutes to speak.',
+    media_url: 'https://picsum.photos/640/480?random=1',
     duration_seconds: 150,
     created_by: teacher.id,
     status: 'active',
   });
 
-  // Task 3: Describe picture (1 min prep + 2 min speak)
+  // Q5: Describe a busy street
   await Question.create({
-    question_type_id: speakingPictureType.id,
+    question_type_id: speakingDescriptionType.id,
     aptis_type_id: aptisType.id,
     difficulty: 'medium',
-    content: 'Look at a busy city street picture.\n\nDescribe:\n- People and their activities\n- Buildings and environment\n- Overall atmosphere\n\n1 minute to prepare, 2 minutes to speak.',
-    media_url: '/images/speaking_task3.jpg',
-    duration_seconds: 180,
+    content: 'Look at the picture of a busy city street.\n\nDescribe:\n- The people and their activities\n- The vehicles and buildings\n- The time of day and weather\n\n1 minute to prepare, 1.5 minutes to speak.',
+    media_url: 'https://picsum.photos/640/480?random=2',
+    duration_seconds: 150,
     created_by: teacher.id,
     status: 'active',
   });
 
-  // Task 4: Discussion (1 min prep + 2 min speak)
+  // Q6: Describe a restaurant scene
+  await Question.create({
+    question_type_id: speakingDescriptionType.id,
+    aptis_type_id: aptisType.id,
+    difficulty: 'medium',
+    content: 'Look at the picture of a restaurant.\n\nDescribe:\n- What people are doing\n- The interior and decoration\n- The type of food or service you see\n\n1 minute to prepare, 1.5 minutes to speak.',
+    media_url: 'https://picsum.photos/640/480?random=3',
+    duration_seconds: 150,
+    created_by: teacher.id,
+    status: 'active',
+  });
+
+  // ===== SECTION 3: Comparison (3 questions) =====
+  // Q7: Compare transportation methods
+  await Question.create({
+    question_type_id: speakingComparisonType.id,
+    aptis_type_id: aptisType.id,
+    difficulty: 'medium',
+    content: 'Look at the two pictures showing different ways to travel.\n\nCompare them:\n- What are the similarities and differences?\n- Which method is faster and why?\n- Which would you prefer and why?\n\n1 minute to prepare, 1.5 minutes to speak.',
+    media_url: 'https://picsum.photos/640/480?random=4',
+    duration_seconds: 150,
+    created_by: teacher.id,
+    status: 'active',
+  });
+
+  // Q8: Compare two ways of working
+  await Question.create({
+    question_type_id: speakingComparisonType.id,
+    aptis_type_id: aptisType.id,
+    difficulty: 'medium',
+    content: 'Look at the two pictures showing different work environments.\n\nCompare them:\n- Describe what you see in each picture\n- What are the advantages and disadvantages of each?\n- Which would you prefer and why?\n\n1 minute to prepare, 1.5 minutes to speak.',
+    media_url: 'https://picsum.photos/640/480?random=5',
+    duration_seconds: 150,
+    created_by: teacher.id,
+    status: 'active',
+  });
+
+  // Q9: Compare two leisure activities
+  await Question.create({
+    question_type_id: speakingComparisonType.id,
+    aptis_type_id: aptisType.id,
+    difficulty: 'medium',
+    content: 'Look at the two pictures showing different leisure activities.\n\nCompare them:\n- What are people doing in each picture?\n- What are the benefits of each activity?\n- Which activity would you enjoy more and why?\n\n1 minute to prepare, 1.5 minutes to speak.',
+    media_url: 'https://picsum.photos/640/480?random=6',
+    duration_seconds: 150,
+    created_by: teacher.id,
+    status: 'active',
+  });
+
+  // ===== SECTION 4: Topic Discussion (1 question) =====
+  // Q10: Discuss technology in education
   await Question.create({
     question_type_id: speakingDiscussionType.id,
     aptis_type_id: aptisType.id,
     difficulty: 'hard',
-    content: 'Topic: Technology in education\n\nDiscuss:\n- How has technology changed learning?\n- Advantages and disadvantages of online learning\n- Future of education\n\n1 minute to prepare, 2 minutes to speak.',
+    content: 'Topic: Technology in Education\n\nDiscuss:\n- How has technology changed the way people learn?\n- What are the advantages and disadvantages of online learning?\n- What will be the future of education?\n\n1 minute to prepare, 2 minutes to speak.',
+    media_url: 'https://picsum.photos/640/480?random=7',
     duration_seconds: 180,
     created_by: teacher.id,
     status: 'active',
   });
 
-  console.log(`[Seed] ✓ 4 Speaking tasks created (4 x 12.5 = 50 điểm)`);
+  console.log(`[Seed] ✓ 10 Speaking questions created (3+3+3+1 sections = 50 điểm tổng)`);
 }
 
 // Run if called directly

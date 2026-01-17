@@ -30,7 +30,7 @@ import {
   CalendarToday,
 } from '@mui/icons-material';
 import { updateProfile } from '@/store/slices/authSlice';
-import { showNotification } from '@/store/slices/uiSlice';
+import { showSnackbar } from '@/store/slices/uiSlice';
 import userService from '@/services/userService';
 
 export default function ProfilePage() {
@@ -90,13 +90,13 @@ export default function ProfilePage() {
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      dispatch(showNotification({ message: 'Vui lòng chọn file hình ảnh', type: 'error' }));
+      dispatch(showSnackbar({ message: 'Vui lòng chọn file hình ảnh', severity: 'error' }));
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      dispatch(showNotification({ message: 'Kích thước file quá lớn (tối đa 5MB)', type: 'error' }));
+      dispatch(showSnackbar({ message: 'Kích thước file quá lớn (tối đa 5MB)', severity: 'error' }));
       return;
     }
 
@@ -106,14 +106,14 @@ export default function ProfilePage() {
       formData.append('avatar', file);
       
       await userService.uploadAvatar(formData);
-      dispatch(showNotification({ message: 'Đã cập nhật ảnh đại diện thành công', type: 'success' }));
+      dispatch(showSnackbar({ message: 'Đã cập nhật ảnh đại diện thành công', severity: 'success' }));
       
       // Reload user data
       window.location.reload();
     } catch (error) {
-      dispatch(showNotification({
+      dispatch(showSnackbar({
         message: error.response?.data?.message || 'Có lỗi xảy ra khi tải lên ảnh',
-        type: 'error'
+        severity: 'error'
       }));
     } finally {
       setIsUploadingAvatar(false);
@@ -128,7 +128,7 @@ export default function ProfilePage() {
     try {
       await dispatch(updateProfile(formData)).unwrap();
       setIsEditing(false);
-      dispatch(showNotification({ message: 'Đã cập nhật thông tin thành công', type: 'success' }));
+      dispatch(showSnackbar({ message: 'Đã cập nhật thông tin thành công', severity: 'success' }));
     } catch (err) {
       // Error is handled by Redux slice
     }

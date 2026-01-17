@@ -5,12 +5,14 @@ import {
   Box,
   Typography,
   TextField,
+  Chip,
 } from '@mui/material';
 
 export default function WritingEmailQuestion({ question, onAnswerChange }) {
   const [answers, setAnswers] = useState({
     friendEmail: '',
-    managerEmail: ''
+    managerEmail: '',
+    formalEmail: ''
   });
 
   // Parse question content
@@ -57,8 +59,9 @@ export default function WritingEmailQuestion({ question, onAnswerChange }) {
           title,
           managerEmail,
           tasks: [
-            { type: "friend", description: "Email to a friend (50 words)" },
-            { type: "manager", description: "Email to manager (100-120 words)" }
+            { type: "friend", description: "Email to a friend", wordCount: "50 words", difficulty: "EASY", maxPoints: 5, icon: "📝" },
+            { type: "manager", description: "Email to school manager", wordCount: "80-100 words", difficulty: "MEDIUM", maxPoints: 10, icon: "📧" },
+            { type: "formal", description: "Formal discussion email", wordCount: "120-150 words", difficulty: "HARD", maxPoints: 15, icon: "📬" }
           ]
         };
       }
@@ -79,33 +82,33 @@ export default function WritingEmailQuestion({ question, onAnswerChange }) {
       if (question.answer_data.text_answer) {
         console.log('[WritingEmailQuestion] Found existing answer:', question.answer_data.text_answer);
         
-        // Parse structured text format: Friend Email:\n<content>\n\nManager Email:\n<content>
         const textAnswer = question.answer_data.text_answer;
         
         let friendEmail = '';
         let managerEmail = '';
+        let formalEmail = '';
         
-        if (textAnswer.includes('Friend Email:') && textAnswer.includes('Manager Email:')) {
-          // Standard format
+        if (textAnswer.includes('Friend Email:') && textAnswer.includes('Manager Email:') && textAnswer.includes('Formal Email:')) {
           const friendMatch = textAnswer.match(/Friend Email:\n([\s\S]*?)(?:\n\nManager Email:|$)/);
-          const managerMatch = textAnswer.match(/Manager Email:\n([\s\S]*?)$/);
+          const managerMatch = textAnswer.match(/Manager Email:\n([\s\S]*?)(?:\n\nFormal Email:|$)/);
+          const formalMatch = textAnswer.match(/Formal Email:\n([\s\S]*?)$/);
           
           friendEmail = friendMatch ? friendMatch[1].trim() : '';
           managerEmail = managerMatch ? managerMatch[1].trim() : '';
+          formalEmail = formalMatch ? formalMatch[1].trim() : '';
         } else {
-          // Fallback - treat as friend email if format doesn't match
           friendEmail = textAnswer.trim();
         }
         
-        console.log('[WritingEmailQuestion] Parsed emails:', { friendEmail, managerEmail });
-        setAnswers({ friendEmail, managerEmail });
+        console.log('[WritingEmailQuestion] Parsed emails:', { friendEmail, managerEmail, formalEmail });
+        setAnswers({ friendEmail, managerEmail, formalEmail });
       } else {
         console.log('[WritingEmailQuestion] No existing answer, resetting');
-        setAnswers({ friendEmail: '', managerEmail: '' });
+        setAnswers({ friendEmail: '', managerEmail: '', formalEmail: '' });
       }
     } else {
       console.log('[WritingEmailQuestion] No answer_data, resetting');
-      setAnswers({ friendEmail: '', managerEmail: '' });
+      setAnswers({ friendEmail: '', managerEmail: '', formalEmail: '' });
     }
   }, [question.id, question.answer_data]);
 
@@ -120,7 +123,7 @@ export default function WritingEmailQuestion({ question, onAnswerChange }) {
     setAnswers(newAnswers);
     
     // Convert to formatted text for consistent storage
-    const formattedText = `Friend Email:\n${newAnswers.friendEmail}\n\nManager Email:\n${newAnswers.managerEmail}`;
+    const formattedText = `Friend Email:\n${newAnswers.friendEmail}\n\nManager Email:\n${newAnswers.managerEmail}\n\nFormal Email:\n${newAnswers.formalEmail}`;
     
     console.log(`[WritingEmailQuestion] Sending formatted answer:`, formattedText);
     
@@ -141,6 +144,7 @@ export default function WritingEmailQuestion({ question, onAnswerChange }) {
 
   const friendWordCount = countWords(answers.friendEmail);
   const managerWordCount = countWords(answers.managerEmail);
+  const formalWordCount = countWords(answers.formalEmail);
 
   return (
     <Box sx={{ p: 3 }}>
@@ -148,7 +152,7 @@ export default function WritingEmailQuestion({ question, onAnswerChange }) {
         {questionData.title}
       </Typography>
 
-      {/* Manager Email - Simplified */}
+      {/* Manager Email - Reference Context */}
       <Box sx={{ mb: 4, p: 2.5, border: '1px solid #ddd', borderRadius: 1, bgcolor: '#f5f5f5' }}>
         <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>Email from Manager</Typography>
         <Typography variant="caption" sx={{ color: 'text.secondary' }}>
@@ -172,12 +176,26 @@ export default function WritingEmailQuestion({ question, onAnswerChange }) {
         </Box>
       </Box>
 
-      {/* Friend Email - Simplified */}
-      <Box sx={{ mb: 3 }}>
-        <Box sx={{ mb: 1.5 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.5 }}>Email to a Friend</Typography>
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>Write a casual email (50 words)</Typography>
+      {/* Email 1: Friend Email */}
+      <Box sx={{ mb: 4 }}>
+        <Box sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+            {questionData.tasks[0].icon} {questionData.tasks[0].description}
+          </Typography>
+          <Chip 
+            label={questionData.tasks[0].difficulty} 
+            size="small" 
+            color="success" 
+            variant="outlined"
+            sx={{ fontWeight: 'bold', fontSize: '0.75rem' }}
+          />
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+            {questionData.tasks[0].maxPoints}pts
+          </Typography>
         </Box>
+        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1 }}>
+          Write a casual email ({questionData.tasks[0].wordCount})
+        </Typography>
         
         <TextField
           multiline
@@ -206,12 +224,26 @@ I wanted to tell you about..."
 
       <Box sx={{ my: 3, borderTop: '1px solid #ddd' }} />
 
-      {/* Manager Reply - Simplified */}
-      <Box>
-        <Box sx={{ mb: 1.5 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.5 }}>Reply to Manager</Typography>
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>Write a professional email (100-120 words)</Typography>
+      {/* Email 2: Manager Email */}
+      <Box sx={{ mb: 4 }}>
+        <Box sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+            {questionData.tasks[1].icon} {questionData.tasks[1].description}
+          </Typography>
+          <Chip 
+            label={questionData.tasks[1].difficulty} 
+            size="small" 
+            color="warning" 
+            variant="outlined"
+            sx={{ fontWeight: 'bold', fontSize: '0.75rem' }}
+          />
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+            {questionData.tasks[1].maxPoints}pts
+          </Typography>
         </Box>
+        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1 }}>
+          Write a semi-formal email ({questionData.tasks[1].wordCount})
+        </Typography>
         
         <TextField
           multiline
@@ -234,7 +266,55 @@ Thank you for your email..."
         
         <Typography variant="caption" sx={{ color: 'text.secondary' }}>
           {managerWordCount} words 
-          {managerWordCount >= 100 && managerWordCount <= 120 ? ' ✓' : managerWordCount < 100 ? ` (need ${100 - managerWordCount} more)` : ` (${managerWordCount - 120} too many)`}
+          {managerWordCount >= 80 && managerWordCount <= 100 ? ' ✓' : managerWordCount < 80 ? ` (need ${80 - managerWordCount} more)` : ` (${managerWordCount - 100} too many)`}
+        </Typography>
+      </Box>
+
+      <Box sx={{ my: 3, borderTop: '1px solid #ddd' }} />
+
+      {/* Email 3: Formal Discussion Email */}
+      <Box>
+        <Box sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+            {questionData.tasks[2].icon} {questionData.tasks[2].description}
+          </Typography>
+          <Chip 
+            label={questionData.tasks[2].difficulty} 
+            size="small" 
+            color="error" 
+            variant="outlined"
+            sx={{ fontWeight: 'bold', fontSize: '0.75rem' }}
+          />
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
+            {questionData.tasks[2].maxPoints}pts
+          </Typography>
+        </Box>
+        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 1 }}>
+          Write a formal professional email with detailed discussion ({questionData.tasks[2].wordCount})
+        </Typography>
+        
+        <TextField
+          multiline
+          fullWidth
+          rows={6}
+          value={answers.formalEmail}
+          onChange={(e) => handleAnswerChange('formalEmail', e.target.value)}
+          variant="outlined"
+          placeholder="Dear Sir/Madam,
+
+I am writing to discuss..."
+          sx={{
+            mb: 1,
+            '& .MuiOutlinedInput-root': {
+              backgroundColor: 'white',
+              fontSize: '0.95rem'
+            }
+          }}
+        />
+        
+        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+          {formalWordCount} words 
+          {formalWordCount >= 120 && formalWordCount <= 150 ? ' ✓' : formalWordCount < 120 ? ` (need ${120 - formalWordCount} more)` : ` (${formalWordCount - 150} too many)`}
         </Typography>
       </Box>
     </Box>

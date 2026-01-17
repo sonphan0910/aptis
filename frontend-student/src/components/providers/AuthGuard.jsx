@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { usePathname, useRouter } from 'next/navigation';
 import { checkAuthStatus } from '@/store/slices/authSlice';
@@ -12,42 +12,68 @@ export default function AuthGuard({ children }) {
   const dispatch = useDispatch();
   const router = useRouter();
   const pathname = usePathname();
+  const [initializing, setInitializing] = useState(true);
   
-  const { isAuthenticated, isLoading, isInitialized } = useSelector((state) => state.auth);
+  const { isAuthenticated, isLoading, isInitialized, token, user } = useSelector((state) => state.auth);
 
   useEffect(() => {
-    // Check authentication status when app loads
+    // Quick initialization check
     if (!isInitialized) {
-      // Only check auth status if we have a token
-      const hasToken = !!(localStorage.getItem('token') || sessionStorage.getItem('token'));
+      const storedToken = typeof window !== 'undefined' ? (localStorage.getItem('token') || sessionStorage.getItem('token')) : null;
+      const storedUser = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
       
-      if (hasToken) {
+      if (storedToken && storedUser) {
+        // If we have stored credentials, check if they're still valid
         dispatch(checkAuthStatus());
       } else {
-        // If no token, just mark as initialized
+        // No stored credentials, mark as initialized quickly
         dispatch({ type: 'auth/setInitialized' });
       }
     }
   }, [dispatch, isInitialized]);
 
   useEffect(() => {
-    // Handle redirects after authentication state is determined
+    // Handle redirects only when fully initialized
     if (isInitialized && !isLoading) {
       const isPublicRoute = publicRoutes.includes(pathname);
       
-      if (!isAuthenticated && !isPublicRoute) {
-        // Redirect to login if not authenticated and trying to access protected route
-        router.push('/login');
+      // Determine if we need to redirect
+      let redirectPath = null;
+      
+      if (!isAuthenticated && !isPublicRoute && pathname !== '/') {
+        redirectPath = '/login';
       } else if (isAuthenticated && isPublicRoute && pathname !== '/') {
-        // Redirect to dashboard if authenticated and trying to access auth pages
-        router.push('/home');
+        redirectPath = '/home';
+      }
+      
+      if (redirectPath) {
+        // Use replace instead of push to avoid flicker
+        router.replace(redirectPath);
+      } else {
+        // No redirect needed, stop initializing
+        setInitializing(false);
       }
     }
   }, [isAuthenticated, isInitialized, isLoading, pathname, router]);
 
-  // Show loading spinner while checking auth status
-  if (!isInitialized || isLoading) {
-    return <LoadingSpinner />;
+  useEffect(() => {
+    // Stop initializing when authentication is determined
+    if (isInitialized && !isLoading) {
+      const timer = setTimeout(() => setInitializing(false), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isInitialized, isLoading]);
+
+  // Show minimal loading only during initial authentication check
+  if (!isInitialized || (isLoading && initializing)) {
+    const isPublicRoute = publicRoutes.includes(pathname);
+    
+    // For public routes, show content immediately if no stored auth
+    if (isPublicRoute && !token && !user) {
+      return children;
+    }
+    
+    return <LoadingSpinner message="Đang kiểm tra xác thực..." />;
   }
 
   return children;

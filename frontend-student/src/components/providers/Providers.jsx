@@ -1,10 +1,12 @@
 'use client';
 
-import { ThemeProvider, CssBaseline } from '@mui/material';
+import { ThemeProvider } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
 import { Provider } from 'react-redux';
 import { store } from '@/store/store';
 import { createTheme } from '@mui/material/styles';
 import AuthGuard from './AuthGuard';
+import { AudioPlayProvider } from '@/contexts/AudioPlayContext';
 
 const theme = createTheme({
   palette: {
@@ -62,9 +64,11 @@ export default function Providers({ children }) {
     <Provider store={store}>
       <ThemeProvider theme={theme}>
         <CssBaseline />
-        <AuthGuard>
-          {children}
-        </AuthGuard>
+        <AudioPlayProvider>
+          <AuthGuard>
+            {children}
+          </AuthGuard>
+        </AudioPlayProvider>
       </ThemeProvider>
     </Provider>
   );
