@@ -9,8 +9,8 @@ Complete backend implementation for APTIS English Testing Platform with AI-power
 - ✅ **Exam Management**: Create, publish, and manage APTIS exams
 - ✅ **Question Bank**: 19 question types covering all skills (Grammar, Reading, Listening, Writing, Speaking)
 - ✅ **Automated Scoring**: Auto-grading for MCQ, Matching, Gap Filling, Ordering
-- ✅ **AI Scoring**: Gemini 2.0 Flash for Writing and Speaking evaluation
-- ✅ **Speech-to-Text**: Offline Whisper.js transcription (no API costs)
+- ✅ **AI Scoring**: Hybrid Engine (Gemini 2.0 Flash & Groq) for Writing evaluation
+- ✅ **Advanced Speech Analysis**: Azure Speech Services for Speaking scoring (Pronunciation, Fluency, Prosody)
 - ✅ **Manual Review**: Teacher override and feedback system
 - ✅ **Email Notifications**: SMTP email for welcome, password reset, exam updates
 - ✅ **Background Jobs**: In-memory queue for async processing
@@ -19,8 +19,8 @@ Complete backend implementation for APTIS English Testing Platform with AI-power
 ### Technical Stack
 - **Runtime**: Node.js 18+ with Express.js
 - **Database**: MySQL 8.0+ with Sequelize ORM
-- **AI Scoring**: Google Gemini 2.0 Flash API
-- **Speech Recognition**: Whisper.js (offline, tiny model)
+- **AI Scoring**: Google Gemini 2.0 & Groq (Hybrid Provider)
+- **Speech Recognition**: Azure Cognitive Services (Speech-to-Text & Pronunciation Assessment)
 - **Authentication**: JWT with refresh tokens
 - **Email**: nodemailer with Gmail SMTP
 - **Validation**: Joi schemas
@@ -32,8 +32,9 @@ Complete backend implementation for APTIS English Testing Platform with AI-power
 
 - Node.js 18+ ([Download](https://nodejs.org/))
 - MySQL 8.0+ ([Download](https://dev.mysql.com/downloads/))
-- Gmail account with App Password ([Setup Guide](https://support.google.com/accounts/answer/185833))
-- Google Gemini API key ([Get Free Key](https://makersuite.google.com/app/apikey))
+- Gmail account with App Password
+- Google Gemini API key or Groq API Key
+- Azure Speech Resource Key
 
 ### Installation
 
@@ -63,8 +64,14 @@ DB_PASSWORD=your_mysql_password
 # JWT
 JWT_SECRET=your_super_secret_key_here
 
-# Gemini AI
-GEMINI_API_KEY=your_gemini_api_key_here
+# AI Providers
+GEMINI_API_KEY=your_gemini_key
+GROQ_API_KEY=your_groq_key
+AI_PROVIDER=gemini # or groq
+
+# Azure Speech (Required for Speaking)
+AZURE_SPEECH_KEY=your_azure_speech_key
+AZURE_SPEECH_REGION=southeastasia
 
 # Email
 SMTP_USER=your_email@gmail.com
@@ -355,9 +362,9 @@ See [DATABASE_SCHEMA.md](../docs/DATABASE_SCHEMA.md) for complete schema.
 - Exam graded notifications
 
 ### Speech Queue
-- Transcribes audio answers using Whisper
-- Offline processing (no API calls)
-- Updates transcribed_text field
+- Processes audio answers using **Azure Speech Services**
+- Performs transcription and **Pronunciation Assessment**
+- Updates transcribed_text and audio_analysis metrics
 
 ### Cleanup Queue
 - Runs daily at 3 AM
