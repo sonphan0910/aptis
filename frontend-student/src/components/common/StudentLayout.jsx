@@ -30,7 +30,6 @@ import {
   History,
   TrendingUp,
   Person,
-  Notifications,
   Menu as MenuIcon,
   Logout,
   Settings,
@@ -47,7 +46,6 @@ const bottomNavItems = [
   { label: 'Đề thi', icon: <Assessment />, path: '/exams' },
   { label: 'Ôn tập', icon: <TrendingUp />, path: '/practice' },
   { label: 'Kết quả', icon: <History />, path: '/results' },
-  { label: 'Cá nhân', icon: <Person />, path: '/profile' },
 ];
 
 const drawerItems = [
@@ -55,7 +53,6 @@ const drawerItems = [
   { label: 'Đề thi', icon: <Assessment />, path: '/exams' },
   { label: 'Ôn tập', icon: <TrendingUp />, path: '/practice' },
   { label: 'Kết quả', icon: <History />, path: '/results' },
-  { label: 'Cá nhân', icon: <Person />, path: '/profile' },
 ];
 
 export default function StudentLayout({ children }) {
@@ -107,42 +104,52 @@ export default function StudentLayout({ children }) {
         elevation: 0,
         sx: {
           overflow: 'visible',
-          filter: 'drop-shadow(0px 2px 8px rgba(0,0,0,0.32))',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.12)',
           mt: 1.5,
+          border: '1px solid #E8E8E8',
+          borderRadius: '8px',
           '& .MuiAvatar-root': {
-            width: 32,
-            height: 32,
+            width: 36,
+            height: 36,
             ml: -0.5,
-            mr: 1,
+            mr: 1.5,
           },
         },
       }}
       transformOrigin={{ horizontal: 'right', vertical: 'top' }}
       anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
     >
-      <MenuItem onClick={() => handleNavigation('/profile')}>
-        <Avatar sx={{ bgcolor: 'primary.main' }}>
+      <MenuItem onClick={() => handleNavigation('/profile')} sx={{ py: 1.5 }}>
+        <Avatar sx={{ bgcolor: 'primary.main', fontWeight: 600 }}>
           {user?.full_name?.charAt(0)?.toUpperCase()}
         </Avatar>
         <Box>
-          <Typography variant="body1">{user?.full_name}</Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" sx={{ fontWeight: 600, color: '#1F2937' }}>
+            {user?.full_name}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
             {user?.email}
           </Typography>
         </Box>
       </MenuItem>
-      <Divider />
-      <MenuItem onClick={() => handleNavigation('/profile')}>
+      <Divider sx={{ my: 0.5 }} />
+      <MenuItem onClick={() => handleNavigation('/profile')} sx={{ py: 1 }}>
         <ListItemIcon>
-          <Settings fontSize="small" />
+          <Person fontSize="small" sx={{ color: '#6B7280' }} />
         </ListItemIcon>
-        Settings
+        <Typography variant="body2">Trang cá nhân</Typography>
       </MenuItem>
-      <MenuItem onClick={handleLogout}>
+      <MenuItem onClick={() => handleNavigation('/profile')} sx={{ py: 1 }}>
         <ListItemIcon>
-          <Logout fontSize="small" />
+          <Settings fontSize="small" sx={{ color: '#6B7280' }} />
         </ListItemIcon>
-        Sign out
+        <Typography variant="body2">Cài đặt</Typography>
+      </MenuItem>
+      <MenuItem onClick={handleLogout} sx={{ py: 1 }}>
+        <ListItemIcon>
+          <Logout fontSize="small" sx={{ color: '#6B7280' }} />
+        </ListItemIcon>
+        <Typography variant="body2">Đăng xuất</Typography>
       </MenuItem>
     </Menu>
   );
@@ -156,14 +163,29 @@ export default function StudentLayout({ children }) {
         keepMounted: true, // Better open performance on mobile
       }}
       sx={{
-        '& .MuiDrawer-paper': { boxSizing: 'border-box', width: 280 },
+        '& .MuiDrawer-paper': { 
+          boxSizing: 'border-box', 
+          width: 280,
+          backgroundColor: '#FFFFFF',
+        },
       }}
     >
-      <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+      <Box sx={{ p: 2, borderBottom: '1px solid #E8E8E8' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <School sx={{ color: 'primary.main' }} />
-          <Typography variant="h6" color="primary">
-            APTIS Student
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 40,
+            height: 40,
+            backgroundColor: '#1976d2',
+            borderRadius: '8px',
+            color: 'white',
+          }}>
+            <School sx={{ fontSize: 20 }} />
+          </Box>
+          <Typography variant="h6" sx={{ color: '#1F2937', fontWeight: 700 }}>
+            APTIS Master
           </Typography>
         </Box>
       </Box>
@@ -173,8 +195,20 @@ export default function StudentLayout({ children }) {
             <ListItemButton
               onClick={() => handleNavigation(item.path)}
               selected={pathname.startsWith(item.path)}
+              sx={{
+                '&.Mui-selected': {
+                  backgroundColor: '#EFF6FF',
+                  color: '#1976d2',
+                  '& .MuiListItemIcon-root': {
+                    color: '#1976d2',
+                  }
+                },
+                '&:hover': {
+                  backgroundColor: '#F3F4F6',
+                }
+              }}
             >
-              <ListItemIcon>{item.icon}</ListItemIcon>
+              <ListItemIcon sx={{ color: 'inherit' }}>{item.icon}</ListItemIcon>
               <ListItemText primary={item.label} />
             </ListItemButton>
           </ListItem>
@@ -212,71 +246,113 @@ export default function StudentLayout({ children }) {
       )}
       
       {/* Top App Bar */}
-      <AppBar position="fixed" elevation={1}>
-        <Toolbar>
+      <AppBar 
+        position="fixed" 
+        elevation={0}
+        sx={{
+          backgroundColor: '#FFFFFF',
+          borderBottom: '1px solid #E8E8E8',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+        }}
+      >
+          <Box sx={{ maxWidth: '1200px', mx: 'auto', width: '100%', px: { xs: 3 } }}>
+            <Toolbar disableGutters sx={{ py: 1, minHeight: { xs: 56, sm: 64 } }}>
           {isMobile && (
             <IconButton
               color="inherit"
               aria-label="open drawer"
               edge="start"
               onClick={() => setDrawerOpen(true)}
-              sx={{ mr: 2 }}
+              sx={{ mr: 2, color: '#1F2937' }}
             >
               <MenuIcon />
             </IconButton>
           )}
           
-          <School sx={{ mr: 2 }} />
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            APTIS Student
-          </Typography>
 
-          {/* Desktop Navigation Links */}
-          {!isMobile && (
-            <Box sx={{ display: 'flex', gap: 0.5, mr: 3 }}>
-              {drawerItems.map((item) => (
-                <Button
-                  key={item.path}
-                  color="inherit"
-                  onClick={() => handleNavigation(item.path)}
-                  sx={{
-                    textTransform: 'none',
-                    fontSize: '0.95rem',
-                    px: 1.5,
-                    py: 0.75,
-                    borderRadius: 1,
-                    opacity: pathname.startsWith(item.path) ? 1 : 0.7,
-                    backgroundColor: pathname.startsWith(item.path) ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
-                    transition: 'all 0.2s ease',
-                    '&:hover': {
-                      opacity: 1,
-                      backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                    }
-                  }}
-                >
-                  {item.label}
-                </Button>
-              ))}
+          <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+            {/* Logo & Brand */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 160 }}>
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 40,
+                height: 40,
+                backgroundColor: '#1976d2',
+                borderRadius: '8px',
+                color: 'white',
+              }}>
+                <School sx={{ fontSize: 24 }} />
+              </Box>
+              <Typography 
+                variant="h6" 
+                component="div" 
+                sx={{ 
+                  fontWeight: 700,
+                  color: '#1F2937',
+                  fontSize: '1.1rem',
+                  letterSpacing: '-0.5px'
+                }}
+              >
+                APTIS Master
+              </Typography>
             </Box>
-          )}
 
-          {/* Notifications */}
-          <IconButton color="inherit" sx={{ mr: 1 }}>
-            <Badge badgeContent={0} color="error">
-              <Notifications />
-            </Badge>
-          </IconButton>
+            {/* Desktop Navigation Links - Centered */}
+            {!isMobile && (
+              <Box sx={{ display: 'flex', gap: 0, flex: 1, justifyContent: 'center' }}>
+                {drawerItems.map((item) => (
+                  <Button
+                    key={item.path}
+                    color="inherit"
+                    onClick={() => handleNavigation(item.path)}
+                    sx={{
+                      textTransform: 'none',
+                      fontSize: '0.95rem',
+                      color: pathname.startsWith(item.path) ? '#1976d2' : '#6B7280',
+                      fontWeight: pathname.startsWith(item.path) ? 600 : 500,
+                      px: 2,
+                      py: 1,
+                      borderRadius: 0,
+                      borderBottom: pathname.startsWith(item.path) ? '3px solid #1976d2' : 'none',
+                      transition: 'all 0.2s ease',
+                      '&:hover': {
+                        color: '#1976d2',
+                        backgroundColor: 'transparent',
+                      }
+                    }}
+                  >
+                    {item.label}
+                  </Button>
+                ))}
+              </Box>
+            )}
 
-          {/* User Profile */}
-          <IconButton
-            onClick={handleProfileMenuOpen}
-            color="inherit"
-          >
-            <Avatar sx={{ bgcolor: 'secondary.main', width: 32, height: 32 }}>
-              {user?.full_name?.charAt(0)?.toUpperCase() || 'S'}
-            </Avatar>
-          </IconButton>
+            {/* Right side actions */}
+            <Box sx={{ display: 'flex', alignItems: 'center', minWidth: 120, justifyContent: 'flex-end' }}>
+
+
+
+              {/* User Profile */}
+              <IconButton
+                onClick={handleProfileMenuOpen}
+                color="inherit"
+                sx={{
+                  p: 0.5,
+                  '&:hover': {
+                    backgroundColor: '#F3F4F6',
+                  }
+                }}
+              >
+                <Avatar sx={{ bgcolor: '#1976d2', width: 36, height: 36, fontSize: '0.9rem' }}>
+                  {user?.full_name?.charAt(0)?.toUpperCase() || 'S'}
+                </Avatar>
+              </IconButton>
+            </Box>
+          </Box>
         </Toolbar>
+          </Box>
       </AppBar>
 
       {renderProfileMenu}
@@ -313,9 +389,16 @@ export default function StudentLayout({ children }) {
             bottom: 0,
             left: 0,
             right: 0,
-            borderTop: 1,
-            borderColor: 'divider',
-            backgroundColor: 'background.paper',
+            borderTop: '1px solid #E8E8E8',
+            backgroundColor: '#FFFFFF',
+            boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.04)',
+            '& .MuiBottomNavigationAction-root': {
+              color: '#6B7280',
+              fontSize: '0.75rem',
+              '&.Mui-selected': {
+                color: '#1976d2',
+              }
+            }
           }}
         >
           {bottomNavItems.map((item) => (

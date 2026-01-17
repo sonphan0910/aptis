@@ -125,16 +125,26 @@ export default function QuestionCard({
         </Typography>
 
         {/* APTIS Type and Stats */}
-        <Box display="flex" justifyContent="space-between" alignItems="center">
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
           <Chip 
             label={question.aptis_type || 'General'} 
             size="small" 
             variant="outlined"
           />
-          <Typography variant="caption" color="text.secondary">
-            Sử dụng: {question.usage_count || 0} lần
-          </Typography>
+          {question.is_used_in_exam && (
+            <Chip 
+              label="✓ Đã thêm vào đề"
+              size="small"
+              color="success"
+              variant="filled"
+            />
+          )}
         </Box>
+
+        {/* Usage Count */}
+        <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+          Sử dụng: {question.usage_count || 0} lần
+        </Typography>
 
         {/* Last Updated */}
         <Typography variant="caption" color="text.secondary" display="block" mt={1}>

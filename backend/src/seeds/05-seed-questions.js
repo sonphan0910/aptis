@@ -432,51 +432,6 @@ J. A notice about cleaning`,
     status: 'active',
   });
 
-  // Create description options (A-J)
-  const descriptions = [
-    { text: 'A warning about vehicle removal', label: 'A' },
-    { text: 'A request for quiet behavior', label: 'B' },
-    { text: 'Safety instructions for students', label: 'C' },
-    { text: 'Information about equipment failure', label: 'D' },
-    { text: 'Rules about borrowed items', label: 'E' },
-    { text: 'A ban on smoking', label: 'F' },
-    { text: 'Instructions for audience members', label: 'G' },
-    { text: 'Directions to another location', label: 'H' },
-    { text: 'Information about opening hours', label: 'I' },
-    { text: 'A notice about cleaning', label: 'J' }
-  ];
-
-  const optionMap = {};
-  for (let k = 0; k < descriptions.length; k++) {
-    const option = await QuestionOption.create({
-      question_id: question5.id,
-      item_id: null,
-      option_text: descriptions[k].text,
-      option_order: k + 1,
-      is_correct: false,
-    });
-    optionMap[descriptions[k].label] = option.id;
-  }
-
-  // Create 7 matching items with correct answers
-  const matchingItems = [
-    { text: 'No parking sign', correctAnswer: 'A' },
-    { text: 'Lab safety rule', correctAnswer: 'C' },
-    { text: 'Noise complaint', correctAnswer: 'B' },
-    { text: 'Library notice', correctAnswer: 'E' },
-    { text: 'Elevator notice', correctAnswer: 'D' },
-    { text: 'Smoking ban', correctAnswer: 'F' },
-    { text: 'Theater rule', correctAnswer: 'G' }
-  ];
-
-  for (let j = 0; j < 7; j++) {
-    const item = await QuestionItem.create({
-      question_id: question5.id,
-      item_order: j + 1,
-      item_text: matchingItems[j].text,
-      correct_option_id: optionMap[matchingItems[j].correctAnswer],
-    });
-  }
 }
 
 // ========================================
@@ -779,9 +734,9 @@ async function seedWritingQuestions(aptisType, teacher) {
     });
   }
 
-  // Task 3 (B1): Chat Responses - 2 câu hỏi
+  // Task 3 (B1): Chat Responses - 1 câu hỏi (3 chat exchanges)
   const task3Questions = [
-    "Chat about your weekend\n\nReply to chat messages (30-40 words each):\n\nAlex: Hi! Did you do anything fun last weekend?\nYour reply: _______\n\nSam: What's your favorite thing to do on weekends?\nYour reply: _______",
+    "Chat about your weekend\n\nReply to chat messages (30-40 words each):\n\nAlex: Hi! Did you do anything fun last weekend?\nYour reply: _______\n\nSam: What's your favorite thing to do on weekends?\nYour reply: _______\n\nJordan: Did you go anywhere during the weekend?\nYour reply: _______",
   ];
 
   for (let i = 0; i < 1; i++) {
@@ -795,9 +750,9 @@ async function seedWritingQuestions(aptisType, teacher) {
     });
   }
   
-  // Task 4 (B2): Email Writing - 2 câu hỏi
+  // Task 4 (B2): Email Writing - 1 câu hỏi (3 email replies với độ khó tăng dần)
   const task4Questions = [
-    "Email about a class trip\n\nRead the email from your teacher:\n\nFrom: Teacher <teacher@school.com>\nSubject: School trip to the museum\n\nDear student,\n\nWe are planning a class trip to the museum. Do you want to go? What do you want to see there?\n\nPlease write back with your answer.\n\nTeacher\n\n---\n\nWrite TWO emails:\n\n1. Email to a friend (50 words):\n_______\n\n2. Reply to teacher (100-120 words):\n_______",
+    "Email discussion about a class trip\n\nRead the email from your teacher:\n\nFrom: Teacher <teacher@school.com>\nSubject: School trip to the museum\n\nDear student,\n\nWe are planning a class trip to the museum. Do you want to go? What do you want to see there?\n\nPlease write back with your answer.\n\nTeacher\n\n---\n\nWrite THREE emails:\n\n1. Email to a friend (50 words) - EASY:\n_______\n\n2. Email to school manager (80-100 words) - MEDIUM:\n_______\n\n3. Formal discussion email (120-150 words) - HARD:\n_______",
   ];
 
   for (let i = 0; i < 1; i++) {

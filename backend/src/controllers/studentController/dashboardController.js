@@ -187,24 +187,56 @@ exports.getRecentAttempts = async (req, res, next) => {
       limit,
     });
 
-    const formattedAttempts = attempts.map(attempt => {
+    const formattedAttempts = await Promise.all(attempts.map(async (attempt) => {
       const maxScore = attempt.exam?.total_score || 100;
-      const percentage = attempt.total_score 
-        ? Math.round((attempt.total_score / maxScore) * 100) 
+      const score = attempt.total_score || 0;
+      const percentage = score 
+        ? Math.round((score / maxScore) * 100) 
         : 0;
+
+      // Get skill breakdown for this attempt
+      let skills = [];
+      try {
+        const skillData = await sequelize.query(
+          `SELECT 
+            st.skill_type_name as name,
+            ROUND(AVG(COALESCE(aa.final_score, aa.score, 0)), 1) as score,
+            ROUND(AVG(aa.max_score), 1) as maxScore
+           FROM attempt_answers aa
+           JOIN questions q ON aa.question_id = q.id
+           JOIN question_types qt ON q.question_type_id = qt.id
+           JOIN skill_types st ON qt.skill_type_id = st.id
+           WHERE aa.attempt_id = ? AND aa.max_score > 0
+           GROUP BY st.id, st.skill_type_name
+           ORDER BY st.skill_type_name`,
+          {
+            replacements: [attempt.id],
+            type: sequelize.QueryTypes.SELECT,
+          }
+        );
+
+        skills = skillData.map(row => ({
+          name: row.name,
+          score: parseFloat(row.score) || 0,
+          maxScore: parseFloat(row.maxScore) || 0,
+        }));
+      } catch (skillError) {
+        console.error('[getRecentAttempts] Error getting skills:', skillError);
+      }
       
       return {
         id: attempt.id,
         examId: attempt.exam_id,
         examTitle: attempt.exam?.title || 'Unknown Exam',
-        score: attempt.total_score || 0,
+        score,
         maxScore,
         percentage,
+        skills,
         status: attempt.status,
         startedAt: attempt.start_time,
         submittedAt: attempt.end_time,
       };
-    });
+    }));
 
     res.json({
       success: true,

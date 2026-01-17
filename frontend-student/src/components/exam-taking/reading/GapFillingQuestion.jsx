@@ -120,10 +120,15 @@ export default function ReadingGapFillingQuestion({ question, onAnswerChange }) 
               displayEmpty
               sx={{
                 height: 32,
+                minHeight: 32,
+                maxHeight: 32,
                 fontSize: '0.95rem',
                 backgroundColor: gaps[item.id] ? '#e3f2fd' : 'white',
                 '& .MuiSelect-select': {
                   py: 0.5,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
                   fontWeight: gaps[item.id] ? 600 : 400
                 }
               }}

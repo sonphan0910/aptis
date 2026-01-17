@@ -160,24 +160,32 @@ exports.getQuestions = async (req, res, next) => {
       distinct: true, // Important for counting with joins
     });
 
-    const transformedRows = rows.map(question => ({
-      id: question.id,
-      title: question.content?.substring(0, 100) || 'Untitled Question',
-      description: question.content?.substring(0, 200) || '',
-      content: question.content,
-      question_type: question.questionType?.question_type_name || 'Unknown',
-      question_type_id: question.question_type_id,
-      skill: question.questionType?.skillType?.skill_type_name || 'General',
-      skill_id: question.questionType?.skillType?.id,
-      difficulty: question.difficulty,
-      aptis_type: question.aptisType?.aptis_type_name || 'Unknown',
-      aptis_type_id: question.aptis_type_id,
-      media_url: question.media_url,
-      duration_seconds: question.duration_seconds,
-      status: question.status,
-      usage_count: 0,
-      created_at: question.created_at,
-      updated_at: question.updated_at,
+    const transformedRows = await Promise.all(rows.map(async (question) => {
+      // Get count of exams this question is used in
+      const usageCount = await ExamSectionQuestion.count({
+        where: { question_id: question.id }
+      });
+
+      return {
+        id: question.id,
+        title: question.content?.substring(0, 100) || 'Untitled Question',
+        description: question.content?.substring(0, 200) || '',
+        content: question.content,
+        question_type: question.questionType?.question_type_name || 'Unknown',
+        question_type_id: question.question_type_id,
+        skill: question.questionType?.skillType?.skill_type_name || 'General',
+        skill_id: question.questionType?.skillType?.id,
+        difficulty: question.difficulty,
+        aptis_type: question.aptisType?.aptis_type_name || 'Unknown',
+        aptis_type_id: question.aptis_type_id,
+        media_url: question.media_url,
+        duration_seconds: question.duration_seconds,
+        status: question.status,
+        usage_count: usageCount,
+        is_used_in_exam: usageCount > 0,
+        created_at: question.created_at,
+        updated_at: question.updated_at,
+      };
     }));
 
     res.json({

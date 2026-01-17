@@ -89,36 +89,39 @@ async function createFullExam(aptisType, teacher, skills) {
 
   let sectionOrder = 1;
 
-  // Section 1-5: Đọc hiểu (5 phần riêng biệt)
-  await createReadingPartSection(exam.id, skills.readingSkill, sectionOrder++, 1, 'READING_GAP_FILL', 'Part 1: Gap Filling', 12, 5, 2.0);
-  await createReadingPartSection(exam.id, skills.readingSkill, sectionOrder++, 2, 'READING_ORDERING', 'Part 2: Ordering', 12, 5, 1.0);
-  await createReadingPartSection(exam.id, skills.readingSkill, sectionOrder++, 3, 'READING_MATCHING', 'Part 3: Matching', 12, 1, 5.0);
-  await createReadingPartSection(exam.id, skills.readingSkill, sectionOrder++, 4, 'READING_MATCHING_HEADINGS', 'Part 4: Matching Headings', 12, 1, 16.0);
-  await createReadingPartSection(exam.id, skills.readingSkill, sectionOrder++, 5, 'READING_MATCHING', 'Part 5: Short Text Matching', 12, 1, 14.0);
+  // Section 1-4: Đọc hiểu (4 phần, chỉ phần 2 có 2 câu, các phần khác mỗi phần 1 câu)
+  // Phần 1: Gap Filling - 10 điểm (1 câu x 10 điểm)
+  await createReadingPartSection(exam.id, skills.readingSkill, sectionOrder++, 1, 'READING_GAP_FILL', 'Part 1: Gap Filling', 5, 1, 10);
+  // Phần 2: Ordering - 20 điểm (2 câu x 10 điểm)
+  await createReadingPartSection(exam.id, skills.readingSkill, sectionOrder++, 2, 'READING_ORDERING', 'Part 2: Ordering', 10, 2, 10);
+  // Phần 3: Matching - 10 điểm (1 câu x 10 điểm)0
+  await createReadingPartSection(exam.id, skills.readingSkill, sectionOrder++, 3, 'READING_MATCHING', 'Part 3: Matching', 10, 1, 10);
+  // Phần 4: Matching Headings - 10 điểm (1 câu x 10 điểm)
+  await createReadingPartSection(exam.id, skills.readingSkill, sectionOrder++, 4, 'READING_MATCHING_HEADINGS', 'Part 4: Matching Headings', 10, 1, 10);
 
   // Section 6-9: Nghe hiểu (4 phần riêng biệt)
-  await createListeningPartSection(exam.id, skills.listeningSkill, sectionOrder++, 1, 'LISTENING_MCQ', 'Part 1: Multiple Choice', 12, 13, 2.0);
-  await createListeningPartSection(exam.id, skills.listeningSkill, sectionOrder++, 2, 'LISTENING_MATCHING', 'Part 2: Speaker Matching', 12, 1, 8.0);
-  await createListeningPartSection(exam.id, skills.listeningSkill, sectionOrder++, 3, 'LISTENING_STATEMENT_MATCHING', 'Part 3: Statement Matching', 12, 1, 8.0);
-  await createListeningPartSection(exam.id, skills.listeningSkill, sectionOrder++, 4, 'LISTENING_MCQ', 'Part 4: Extended MCQ', 12, 2, 4.0);
+  await createListeningPartSection(exam.id, skills.listeningSkill, sectionOrder++, 1, 'LISTENING_MCQ', 'Part 1: Multiple Choice', 10, 13, 2.0);
+  await createListeningPartSection(exam.id, skills.listeningSkill, sectionOrder++, 2, 'LISTENING_MATCHING', 'Part 2: Speaker Matching', 10, 1, 8.0);
+  await createListeningPartSection(exam.id, skills.listeningSkill, sectionOrder++, 3, 'LISTENING_STATEMENT_MATCHING', 'Part 3: Statement Matching', 10, 1, 8.0);
+  await createListeningPartSection(exam.id, skills.listeningSkill, sectionOrder++, 4, 'LISTENING_MCQ', 'Part 4: Extended MCQ', 10, 2, 4.0);
 
-  // Section 10-13: Viết (4 task với số câu hỏi khác nhau, tổng 50 điểm)
-  await createWritingSection(exam.id, skills.writingSkill, sectionOrder++, 'WRITING_SHORT', 'Task 1: Form Filling (A1)', 3, 5, 5); // 5 câu
-  await createWritingSection(exam.id, skills.writingSkill, sectionOrder++, 'WRITING_FORM', 'Task 2: Short Response (A2)', 3, 10, 2); // 2 câu
-  await createWritingSection(exam.id, skills.writingSkill, sectionOrder++, 'WRITING_LONG', 'Task 3: Chat Responses (B1)', 10, 15, 2); // 2 câu
-  await createWritingSection(exam.id, skills.writingSkill, sectionOrder++, 'WRITING_EMAIL', 'Task 4: Email Writing (B2)', 30, 20, 2); // 2 câu
+  // Section 10-13: Viết (4 task, tổng 50 phút, 50 điểm)
+  await createWritingSection(exam.id, skills.writingSkill, sectionOrder++, 'WRITING_SHORT', 'Part 1: Form Filling (A1)', 10, 5, 1); // 10 phút, 5 điểm
+  await createWritingSection(exam.id, skills.writingSkill, sectionOrder++, 'WRITING_FORM', 'Part 2: Short Response (A2)', 10, 10, 1); // 10 phút, 10 điểm
+  await createWritingSection(exam.id, skills.writingSkill, sectionOrder++, 'WRITING_LONG', 'Part 3: Chat Responses (B1)', 10, 15, 1); // 10 phút, 15 điểm
+  await createWritingSection(exam.id, skills.writingSkill, sectionOrder++, 'WRITING_EMAIL', 'Part 4: Email Writing (B2)', 20, 20, 1); // 20 phút, 20 điểm
 
   // Section 14-17: Nói (4 section, tổng 50 điểm)
-  // Section 1: 3 questions x 5 điểm = 15 điểm
-  await createSpeakingPartSection(exam.id, skills.speakingSkill, sectionOrder++, 1, 'SPEAKING_INTRO', 'Section 1: Personal Introduction', 3, 3, 5);
-  // Section 2: 3 questions x 5 điểm = 15 điểm
-  await createSpeakingPartSection(exam.id, skills.speakingSkill, sectionOrder++, 2, 'SPEAKING_DESCRIPTION', 'Section 2: Picture Description', 3, 3, 5);
-  // Section 3: 3 questions x 5 điểm = 15 điểm
-  await createSpeakingPartSection(exam.id, skills.speakingSkill, sectionOrder++, 3, 'SPEAKING_COMPARISON', 'Section 3: Comparison', 3, 3, 5);
-  // Section 4: 1 question x 5 điểm = 5 điểm
-  await createSpeakingPartSection(exam.id, skills.speakingSkill, sectionOrder++, 4, 'SPEAKING_DISCUSSION', 'Section 4: Topic Discussion', 3, 1, 5);
+  // Section 1: 3 questions x 4 điểm = 12 điểm
+  await createSpeakingPartSection(exam.id, skills.speakingSkill, sectionOrder++, 1, 'SPEAKING_INTRO', 'Part 1: Personal Introduction', 2, 3, 4);
+  // Section 2: 3 questions x 4 điểm = 12 điểm
+  await createSpeakingPartSection(exam.id, skills.speakingSkill, sectionOrder++, 2, 'SPEAKING_DESCRIPTION', 'Part 2: Picture Description', 2, 3, 4);
+  // Section 3: 3 questions x 4 điểm = 12 điểm
+  await createSpeakingPartSection(exam.id, skills.speakingSkill, sectionOrder++, 3, 'SPEAKING_COMPARISON', 'Part 3: Comparison', 2, 3, 4);
+  // Section 4: 1 question x 14 điểm = 14 điểm (nhiều thời gian và điểm hơn)
+  await createSpeakingPartSection(exam.id, skills.speakingSkill, sectionOrder++, 4, 'SPEAKING_DISCUSSION', 'Part 4: Topic Discussion', 4, 1, 14);
 
-  console.log(`[Seed] ✓ Đã tạo đủ 17 section theo chuẩn APTIS (5 Đọc + 4 Nghe + 4 Viết + 4 Nói)`);
+  console.log(`[Seed] ✓ Đã tạo đủ 16 section theo chuẩn APTIS (4 Đọc + 4 Nghe + 4 Viết + 4 Nói)`);
 }
 
 // Tạo section riêng cho từng phần Đọc hiểu
@@ -133,33 +136,38 @@ async function createReadingPartSection(examId, skillType, sectionOrder, partNum
 
   let questionOrder = 1;
   const questionType = await QuestionType.findOne({ where: { code: questionTypeCode } });
-  
-  let questions;
-  if (partNumber === 5) {
-    // Part 5 cần offset để lấy question khác
-    questions = await Question.findAll({
-      where: { question_type_id: questionType.id },
-      limit: questionLimit,
-      offset: 1,
-    });
-  } else {
-    questions = await Question.findAll({
-      where: { question_type_id: questionType.id },
-      limit: questionLimit,
-    });
+  let questions = await Question.findAll({
+    where: { question_type_id: questionType.id },
+    limit: questionLimit,
+  });
+
+  // Gán điểm đúng cho từng phần
+  let scores = [];
+  if (partNumber === 1) {
+    // Part 1: 1 câu x 10 điểm
+    scores = [10];
+  } else if (partNumber === 2) {
+    // Part 2: 2 câu x 10 điểm
+    scores = [10, 10];
+  } else if (partNumber === 3) {
+    // Part 3: 1 câu x 10 điểm
+    scores = [10];
+  } else if (partNumber === 4) {
+    // Part 4: 1 câu x 10 điểm
+    scores = [10];
   }
 
-  for (const q of questions) {
+  for (let i = 0; i < questions.length; i++) {
     await ExamSectionQuestion.create({
       exam_section_id: section.id,
-      question_id: q.id,
+      question_id: questions[i].id,
       question_order: questionOrder++,
-      max_score: maxScore,
+      max_score: scores[i] || maxScore,
     });
   }
 
-  const totalScore = questionLimit * maxScore;
-  console.log(`[Seed]   - Đọc hiểu ${sectionTitle}: ${questionLimit} câu x ${maxScore} = ${totalScore} điểm`);
+  const totalScore = scores.reduce((a, b) => a + b, 0);
+  console.log(`[Seed]   - Đọc hiểu ${sectionTitle}: ${questionLimit} câu, tổng ${totalScore} điểm`);
 }
 
 // Tạo section riêng cho từng phần Nghe hiểu

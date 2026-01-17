@@ -18,62 +18,59 @@ export default function WritingChatQuestion({ question, onAnswerChange }) {
     try {
       // If content is text format, parse it
       if (typeof question.content === 'string' && !question.content.startsWith('{')) {
-        // Parse the text content to extract chat context and reply prompts
+        // Parse the text content to extract chat exchanges with replies
         const lines = question.content.split('\n');
         const title = lines[0]?.trim() || "Chat Messages";
         
-        // Separate context messages from reply prompts
-        const contextMessages = [];
-        const peopleInChat = new Set(); // Track unique people names
-        const instructionKeywords = ['reply', 'your', 'response', 'chat', 'word', 'messages'];
+        // Build structured chat exchanges: [{speaker, message, hasReply}, ...]
+        const chatExchanges = [];
+        let i = 1; // Skip title
         
-        // First pass: Extract actual chat messages and identify people
-        for (let i = 0; i < lines.length; i++) {
+        while (i < lines.length) {
           const line = lines[i].trim();
+          i++;
           
-          // Skip empty lines, title, and instruction lines
-          if (!line || line === title) continue;
-          
-          // Skip lines that contain instruction keywords
-          const isInstruction = instructionKeywords.some(keyword => 
-            line.toLowerCase().includes(keyword) && 
-            (line.includes('(') || line.includes(')') || line.length > 100)
-          );
+          // Skip empty lines, instructions with multiple words in parentheses
+          if (!line) continue;
+          const isInstruction = line.includes('(') && line.includes(')') && line.length > 50;
           if (isInstruction) continue;
           
-          // Check if this is a message (contains colon and a name)
+          // Check if this is a speaker message (Name: message format)
           if (line.includes(':')) {
             const colonIndex = line.indexOf(':');
             const potentialName = line.substring(0, colonIndex).trim();
             const message = line.substring(colonIndex + 1).trim();
             
-            // Valid name: alphanumeric, no numbers at start, reasonable length
+            // Validate name format
             const isValidName = /^[A-Za-z][A-Za-z\s]*$/.test(potentialName) && 
                                potentialName.length < 30 && 
-                               message.length > 0;
+                               message.length > 0 &&
+                               !potentialName.toLowerCase().includes('your') &&
+                               !potentialName.toLowerCase().includes('you');
             
             if (isValidName) {
-              contextMessages.push({
-                user: potentialName,
-                message
+              // Check if next line is "Your reply:" or contains underscore placeholders
+              let hasReply = false;
+              if (i < lines.length) {
+                const nextLine = lines[i].trim();
+                if (nextLine.toLowerCase().includes('your reply') || nextLine.includes('_')) {
+                  hasReply = true;
+                  i++; // Skip the "Your reply:" line
+                }
+              }
+              
+              chatExchanges.push({
+                speaker: potentialName,
+                message,
+                hasReply
               });
-              peopleInChat.add(potentialName);
             }
           }
         }
         
-        // Create reply prompts only for people who appeared in context
-        const replyPrompts = Array.from(peopleInChat).map(person => ({ user: person }));
-        
-        // If no people found, use defaults
-        if (replyPrompts.length === 0) {
-          replyPrompts.push({ user: 'Alex' }, { user: 'Sam' });
-        }
-        
         return {
           title,
-          contextMessages,
-          replyPrompts
+          chatExchanges
         };
       }
       
@@ -93,22 +90,16 @@ export default function WritingChatQuestion({ question, onAnswerChange }) {
       if (question.answer_data.text_answer) {
         console.log('[WritingChatQuestion] Found existing answer:', question.answer_data.text_answer);
         
-        // Parse structured text format: Reply 1:\n<content>\n\nReply 2:\n<content>
         const textAnswer = question.answer_data.text_answer;
-        
-        // More robust parsing to handle different formats
         let personA = '';
         let personB = '';
         
         if (textAnswer.includes('Reply 1:') && textAnswer.includes('Reply 2:')) {
-          // Standard format
           const reply1Match = textAnswer.match(/Reply 1:\n([\s\S]*?)(?:\n\nReply 2:|$)/);
           const reply2Match = textAnswer.match(/Reply 2:\n([\s\S]*?)$/);
-          
           personA = reply1Match ? reply1Match[1].trim() : '';
           personB = reply2Match ? reply2Match[1].trim() : '';
         } else {
-          // Fallback - treat as single reply for personA
           personA = textAnswer.trim();
           personB = '';
         }
@@ -155,9 +146,6 @@ export default function WritingChatQuestion({ question, onAnswerChange }) {
     return <Box sx={{ p: 2 }}><Typography color="error">Không thể tải câu hỏi</Typography></Box>;
   }
 
-  const personAWordCount = countWords(answers.personA);
-  const personBWordCount = countWords(answers.personB);
-
   return (
     <Box sx={{ maxHeight: '100vh', overflow: 'auto', p: 2 }}>
       <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
@@ -166,54 +154,52 @@ export default function WritingChatQuestion({ question, onAnswerChange }) {
 
       {/* Chat Conversation - Continuous Format with Inline Input Fields */}
       <Box sx={{ p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1, bgcolor: 'grey.50' }}>
-        {questionData.contextMessages && questionData.contextMessages.length > 0 ? (
+        {questionData.chatExchanges && questionData.chatExchanges.length > 0 ? (
           <Box>
-            {questionData.contextMessages.map((msg, index) => {
-              const replyPromptIndex = questionData.replyPrompts.findIndex(p => p.user === msg.user);
-              const hasReplyPrompt = replyPromptIndex !== -1;
+            {questionData.chatExchanges.map((exchange, index) => {
+              // Determine which answer key to use (alternating between personA and personB)
+              const answerKey = exchange.hasReply ? (index % 2 === 0 ? 'personA' : 'personB') : null;
               
               return (
-                <Box key={`message-${index}`} sx={{ mb: 3 }}>
-                  {/* Chat message */}
+                <Box key={`exchange-${index}`} sx={{ mb: 3 }}>
+                  {/* Speaker's message */}
                   <Box sx={{ mb: 2 }}>
                     <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main' }}>
-                      {msg.user}:
+                      {exchange.speaker}:
                     </Typography>
                     <Typography variant="body2" sx={{ ml: 2, color: 'text.primary' }}>
-                      {msg.message}
+                      {exchange.message}
                     </Typography>
                   </Box>
 
-                  {/* Inline reply input */}
-                  {hasReplyPrompt && (
+                  {/* User's reply input if needed */}
+                  {exchange.hasReply && answerKey && (
                     <Box sx={{ ml: 2, mb: 2 }}>
                       <Typography variant="body2" sx={{ fontWeight: 600, color: 'secondary.main', mb: 1 }}>
-                        You:
+                        Your reply:
                       </Typography>
-                      <Box>
-                        <TextField
-                          multiline
-                          fullWidth
-                          rows={2}
-                          value={answers[replyPromptIndex === 0 ? 'personA' : 'personB'] || ''}
-                          onChange={(e) => handleAnswerChange(replyPromptIndex === 0 ? 'personA' : 'personB', e.target.value)}
-                          variant="outlined"
-                          placeholder="Nhập câu trả lời..."
-                          helperText={`${countWords(answers[replyPromptIndex === 0 ? 'personA' : 'personB'] || '')} từ`}
-                          sx={{
-                            '& .MuiOutlinedInput-root': {
-                              fontSize: '0.95rem',
-                              lineHeight: 1.5,
-                              backgroundColor: 'white'
-                            }
-                          }}
-                        />
-                      </Box>
+                      <TextField
+                        multiline
+                        fullWidth
+                        rows={2}
+                        value={answers[answerKey] || ''}
+                        onChange={(e) => handleAnswerChange(answerKey, e.target.value)}
+                        variant="outlined"
+                        placeholder="Nhập câu trả lời..."
+                        helperText={`${countWords(answers[answerKey] || '')} từ`}
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            fontSize: '0.95rem',
+                            lineHeight: 1.5,
+                            backgroundColor: 'white'
+                          }
+                        }}
+                      />
                     </Box>
                   )}
 
-                  {/* Divider between conversation exchanges */}
-                  {index < questionData.contextMessages.length - 1 && (
+                  {/* Divider between exchanges */}
+                  {index < questionData.chatExchanges.length - 1 && (
                     <Box sx={{ my: 2, borderBottom: '1px solid', borderColor: 'divider' }} />
                   )}
                 </Box>
