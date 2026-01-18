@@ -33,63 +33,30 @@ import {
 } from '@mui/icons-material';
 import AudioPlayer from './AudioPlayer';
 
-const speakingCriteria = [
-  {
-    aspect: 'Phát âm và ngữ điệu',
-    description: 'Độ rõ ràng, stress, intonation',
-    maxScore: 5
-  },
-  {
-    aspect: 'Từ vựng và cách diễn đạt',
-    description: 'Phong phú từ vựng, chính xác nghĩa',
-    maxScore: 5
-  },
-  {
-    aspect: 'Ngữ pháp',
-    description: 'Độ chính xác và đa dạng cấu trúc',
-    maxScore: 5
-  },
-  {
-    aspect: 'Tính lưu loát',
-    description: 'Tốc độ nói, hesitation, flow',
-    maxScore: 5
-  },
-  {
-    aspect: 'Nội dung và ý tưởng',
-    description: 'Relevance, development, coherence',
-    maxScore: 5
-  }
-];
-
 const timeMarkers = [];
 
 export default function SpeakingReview({ 
   answer,
+  question,
   reviewData,
   onReviewChange,
-  readonly = false 
+  onSubmitReview,
+  readonly = false,
+  saving = false
 }) {
-  const [scores, setScores] = useState(reviewData?.scores || {});
+  const maxScore = answer?.max_score || 5;
+  const [score, setScore] = useState(reviewData?.final_score || 0);
   const [feedback, setFeedback] = useState(reviewData?.feedback || '');
   const [timeComments, setTimeComments] = useState([]);
   const [currentTime, setCurrentTime] = useState(0);
   const [newComment, setNewComment] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const handleScoreChange = (aspect, score) => {
-    const newScores = { ...scores, [aspect]: score };
-    setScores(newScores);
-    
-    // Calculate total score and update parent
-    const scoreValues = Object.values(newScores);
-    const totalScore = scoreValues.length > 0 
-      ? scoreValues.reduce((sum, s) => sum + s, 0) / scoreValues.length 
-      : 0;
-    
+  const handleScoreChange = (newScore) => {
+    setScore(newScore);
     onReviewChange?.({
       ...reviewData,
-      scores: newScores,
-      final_score: totalScore
+      final_score: newScore
     });
   };
 
@@ -100,6 +67,16 @@ export default function SpeakingReview({
       ...reviewData,
       feedback: newFeedback
     });
+  };
+
+  const handleSave = () => {
+    if (onSubmitReview && answer?.id) {
+      onSubmitReview(answer.id, {
+        final_score: score,
+        feedback,
+        timeComments
+      });
+    }
   };
 
   const addTimeComment = () => {
@@ -126,22 +103,25 @@ export default function SpeakingReview({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const calculateTotalScore = () => {
-    const scoreValues = Object.values(scores);
-    if (scoreValues.length === 0) return 0;
-    return scoreValues.reduce((sum, score) => sum + score, 0) / scoreValues.length;
-  };
-
   const getScoreColor = (score) => {
-    if (score >= 4.5) return 'success';
-    if (score >= 3.5) return 'primary';
-    if (score >= 2.5) return 'info';
-    if (score >= 1.5) return 'warning';
+    const percentage = (score / maxScore) * 100;
+    if (percentage >= 80) return 'success';
+    if (percentage >= 60) return 'primary';
+    if (percentage >= 40) return 'info';
+    if (percentage >= 20) return 'warning';
     return 'error';
   };
 
-  const totalScore = calculateTotalScore();
-  const progress = (totalScore / 5) * 100;
+  const getScoreLabel = (score) => {
+    const percentage = (score / maxScore) * 100;
+    if (percentage >= 80) return 'Xuất sắc';
+    if (percentage >= 60) return 'Tốt';
+    if (percentage >= 40) return 'Đạt yêu cầu';
+    if (percentage >= 20) return 'Cần cải thiện';
+    return 'Chưa đạt';
+  };
+
+  const progress = (score / maxScore) * 100;
 
   return (
     <Box>
@@ -152,26 +132,49 @@ export default function SpeakingReview({
             Chấm điểm bài Speaking
           </Typography>
           <Box textAlign="center">
-            <Typography variant="h4" color={getScoreColor(totalScore)}>
-              {totalScore.toFixed(1)}/5.0
+            <Typography variant="h4" color={getScoreColor(score)}>
+              {score.toFixed(1)}/{maxScore}
             </Typography>
+            <Chip 
+              label={getScoreLabel(score)}
+              color={getScoreColor(score)}
+              size="small"
+            />
             <LinearProgress 
               variant="determinate" 
               value={progress} 
-              color={getScoreColor(totalScore)}
-              sx={{ width: 100, height: 8, borderRadius: 4 }}
+              color={getScoreColor(score)}
+              sx={{ width: 120, height: 8, borderRadius: 4, mt: 1 }}
             />
           </Box>
         </Box>
-        
-        <Alert severity="info" sx={{ mb: 2 }}>
-          Nghe kỹ bài nói của học sinh và đánh giá theo từng tiêu chí. Bạn có thể thêm nhận xét tại các thời điểm cụ thể.
-        </Alert>
       </Paper>
 
       <Box display="flex" gap={3}>
-        {/* Audio Player and Comments */}
+        {/* Question, Audio Player and Comments */}
         <Paper sx={{ flex: 1, p: 3 }}>
+          {/* Question Display */}
+          <Card sx={{ mb: 3, bgcolor: 'primary.50' }}>
+            <CardContent>
+              <Typography variant="h6" gutterBottom color="primary">
+                Câu hỏi: {question?.title || 'Không có tiêu đề'}
+              </Typography>
+              <Typography variant="body1" sx={{ mb: 2 }}>
+                {question?.content || question?.question_text || 'Không có nội dung câu hỏi'}
+              </Typography>
+              {question?.additional_info && (
+                <Typography variant="body2" color="text.secondary">
+                  {question.additional_info}
+                </Typography>
+              )}
+              <Box mt={2} display="flex" gap={1}>
+                <Chip label={`Điểm tối đa: ${answer?.max_score || 5}`} size="small" />
+                <Chip label={`Thời gian chuẩn bị: ${question?.preparation_time || 30}s`} size="small" />
+                <Chip label={`Thời gian nói: ${question?.speaking_time || 60}s`} size="small" />
+              </Box>
+            </CardContent>
+          </Card>
+          
           <Typography variant="h6" gutterBottom>
             Bài nói của học sinh
           </Typography>
@@ -195,6 +198,20 @@ export default function SpeakingReview({
               </Box>
             </CardContent>
           </Card>
+
+          {/* Transcribed Text if available */}
+          {answer?.transcribed_text && (
+            <Card sx={{ mb: 3, bgcolor: 'grey.50' }}>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Nội dung đã chuyển đổi (Speech-to-Text)
+                </Typography>
+                <Typography variant="body2" sx={{ fontFamily: 'monospace', lineHeight: 1.6 }}>
+                  {answer.transcribed_text}
+                </Typography>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Add Time Comment */}
           {!readonly && (
@@ -272,36 +289,47 @@ export default function SpeakingReview({
         {/* Scoring Panel */}
         <Paper sx={{ width: 400, p: 3 }}>
           <Typography variant="h6" gutterBottom>
-            Bảng điểm chi tiết
+            Chấm điểm
           </Typography>
 
+          <Alert severity="info" sx={{ mb: 3 }}>
+            Nghe bài nói của học sinh và đánh giá tổng thể từ 0-5 điểm
+          </Alert>
+
+          {/* Score Input */}
           <Box mb={3}>
-            {speakingCriteria.map((criterion) => (
-              <Box key={criterion.aspect} mb={3}>
-                <Typography variant="subtitle2" gutterBottom>
-                  {criterion.aspect}
-                </Typography>
-                <Typography variant="caption" color="text.secondary" display="block" mb={1}>
-                  {criterion.description}
-                </Typography>
-                <Box display="flex" alignItems="center" gap={2}>
-                  <Rating
-                    value={scores[criterion.aspect] || 0}
-                    onChange={(e, value) => handleScoreChange(criterion.aspect, value)}
-                    max={criterion.maxScore}
-                    precision={0.5}
-                    readOnly={readonly}
-                  />
-                  <Typography variant="body2" color="text.secondary">
-                    {scores[criterion.aspect] || 0}/{criterion.maxScore}
-                  </Typography>
-                </Box>
-              </Box>
-            ))}
+            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+              Điểm số (0-5)
+            </Typography>
+            
+            <Box display="flex" alignItems="center" gap={2} mb={2}>
+              <Rating
+                value={score}
+                onChange={(e, value) => handleScoreChange(value || 0)}
+                max={Math.ceil(maxScore)}
+                precision={0.5}
+                readOnly={readonly}
+                size="large"
+              />
+              <TextField
+                type="number"
+                value={score}
+                onChange={(e) => handleScoreChange(Math.min(parseFloat(e.target.value) || 0, maxScore))}
+                inputProps={{ min: 0, max: maxScore, step: 0.5 }}
+                size="small"
+                sx={{ width: 80 }}
+                disabled={readonly}
+              />
+            </Box>
+            
+            <Typography variant="caption" color="text.secondary">
+              {getScoreLabel(score)} - Điểm hiện tại: {score.toFixed(1)}/{maxScore}
+            </Typography>
           </Box>
 
           <Divider sx={{ my: 2 }} />
 
+          {/* Feedback */}
           <Typography variant="h6" gutterBottom>
             Phản hồi tổng quát
           </Typography>
@@ -309,7 +337,7 @@ export default function SpeakingReview({
           <TextField
             fullWidth
             multiline
-            rows={6}
+            rows={8}
             value={feedback}
             onChange={handleFeedbackChange}
             placeholder="Nhập phản hồi tổng quát về bài nói của học sinh..."
@@ -320,28 +348,19 @@ export default function SpeakingReview({
           />
 
           {!readonly && (
-            <Box mt={3} display="flex" gap={2}>
+            <Box mt={3}>
               <Button
                 variant="contained"
                 startIcon={<Save />}
-                onClick={() => onSave?.({ scores, feedback, timeComments })}
+                onClick={handleSave}
                 fullWidth
+                size="large"
+                disabled={saving}
               >
-                Lưu điểm và phản hồi
+                {saving ? 'Đang lưu...' : 'Lưu điểm và phản hồi'}
               </Button>
             </Box>
           )}
-
-          {/* Task Info */}
-          <Box mt={2} p={2} bgcolor="grey.50" borderRadius={1}>
-            <Typography variant="caption" color="text.secondary">
-              <strong>Thông tin bài thi:</strong><br />
-              Nhiệm vụ: {submission?.task_description}<br />
-              Thời gian chuẩn bị: {submission?.preparation_time || 'N/A'}s<br />
-              Thời gian nói: {submission?.speaking_time || 'N/A'}s<br />
-              Tổng thời gian: {formatTime(submission?.duration || 0)}
-            </Typography>
-          </Box>
         </Paper>
       </Box>
     </Box>

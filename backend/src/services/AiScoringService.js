@@ -815,11 +815,21 @@ Consider this objective audio data when assessing speaking fluency and delivery.
       // Validate CEFR level based on actual score
       const validatedCefrLevel = this.validateCefrLevel(result.score, maxScore, result.cefrLevel);
       
+      // Handle suggestions - convert array to string if necessary
+      let suggestions = result.suggestions;
+      if (Array.isArray(suggestions)) {
+        suggestions = suggestions.join('\n');
+      } else if (typeof suggestions === 'object') {
+        suggestions = JSON.stringify(suggestions);
+      } else if (!suggestions) {
+        suggestions = '';
+      }
+      
       const feedbackData = {
         answer_id: answerId,
         score: result.score,
         comment: result.comment || result.overallFeedback,
-        suggestions: result.suggestions,
+        suggestions: suggestions,
         cefr_level: validatedCefrLevel // Use validated level
       };
       

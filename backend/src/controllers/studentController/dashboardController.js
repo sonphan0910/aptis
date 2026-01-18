@@ -17,8 +17,13 @@ exports.getStats = async (req, res, next) => {
   try {
     const studentId = req.user.userId;
 
-    // Count only published exams that this student has attempted
-    const totalExams = await ExamAttempt.count({
+    // Count all published exams available (not just attempted ones)
+    const totalExams = await Exam.count({
+      where: { status: 'published' },
+    });
+
+    // Count distinct exams this student has attempted
+    const completedExams = await ExamAttempt.count({
       where: { student_id: studentId },
       distinct: true,
       col: 'exam_id',
@@ -152,6 +157,7 @@ exports.getStats = async (req, res, next) => {
       success: true,
       data: {
         totalExams,
+        completedExams,
         totalAttempts,
         averageScore,
         streak,

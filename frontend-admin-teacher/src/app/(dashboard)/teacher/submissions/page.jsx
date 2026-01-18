@@ -11,8 +11,17 @@ import {
   Alert,
   Snackbar,
   Container,
-  CircularProgress
+  CircularProgress,
+  Chip,
+  Icon
 } from '@mui/material';
+import {
+  Psychology,
+  Person,
+  Warning,
+  Assignment,
+  CheckCircle
+} from '@mui/icons-material';
 import SubmissionFilters from '@/components/teacher/submissions/SubmissionFilters';
 import SubmissionList from '@/components/teacher/submissions/SubmissionList';
 import { submissionApi } from '@/services/submissionService';
@@ -24,15 +33,10 @@ export default function SubmissionsPage() {
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState(null);
-  const [availableExams, setAvailableExams] = useState([]);
   
   const [filters, setFilters] = useState({
     grading_status: '',
     skill_type: '',
-    exam_id: '',
-    has_ai_feedback: '',
-    answer_type: '', // 'text' for writing, 'audio' for speaking
-    score_range: { min: 0, max: 100 },
     page: 1,
     limit: 20
   });
@@ -65,22 +69,16 @@ export default function SubmissionsPage() {
   const loadStats = async () => {
     try {
       // Chỉ gọi API stats khi có filter cụ thể
-      const hasFilters = filters.exam_id || filters.skill_type;
+      const hasFilters = filters.skill_type;
       
       if (!hasFilters) {
-        // Set default stats khi chưa có filter
-        setStats({
-          total: 0,
-          ungraded: 0,
-          ai_graded: 0,
-          manually_graded: 0,
-          needs_review: 0
-        });
+        // Load all submissions stats by default
+        const response = await submissionApi.getGradingStats({});
+        setStats(response.data);
         return;
       }
 
       const response = await submissionApi.getGradingStats({
-        exam_id: filters.exam_id,
         skill_type: filters.skill_type
       });
       setStats(response.data);
@@ -105,23 +103,19 @@ export default function SubmissionsPage() {
     setFilters({
       grading_status: '',
       skill_type: '',
-      exam_id: '',
-      has_ai_feedback: '',
-      answer_type: '',
-      score_range: { min: 0, max: 100 },
       page: 1,
       limit: 20
     });
   };
 
   const handleViewSubmission = (submission) => {
-    // Navigate to submission detail view
-    router.push(`/teacher/submissions/${submission.attempt_id || submission.attempt?.id}`);
+    // Navigate to submission detail view using attempt ID
+    router.push(`/teacher/submissions/${submission.attempt?.id}?mode=view`);
   };
 
   const handleGradeSubmission = (submission) => {
-    // Navigate to grading interface  
-    router.push(`/teacher/grading/${submission.id}`);
+    // Navigate to same page as view but with grading mode
+    router.push(`/teacher/submissions/${submission.attempt?.id}?mode=grade`);
   };
 
   const handleRegradeSubmissions = async (answerIds, regradeType) => {
@@ -171,8 +165,9 @@ export default function SubmissionsPage() {
         {stats && (
           <Grid container spacing={3} sx={{ mb: 4 }}>
             <Grid item xs={12} sm={6} md={2.4}>
-              <Card sx={{ height: '100%' }}>
+              <Card sx={{ height: '100%', bgcolor: 'grey.50' }}>
                 <CardContent sx={{ textAlign: 'center' }}>
+                  <Assignment sx={{ fontSize: 40, color: 'grey.600', mb: 1 }} />
                   <Typography color="textSecondary" gutterBottom variant="h6">
                     Tổng số bài
                   </Typography>
@@ -184,53 +179,61 @@ export default function SubmissionsPage() {
             </Grid>
             
             <Grid item xs={12} sm={6} md={2.4}>
-              <Card sx={{ height: '100%' }}>
+              <Card sx={{ height: '100%', bgcolor: 'error.50' }}>
                 <CardContent sx={{ textAlign: 'center' }}>
+                  <Warning sx={{ fontSize: 40, color: 'error.main', mb: 1 }} />
                   <Typography color="textSecondary" gutterBottom variant="h6">
-                    Chưa chấm
+                    Cần chấm ngay
                   </Typography>
-                  <Typography variant="h3" fontWeight="bold" color="warning.main">
+                  <Typography variant="h3" fontWeight="bold" color="error.main">
                     {stats.ungraded || 0}
                   </Typography>
+                  <Chip label="Ưu tiên cao" size="small" color="error" />
                 </CardContent>
               </Card>
             </Grid>
             
             <Grid item xs={12} sm={6} md={2.4}>
-              <Card sx={{ height: '100%' }}>
+              <Card sx={{ height: '100%', bgcolor: 'warning.50' }}>
                 <CardContent sx={{ textAlign: 'center' }}>
+                  <Psychology sx={{ fontSize: 40, color: 'warning.main', mb: 1 }} />
                   <Typography color="textSecondary" gutterBottom variant="h6">
                     AI đã chấm
                   </Typography>
-                  <Typography variant="h3" fontWeight="bold" color="info.main">
+                  <Typography variant="h3" fontWeight="bold" color="warning.main">
                     {stats.ai_graded || 0}
                   </Typography>
+                  <Chip label="Cần kiểm tra" size="small" color="warning" />
                 </CardContent>
               </Card>
             </Grid>
             
             <Grid item xs={12} sm={6} md={2.4}>
-              <Card sx={{ height: '100%' }}>
+              <Card sx={{ height: '100%', bgcolor: 'success.50' }}>
                 <CardContent sx={{ textAlign: 'center' }}>
+                  <CheckCircle sx={{ fontSize: 40, color: 'success.main', mb: 1 }} />
                   <Typography color="textSecondary" gutterBottom variant="h6">
                     GV đã chấm
                   </Typography>
                   <Typography variant="h3" fontWeight="bold" color="success.main">
                     {stats.manually_graded || 0}
                   </Typography>
+                  <Chip label="Hoàn thành" size="small" color="success" />
                 </CardContent>
               </Card>
             </Grid>
             
             <Grid item xs={12} sm={6} md={2.4}>
-              <Card sx={{ height: '100%' }}>
+              <Card sx={{ height: '100%', bgcolor: 'error.50' }}>
                 <CardContent sx={{ textAlign: 'center' }}>
+                  <Warning sx={{ fontSize: 40, color: 'error.main', mb: 1 }} />
                   <Typography color="textSecondary" gutterBottom variant="h6">
                     Cần xem xét
                   </Typography>
                   <Typography variant="h3" fontWeight="bold" color="error.main">
                     {stats.needs_review || 0}
                   </Typography>
+                  <Chip label="Cần sửa" size="small" color="error" />
                 </CardContent>
               </Card>
             </Grid>
@@ -242,7 +245,6 @@ export default function SubmissionsPage() {
           filters={filters}
           onFiltersChange={handleFiltersChange}
           onClearFilters={handleClearFilters}
-          availableExams={availableExams}
         />
 
         {/* Main Content */}

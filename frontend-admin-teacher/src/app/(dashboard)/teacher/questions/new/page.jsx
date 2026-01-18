@@ -25,7 +25,7 @@ import {
 } from '@mui/material';
 import { Save, Preview, ArrowBack, School, Psychology, AutoAwesome } from '@mui/icons-material';
 import QuestionForm from '@/components/teacher/questions/QuestionForm';
-import QuestionPreview from '@/components/teacher/questions/QuestionPreview';
+import { QuestionPreview } from '@/components/teacher/questions/common';
 import { createQuestion } from '@/store/slices/questionSlice';
 import { showNotification } from '@/store/slices/uiSlice';
 import { usePublicData } from '@/hooks/usePublicData';
