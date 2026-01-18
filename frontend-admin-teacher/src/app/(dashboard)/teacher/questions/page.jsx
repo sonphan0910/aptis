@@ -7,7 +7,7 @@ import { Add } from '@mui/icons-material';
 import dynamic from 'next/dynamic';
 
 // Dynamic imports to prevent SSR issues
-const QuestionList = dynamic(() => import('@/components/teacher/questions/QuestionList'), { ssr: false });
+const QuestionList = dynamic(() => import('@/components/teacher/questions/common/QuestionList'), { ssr: false });
 
 export default function QuestionsPage() {
   const router = useRouter();

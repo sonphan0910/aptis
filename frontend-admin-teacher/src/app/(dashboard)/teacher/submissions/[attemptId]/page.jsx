@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import {
   Box,
   Typography,
@@ -27,7 +27,9 @@ import { submissionApi } from '@/services/submissionService';
 export default function SubmissionDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const attemptId = params.attemptId;
+  const searchParams = useSearchParams();
+  const attemptId = params.attemptId; // Using attemptId as expected by backend
+  const mode = searchParams.get('mode') || 'view'; // 'view' or 'grade'
   
   const [submissionDetail, setSubmissionDetail] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -84,11 +86,6 @@ export default function SubmissionDetailPage() {
   const handleCloseNotification = () => {
     setNotification(prev => ({ ...prev, open: false }));
   };
-        feedback: currentSubmission.teacher_feedback || '',
-        final_score: currentSubmission.final_score
-      });
-    }
-  }, [currentSubmission]);
 
   const handleReviewSubmit = async () => {
     setSaving(true);
@@ -127,37 +124,72 @@ export default function SubmissionDetailPage() {
           </Button>
           <Box>
             <Typography variant="h4" fontWeight="bold">
-              Xem xét bài làm
+              {mode === 'grade' ? 'Chấm bài' : 'Xem bài làm'}
             </Typography>
             <Typography variant="subtitle1" color="text.secondary">
               {student?.full_name} - {exam?.title} ({skill})
             </Typography>
+            <Box display="flex" gap={1} mt={1}>
+              <Chip 
+                label={mode === 'grade' ? 'Chế độ chấm' : 'Chế độ xem'} 
+                color={mode === 'grade' ? 'secondary' : 'primary'}
+                variant="outlined"
+              />
+              {mode === 'view' && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => router.push(`/teacher/submissions/${attemptId}?mode=grade`)}
+                  startIcon={<Grade />}
+                >
+                  Chuyển sang chấm
+                </Button>
+              )}
+            </Box>
           </Box>
         </Box>
         
-        <Button
-          variant="contained"
-          onClick={handleReviewSubmit}
-          disabled={saving}
-          startIcon={saving ? <CircularProgress size={16} /> : <Grade />}
-        >
-          Gửi đánh giá
-        </Button>
+        {mode === 'grade' && (
+          <Button
+            variant="contained"
+            onClick={handleReviewSubmit}
+            disabled={saving}
+            startIcon={saving ? <CircularProgress size={16} /> : <Save />}
+          >
+            Lưu đánh giá
+          </Button>
+        )}
       </Box>
 
       <Card>
         <CardContent>
+          {mode === 'view' && (
+            <Alert severity="info" sx={{ mb: 3 }}>
+              <strong>Chế độ xem:</strong> Bạn đang xem bài làm của học sinh. 
+              Nhấn "Chuyển sang chấm" để bắt đầu chấm điểm.
+            </Alert>
+          )}
+          
+          {mode === 'grade' && (
+            <Alert severity="warning" sx={{ mb: 3 }}>
+              <strong>Chế độ chấm:</strong> Bạn có thể chấm điểm và đưa ra phản hồi. 
+              Nhớ nhấn "Lưu đánh giá" sau khi hoàn thành.
+            </Alert>
+          )}
+          
           {skill === 'writing' ? (
             <WritingReview
               answer={answer}
               onSubmitReview={handleSubmitReview}
               saving={saving}
+              readonly={mode === 'view'}
             />
           ) : (
             <SpeakingReview
               answer={answer}
               onSubmitReview={handleSubmitReview}
               saving={saving}
+              readonly={mode === 'view'}
             />
           )}
         </CardContent>

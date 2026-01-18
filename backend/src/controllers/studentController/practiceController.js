@@ -507,6 +507,77 @@ class PracticeController {
       });
     }
   }
+
+  /**
+   * Get practice stats for a specific skill
+   */
+  async getSkillStats(req, res) {
+    try {
+      const { skillId } = req.params;
+      const userId = req.user.userId;
+
+      const skill = await SkillType.findByPk(skillId);
+      if (!skill) {
+        return res.status(404).json({
+          success: false,
+          message: 'Skill not found'
+        });
+      }
+
+      // Get total exams count for this skill
+      const totalExamsQuery = `
+        SELECT COUNT(DISTINCT e.id) as total_exams
+        FROM exams e
+        INNER JOIN exam_sections es ON e.id = es.exam_id
+        INNER JOIN exam_section_questions esq ON es.id = esq.exam_section_id
+        INNER JOIN questions q ON esq.question_id = q.id
+        WHERE q.skill_type_id = :skillId
+          AND e.status = 'published'
+      `;
+
+      const [totalExamsResult] = await sequelize.query(totalExamsQuery, {
+        replacements: { skillId },
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      // Get user's completed attempts for this skill
+      const completedAttemptsQuery = `
+        SELECT COUNT(*) as completed_attempts,
+               AVG(aa.score / NULLIF(aa.max_score, 0) * 5) as avg_score
+        FROM exam_attempts ea
+        INNER JOIN attempt_answers aa ON ea.id = aa.attempt_id
+        INNER JOIN questions q ON aa.question_id = q.id
+        WHERE ea.user_id = :userId
+          AND ea.status = 'submitted'
+          AND q.skill_type_id = :skillId
+          AND aa.score IS NOT NULL
+      `;
+
+      const [attemptsResult] = await sequelize.query(completedAttemptsQuery, {
+        replacements: { userId, skillId },
+        type: sequelize.QueryTypes.SELECT
+      });
+
+      const stats = {
+        totalExams: parseInt(totalExamsResult?.total_exams || 0),
+        completedAttempts: parseInt(attemptsResult?.completed_attempts || 0),
+        averageScore: parseFloat(attemptsResult?.avg_score || 0)
+      };
+
+      res.json({
+        success: true,
+        data: stats
+      });
+
+    } catch (error) {
+      console.error('Error getting skill stats:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
 }
 
 module.exports = new PracticeController();

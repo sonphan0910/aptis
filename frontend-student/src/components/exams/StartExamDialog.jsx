@@ -94,68 +94,11 @@ export default function StartExamDialog({ open, onClose, exam, onStart }) {
               }
             />
             
-            <FormControlLabel
-              value="single_skill"
-              control={<Radio />}
-              label={
-                <Box>
-                  <Typography variant="body1" fontWeight="medium">
-                    Luyện tập một kỹ năng
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary">
-                    Chọn một kỹ năng cụ thể để luyện tập
-                  </Typography>
-                </Box>
-              }
-            />
+
           </RadioGroup>
         </FormControl>
 
-        {attemptType === 'single_skill' && (
-          <Box mt={2}>
-            <Typography variant="subtitle2" gutterBottom>
-              Chọn kỹ năng muốn luyện tập:
-            </Typography>
-            <FormControl component="fieldset" fullWidth>
-              <RadioGroup
-                value={selectedSkill}
-                onChange={(e) => setSelectedSkill(e.target.value)}
-              >
-                {availableSkills.map((skill) => (
-                  <FormControlLabel
-                    key={skill.id}
-                    value={skill.id}
-                    control={<Radio />}
-                    label={
-                      <Box sx={{ width: '100%', py: 1 }}>
-                        <Typography variant="body2" fontWeight="medium">
-                          {skill.skill_type}
-                        </Typography>
-                        <Box display="flex" gap={1} mt={0.5}>
-                          <Chip 
-                            size="small" 
-                            variant="outlined"
-                            label={`${skill.duration} phút`}
-                          />
-                          <Chip 
-                            size="small" 
-                            variant="outlined"
-                            label={`${skill.questions} câu`}
-                          />
-                          <Chip 
-                            size="small" 
-                            variant="outlined"
-                            label={`${skill.max_score} điểm`}
-                          />
-                        </Box>
-                      </Box>
-                    }
-                  />
-                ))}
-              </RadioGroup>
-            </FormControl>
-          </Box>
-        )}
+
 
         <Divider sx={{ my: 2 }} />
         

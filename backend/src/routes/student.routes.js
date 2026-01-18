@@ -145,4 +145,7 @@ router.post(
 // GET /student/practice/stats - Thống kê luyện tập
 router.get('/practice/stats', authMiddleware, isStudent, apiLimiter, practiceController.getPracticeStats);
 
+// GET /student/practice/skills/:skillId/stats - Thống kê theo skill
+router.get('/practice/skills/:skillId/stats', authMiddleware, isStudent, apiLimiter, practiceController.getSkillStats);
+
 module.exports = router;

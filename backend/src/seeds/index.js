@@ -52,6 +52,24 @@ async function runAllSeeds() {
     console.log('\n[6/6] Seed các đề thi mẫu...');
     await seedExams();
 
+        // Step 7: Seed original exam (Exam 1)
+    console.log('\n=== STEP 7: Seed Original Exam ===');
+    const seedExams = require('./06-seed-exams');
+    await seedExams();
+    
+
+        // Step 6: Seed additional questions for new exams
+    console.log('\n=== STEP 6: Seed Additional Questions ===');
+    const seedAdditionalQuestions = require('./07-seed-additional-questions');
+    await seedAdditionalQuestions();
+    
+
+    // Step 8: Seed additional exams (Exams 2-5)
+    console.log('\n=== STEP 8: Seed Additional Exams ===');
+    const seedAdditionalExams = require('./08-seed-additional-exams');
+    await seedAdditionalExams();
+    
+
     // Thông báo hoàn thành
     console.log('\n' + '='.repeat(60));
     console.log('🎉 ĐÃ SEED TOÀN BỘ DỮ LIỆU THÀNH CÔNG');

@@ -20,15 +20,41 @@ import {
 import { Save, ArrowBack } from '@mui/icons-material';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
-import MCQForm from './MCQForm';
-import MatchingForm from './MatchingForm';
-import GapFillingForm from './GapFillingForm';
-import OrderingForm from './OrderingForm';
-import WritingPromptForm from './WritingPromptForm';
-import SpeakingTaskForm from './SpeakingTaskForm';
-import TrueFalseForm from './TrueFalseForm';
-import NoteCompletionForm from './NoteCompletionForm';
-import QuestionStructureGuide from './QuestionStructureGuide';
+
+// Reading components
+import { 
+  ReadingGapFillingForm, 
+  ReadingOrderingForm, 
+  ReadingMatchingForm, 
+  ReadingMatchingHeadingsForm,
+  ReadingShortTextForm
+} from './reading';
+
+// Listening components
+import { 
+  ListeningMCQForm, 
+  ListeningGapFillingForm,
+  ListeningMatchingForm
+} from './listening';
+
+// Speaking components
+import { 
+  SpeakingPersonalIntroForm, 
+  SpeakingDescriptionForm,
+  SpeakingComparisonForm,
+  SpeakingTopicDiscussionForm
+} from './speaking';
+
+// Writing components
+import { 
+  WritingShortResponseForm,
+  WritingFormFillingForm,
+  WritingChatResponsesForm,
+  WritingEmailForm 
+} from './writing';
+
+// Common components
+import { QuestionStructureGuide } from './common';
 
 const DIFFICULTY_LEVELS = [
   { value: 'easy', label: 'Dễ', color: '#4caf50' },
@@ -179,43 +205,50 @@ export default function QuestionForm({
 
     // Use the code from questionTypeData (from database)
     const questionCode = selectedQuestionType?.code;
+    const skillCode = selectedSkill?.code || skillData?.code;
 
+    // Use new organized components based on skill type and question type
     switch (questionCode) {
-      // Listening types
-      case 'LISTENING_MCQ':
-        return <MCQForm {...props} />;
-      case 'LISTENING_GAP_FILL':
-        return <GapFillingForm {...props} />;
-      case 'LISTENING_MATCHING':
-        return <MatchingForm {...props} speakerMatching={true} />;
-      case 'LISTENING_STATEMENT_MATCHING':
-        return <MatchingForm {...props} statementMatching={true} />;
-      
-      // Reading types  
+      // === READING COMPONENTS ===
       case 'READING_GAP_FILL':
-        return <GapFillingForm {...props} />;
+        return <ReadingGapFillingForm {...props} />;
       case 'READING_ORDERING':
-        return <OrderingForm {...props} />;
+        return <ReadingOrderingForm {...props} />;
       case 'READING_MATCHING':
-        return <MatchingForm {...props} personMatching={true} />;
+        return <ReadingMatchingForm {...props} />;
       case 'READING_MATCHING_HEADINGS':
-        return <MatchingForm {...props} headingMatching={true} />;
+        return <ReadingMatchingHeadingsForm {...props} />;
       
-      // Speaking types
+      // === LISTENING COMPONENTS ===
+      case 'LISTENING_MCQ':
+        return <ListeningMCQForm {...props} />;
+      case 'LISTENING_GAP_FILL':
+        return <ListeningGapFillingForm {...props} />;
+      case 'LISTENING_MATCHING':
+      case 'LISTENING_STATEMENT_MATCHING':
+        return <ListeningMatchingForm {...props} />;
+      
+      // === SPEAKING COMPONENTS ===
       case 'SPEAKING_INTRO':
+        return <SpeakingPersonalIntroForm {...props} />;
       case 'SPEAKING_DESCRIPTION': 
+        return <SpeakingDescriptionForm {...props} />;
       case 'SPEAKING_COMPARISON':
+        return <SpeakingComparisonForm {...props} />;
       case 'SPEAKING_DISCUSSION':
-        return <SpeakingTaskForm {...props} speakingType={questionCode} />;
+        return <SpeakingTopicDiscussionForm {...props} />;
       
-      // Writing types
+      // === WRITING COMPONENTS ===
       case 'WRITING_SHORT':
+        return <WritingShortResponseForm {...props} />;
       case 'WRITING_FORM':
+        return <WritingFormFillingForm {...props} />;
       case 'WRITING_LONG':
+        return <WritingChatResponsesForm {...props} />;
       case 'WRITING_EMAIL':
-      case 'WRITING_ESSAY':
-        return <WritingPromptForm {...props} writingType={questionCode} />;
+        return <WritingEmailForm {...props} />;
       
+      // === UNSUPPORTED QUESTION TYPES ===
       default:
         return (
           <Box textAlign="center" py={4}>
@@ -226,10 +259,19 @@ export default function QuestionForm({
               Question Code: {questionCode}
             </Typography>
             <Typography variant="body2" color="text.secondary" mt={1}>
-              Selected Type: {JSON.stringify(selectedQuestionType, null, 2)}
+              Skill Code: {skillCode}
             </Typography>
             <Typography variant="body2" color="text.secondary" mt={2}>
-              Cần thêm form component cho loại câu hỏi này.
+              <strong>Các loại câu hỏi được hỗ trợ:</strong>
+            </Typography>
+            <Typography variant="body2" color="text.secondary" component="div" sx={{ mt: 1, textAlign: 'left', display: 'inline-block' }}>
+              <strong>Reading:</strong> READING_GAP_FILL, READING_ORDERING, READING_MATCHING, READING_MATCHING_HEADINGS<br/>
+              <strong>Listening:</strong> LISTENING_MCQ, LISTENING_GAP_FILL, LISTENING_MATCHING, LISTENING_STATEMENT_MATCHING<br/>
+              <strong>Speaking:</strong> SPEAKING_INTRO, SPEAKING_DESCRIPTION, SPEAKING_COMPARISON, SPEAKING_DISCUSSION<br/>
+              <strong>Writing:</strong> WRITING_SHORT, WRITING_FORM, WRITING_LONG, WRITING_EMAIL<br/>
+            </Typography>
+            <Typography variant="body2" color="text.secondary" mt={2}>
+              Liên hệ admin để thêm support cho loại câu hỏi khác.
             </Typography>
           </Box>
         );
