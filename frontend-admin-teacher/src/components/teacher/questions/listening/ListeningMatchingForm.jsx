@@ -6,12 +6,7 @@ import {
   TextField,
   Button,
   Typography,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   IconButton,
-  Chip,
   Grid,
   Paper,
   Alert,
@@ -21,148 +16,118 @@ import {
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
-  Headphones as HeadphonesIcon,
   Person as PersonIcon,
-  Info as InfoIcon,
-  VolumeUp as VolumeIcon
+  CheckCircle,
+  Warning,
+  Upload,
+  AudioFile
 } from '@mui/icons-material';
+import { questionApi } from '../../../../services/questionService';
 
 /**
- * APTIS Listening Speaker/Statement Matching Form
- * Hỗ trợ cả Speaker Matching và Statement Matching
- * Part 2-4: Listening comprehension with matching tasks
+ * APTIS Listening Speaker Matching Form  
+ * Part 2-4: Listening comprehension with speaker matching tasks
  */
 const ListeningMatchingForm = ({ questionData, onChange, onValidate }) => {
   const [formData, setFormData] = React.useState({
     content: questionData?.content || '',
-    matching_type: questionData?.matching_type || 'speaker', // 'speaker' or 'statement'
-    audio_file: questionData?.audio_file || '',
-    transcript: questionData?.transcript || '',
+    title: questionData?.title || '',
+    audioFile: null,
+    audioUrl: questionData?.audioUrl || '',
     speakers: questionData?.speakers || [
       {
         id: 1,
-        name: 'Speaker A',
-        description: '',
-        voice_characteristics: ''
+        name: 'Speaker A', 
+        audioFile: null,
+        audioUrl: '',
+        description: ''
       },
       {
         id: 2,
         name: 'Speaker B',
-        description: '',
-        voice_characteristics: ''
+        audioFile: null, 
+        audioUrl: '',
+        description: ''
       }
     ],
     statements: questionData?.statements || [
       {
         id: 1,
         statement: '',
-        speaker_id: 1,
-        time_code: ''
+        speaker_id: 1
       }
     ],
-    options: questionData?.options || [
-      {
-        id: 1,
-        option_text: '',
-        matches_statement_id: null
-      }
-    ],
-    instructions: questionData?.instructions || 'Listen to the conversation. Match each speaker with what they say, or match each statement with the correct person.',
-    difficulty: questionData?.difficulty || 'medium',
-    time_limit: questionData?.time_limit || 8,
-    audio_length: questionData?.audio_length || 120,
-    points: questionData?.points || 8
+    instructions: questionData?.instructions || 'Listen to the conversation. Match each speaker with what they say.',
+    difficulty: questionData?.difficulty || 'medium'
   });
 
   const [errors, setErrors] = React.useState({});
-  const [isGeneratingAudio, setIsGeneratingAudio] = React.useState(false);
+  const [isValidated, setIsValidated] = React.useState(false);
+  const [isUploading, setIsUploading] = React.useState(false);
 
-  // Audio generation function
-  const generateAudio = async (text) => {
-    if (!text || !text.trim()) return;
+  // Main audio file selection handler
+  const handleMainAudioFileSelect = (file) => {
+    if (!file) return;
     
-    try {
-      setIsGeneratingAudio(true);
-      console.log('🎵 Generating audio for Listening Matching...');
-      
-      // Call backend API to generate audio
-      const response = await fetch('/api/teacher/speech/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: text.trim(), language: 'en' })
-      });
-      
-      if (response.ok) {
-        const result = await response.json();
-        console.log('✅ Audio generated:', result.audioUrl);
-        // Could store audioUrl in state if needed
-      }
-    } catch (error) {
-      console.error('❌ Audio generation failed:', error);
-    } finally {
-      setIsGeneratingAudio(false);
-    }
+    setFormData(prev => ({ ...prev, audioFile: file }));
+    console.log('✅ Main audio file selected:', file.name);
   };
 
-  // Remove auto-validation useEffect - causes infinite loops
-  // Validation is only called on demand via button click
+  // Speaker audio file selection handler
+  const handleSpeakerAudioFileSelect = (speakerIndex, file) => {
+    if (!file) return;
+    
+    const newSpeakers = [...formData.speakers];
+    newSpeakers[speakerIndex].audioFile = file;
+    setFormData(prev => ({ ...prev, speakers: newSpeakers }));
+    console.log(`✅ Speaker ${speakerIndex + 1} audio file selected:`, file.name);
+  };
 
   const validateForm = () => {
     const newErrors = {};
     
-    // Validate audio file
-    if (!formData.audio_file.trim()) {
-      newErrors.audio_file = 'Audio file is required';
+    // Check title
+    if (!formData.title.trim()) {
+      newErrors.title = 'Tiêu đề không được để trống';
     }
-
-    // Validate speakers
-    if (formData.speakers.length < 2) {
-      newErrors.speakers = 'At least 2 speakers are required for matching';
+    
+    // Check main audio - allow either URL or file
+    if (!formData.audioUrl && !formData.audioFile) {
+      newErrors.audio = 'Vui lòng chọn file audio chính';
     }
-
-    const emptySpeakers = formData.speakers.filter(speaker => !speaker.name.trim());
-    if (emptySpeakers.length > 0) {
-      newErrors.speaker_names = `${emptySpeakers.length} speaker(s) missing names`;
+    
+    // Check speakers
+    const validSpeakers = formData.speakers.filter(s => s.name.trim() && (s.audioUrl || s.audioFile));
+    if (validSpeakers.length < 2) {
+      newErrors.speakers = 'Phải có ít nhất 2 người nói với file audio';
     }
-
-    // Validate statements
-    if (formData.statements.length === 0) {
-      newErrors.statements = 'At least one statement is required';
+    
+    // Check statements
+    const validStatements = formData.statements.filter(s => s.statement.trim());
+    if (validStatements.length === 0) {
+      newErrors.statements = 'Phải có ít nhất 1 câu nói';
     }
-
-    const emptyStatements = formData.statements.filter(stmt => !stmt.statement.trim());
-    if (emptyStatements.length > 0) {
-      newErrors.statement_content = `${emptyStatements.length} statement(s) are empty`;
-    }
-
-    // Validate options
-    if (formData.matching_type === 'statement' && formData.options.length === 0) {
-      newErrors.options = 'Options are required for statement matching';
-    }
-
+    
     setErrors(newErrors);
-    
     const isValid = Object.keys(newErrors).length === 0;
+    setIsValidated(isValid);
     
-    // Send data to parent and generate audio when valid
     if (isValid && onChange) {
-      const validSpeakers = formData.speakers.filter(s => s.name && s.name.trim());
-      const validStatements = formData.statements.filter(s => s.statement && s.statement.trim());
-      
       const sendData = {
-        ...formData,
-        speakers: validSpeakers,
+        title: formData.title.trim(),
+        audioUrl: formData.audioUrl,
+        audioFile: formData.audioFile, // ✅ Direct main audio File object
+        speakers: validSpeakers.map(speaker => ({
+          ...speaker,
+          audioFile: speaker.audioFile // ✅ Direct speaker audio File objects  
+        })),
         statements: validStatements,
+        instructions: formData.instructions.trim(),
         type: 'listening_matching'
       };
       
-      // Auto-generate audio from transcript
-      if (formData.transcript && formData.transcript.trim()) {
-        generateAudio(formData.transcript.trim());
-      }
-      
       // Create summary content for database
-      const summary = `Listening Matching (${formData.matching_type}): ${validSpeakers.length} speakers, ${validStatements.length} statements${formData.matching_type === 'statement' ? `, ${formData.options.length} options` : ''}. Transcript: ${formData.transcript.trim().substring(0, 100)}...`;
+      const summary = `Listening Speaker Matching: ${validSpeakers.length} speakers, ${validStatements.length} statements. Main audio with individual speaker samples.`;
       
       // Send content as JSON string for backend - MUST have meaningful content
       const finalData = {
@@ -176,467 +141,288 @@ const ListeningMatchingForm = ({ questionData, onChange, onValidate }) => {
   };
 
   const handleChange = (field, value) => {
-    const newFormData = { ...formData, [field]: value };
-    setFormData(newFormData);
-    if (onChange) onChange(newFormData);
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSpeakerChange = (index, field, value) => {
     const newSpeakers = [...formData.speakers];
-    newSpeakers[index] = { ...newSpeakers[index], [field]: value };
-    handleChange('speakers', newSpeakers);
+    newSpeakers[index][field] = value;
+    setFormData(prev => ({ ...prev, speakers: newSpeakers }));
   };
 
   const handleStatementChange = (index, field, value) => {
     const newStatements = [...formData.statements];
-    newStatements[index] = { ...newStatements[index], [field]: value };
-    handleChange('statements', newStatements);
-  };
-
-  const handleOptionChange = (index, field, value) => {
-    const newOptions = [...formData.options];
-    newOptions[index] = { ...newOptions[index], [field]: value };
-    handleChange('options', newOptions);
+    newStatements[index][field] = value;
+    setFormData(prev => ({ ...prev, statements: newStatements }));
   };
 
   const addSpeaker = () => {
-    if (formData.speakers.length < 6) {
-      const newSpeakers = [...formData.speakers];
-      newSpeakers.push({
-        id: Date.now(),
-        name: `Speaker ${String.fromCharCode(65 + newSpeakers.length)}`,
-        description: '',
-        voice_characteristics: ''
-      });
-      handleChange('speakers', newSpeakers);
-    }
+    const newSpeaker = {
+      id: Math.max(...formData.speakers.map(s => s.id)) + 1,
+      name: `Speaker ${String.fromCharCode(65 + formData.speakers.length)}`,
+      audioFile: null,
+      audioUrl: '',
+      description: ''
+    };
+    setFormData(prev => ({ ...prev, speakers: [...prev.speakers, newSpeaker] }));
   };
 
   const removeSpeaker = (index) => {
-    if (formData.speakers.length > 2) {
-      const newSpeakers = formData.speakers.filter((_, i) => i !== index);
-      handleChange('speakers', newSpeakers);
-    }
+    if (formData.speakers.length <= 2) return;
+    const newSpeakers = formData.speakers.filter((_, i) => i !== index);
+    setFormData(prev => ({ ...prev, speakers: newSpeakers }));
   };
 
   const addStatement = () => {
-    const newStatements = [...formData.statements];
-    newStatements.push({
-      id: Date.now(),
+    const newStatement = {
+      id: Math.max(...formData.statements.map(s => s.id)) + 1,
       statement: '',
-      speaker_id: formData.speakers[0]?.id || 1,
-      time_code: ''
-    });
-    handleChange('statements', newStatements);
+      speaker_id: 1
+    };
+    setFormData(prev => ({ ...prev, statements: [...prev.statements, newStatement] }));
   };
 
   const removeStatement = (index) => {
-    if (formData.statements.length > 1) {
-      const newStatements = formData.statements.filter((_, i) => i !== index);
-      handleChange('statements', newStatements);
-    }
+    if (formData.statements.length <= 1) return;
+    const newStatements = formData.statements.filter((_, i) => i !== index);
+    setFormData(prev => ({ ...prev, statements: newStatements }));
   };
-
-  const addOption = () => {
-    const newOptions = [...formData.options];
-    newOptions.push({
-      id: Date.now(),
-      option_text: '',
-      matches_statement_id: null
-    });
-    handleChange('options', newOptions);
-  };
-
-  const removeOption = (index) => {
-    if (formData.options.length > 1) {
-      const newOptions = formData.options.filter((_, i) => i !== index);
-      handleChange('options', newOptions);
-    }
-  };
-
-  const matchingTypes = [
-    { value: 'speaker', label: 'Speaker Matching' },
-    { value: 'statement', label: 'Statement Matching' }
-  ];
 
   return (
-    <Box sx={{ p: 3 }}>
-      {/* Header */}
-      <Paper sx={{ p: 2, mb: 3, backgroundColor: '#f5f5f5' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <HeadphonesIcon color="primary" />
-          <Typography variant="h5" fontWeight="bold">
-            Listening Matching Task
-          </Typography>
-          <Chip label="8 Points" color="primary" />
-          <Chip label="Parts 2-4" variant="outlined" />
+    <Box>
+      <Typography variant="h6" gutterBottom>
+        Listening Speaker Matching
+      </Typography>
+      
+      <Typography variant="body2" color="text.secondary" mb={3}>
+        Tạo bài nghe ghép người nói với câu nói tương ứng
+      </Typography>
+
+      {/* Title */}
+      <TextField
+        label="Tiêu đề bài nghe"
+        value={formData.title}
+        onChange={(e) => handleChange('title', e.target.value)}
+        fullWidth
+        margin="normal"
+        error={!!errors.title}
+        helperText={errors.title}
+      />
+
+      {/* Main Audio Upload */}
+      <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
+        <Typography variant="subtitle1" gutterBottom>
+          File Audio Chính
+        </Typography>
+        
+        <Box display="flex" alignItems="center" gap={2}>
+          <Button
+            variant="outlined"
+            component="label"
+            startIcon={isUploading ? <Upload /> : <AudioFile />}
+            disabled={isUploading}
+          >
+            {isUploading ? 'Đang tải lên...' : 'Chọn file audio'}
+            <input
+              type="file"
+              hidden
+              accept="audio/*"
+              onChange={(e) => {
+                const file = e.target.files[0];
+                if (file) {
+                  handleMainAudioFileSelect(file);
+                }
+              }}
+            />
+          </Button>
+          
+          {formData.audioUrl && (
+            <audio controls style={{ maxWidth: 300 }}>
+              <source src={formData.audioUrl} type="audio/mpeg" />
+              Your browser does not support the audio element.
+            </audio>
+          )}
         </Box>
         
-        <Typography variant="body2" sx={{ mt: 1, color: 'text.secondary' }}>
-          Students listen to conversations and match speakers with statements, or statements with correct persons/categories.
-        </Typography>
+        {errors.audio && (
+          <Typography variant="caption" color="error" display="block" mt={1}>
+            {errors.audio}
+          </Typography>
+        )}
       </Paper>
 
-      {/* Task Configuration */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <InfoIcon /> Task Configuration
-          </Typography>
-          
-          <Grid container spacing={2} sx={{ mb: 2 }}>
-            <Grid item xs={12} md={4}>
-              <FormControl fullWidth>
-                <InputLabel>Matching Type</InputLabel>
-                <Select
-                  value={formData.matching_type}
-                  onChange={(e) => handleChange('matching_type', e.target.value)}
-                  label="Matching Type"
-                >
-                  {matchingTypes.map((type) => (
-                    <MenuItem key={type.value} value={type.value}>
-                      {type.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={6} md={2}>
-              <TextField
-                fullWidth
-                label="Time Limit (min)"
-                type="number"
-                value={formData.time_limit}
-                onChange={(e) => handleChange('time_limit', parseInt(e.target.value))}
-                InputProps={{ inputProps: { min: 5, max: 15 } }}
-              />
-            </Grid>
-            <Grid item xs={6} md={2}>
-              <TextField
-                fullWidth
-                label="Audio Length (sec)"
-                type="number"
-                value={formData.audio_length}
-                onChange={(e) => handleChange('audio_length', parseInt(e.target.value))}
-                InputProps={{ inputProps: { min: 60, max: 300 } }}
-              />
-            </Grid>
-            <Grid item xs={12} md={4}>
-              <FormControl fullWidth>
-                <InputLabel>Difficulty</InputLabel>
-                <Select
-                  value={formData.difficulty}
-                  onChange={(e) => handleChange('difficulty', e.target.value)}
-                  label="Difficulty"
-                >
-                  <MenuItem value="easy">Easy</MenuItem>
-                  <MenuItem value="medium">Medium</MenuItem>
-                  <MenuItem value="hard">Hard</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-          </Grid>
-
-          <TextField
-            fullWidth
-            multiline
-            rows={2}
-            label="Instructions to Students"
-            value={formData.instructions}
-            onChange={(e) => handleChange('instructions', e.target.value)}
-            sx={{ mb: 2 }}
-            helperText="Clear instructions for the matching task"
-          />
-
-          <TextField
-            fullWidth
-            label="Audio File Path/URL"
-            value={formData.audio_file}
-            onChange={(e) => handleChange('audio_file', e.target.value)}
-            error={!!errors.audio_file}
-            helperText={errors.audio_file || 'Path to the audio file for this listening task'}
-            placeholder="/uploads/audio/listening_matching_01.mp3"
-            InputProps={{
-              startAdornment: <VolumeIcon sx={{ mr: 1, color: 'text.secondary' }} />
-            }}
-          />
-        </CardContent>
-      </Card>
-
       {/* Speakers Section */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6">
-              Speakers ({formData.speakers.length}/6 max)
-            </Typography>
-            <Button
-              startIcon={<AddIcon />}
-              onClick={addSpeaker}
-              disabled={formData.speakers.length >= 6}
-              variant="outlined"
-              size="small"
-            >
-              Add Speaker
-            </Button>
-          </Box>
+      <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Typography variant="h6">
+            Người nói ({formData.speakers.length})
+          </Typography>
+          <Button
+            startIcon={<AddIcon />}
+            onClick={addSpeaker}
+            variant="outlined"
+            size="small"
+          >
+            Thêm người nói
+          </Button>
+        </Box>
 
-          {errors.speakers && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {errors.speakers}
-            </Alert>
-          )}
-
-          {errors.speaker_names && (
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              {errors.speaker_names}
-            </Alert>
-          )}
-
-          <Grid container spacing={2}>
-            {formData.speakers.map((speaker, index) => (
-              <Grid item xs={12} md={6} key={speaker.id}>
-                <Paper variant="outlined" sx={{ p: 2 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Avatar sx={{ width: 32, height: 32 }}>
+        <Grid container spacing={2}>
+          {formData.speakers.map((speaker, index) => (
+            <Grid item xs={12} md={6} key={speaker.id}>
+              <Card variant="outlined">
+                <CardContent>
+                  <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                    <Box display="flex" alignItems="center">
+                      <Avatar sx={{ mr: 1, bgcolor: 'primary.main' }}>
                         <PersonIcon />
                       </Avatar>
                       <Typography variant="subtitle2">
-                        Speaker {index + 1}
+                        Người {index + 1}
                       </Typography>
                     </Box>
-                    {formData.speakers.length > 2 && (
-                      <IconButton 
-                        size="small" 
-                        onClick={() => removeSpeaker(index)}
-                        color="error"
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    )}
+                    <IconButton
+                      onClick={() => removeSpeaker(index)}
+                      disabled={formData.speakers.length <= 2}
+                      color="error"
+                      size="small"
+                    >
+                      <DeleteIcon />
+                    </IconButton>
                   </Box>
 
                   <TextField
-                    fullWidth
-                    label="Speaker Name/ID"
+                    label="Tên người nói"
                     value={speaker.name}
                     onChange={(e) => handleSpeakerChange(index, 'name', e.target.value)}
-                    sx={{ mb: 1 }}
-                    error={!speaker.name.trim()}
-                    placeholder="e.g., Speaker A, John, Woman 1"
+                    fullWidth
+                    size="small"
+                    margin="normal"
                   />
 
                   <TextField
+                    label="Mô tả"
+                    value={speaker.description}
+                    onChange={(e) => handleSpeakerChange(index, 'description', e.target.value)}
                     fullWidth
                     multiline
                     rows={2}
-                    label="Description"
-                    value={speaker.description}
-                    onChange={(e) => handleSpeakerChange(index, 'description', e.target.value)}
-                    sx={{ mb: 1 }}
-                    placeholder="Brief description of the speaker's role or background"
+                    size="small"
+                    margin="normal"
                   />
 
-                  <TextField
-                    fullWidth
-                    label="Voice Characteristics"
-                    value={speaker.voice_characteristics}
-                    onChange={(e) => handleSpeakerChange(index, 'voice_characteristics', e.target.value)}
-                    placeholder="e.g., Male, British accent, Young adult"
-                  />
-                </Paper>
-              </Grid>
-            ))}
-          </Grid>
-        </CardContent>
-      </Card>
+                  {/* Speaker Audio Upload */}
+                  <Box mt={2}>
+                    <Typography variant="caption" display="block" mb={1}>
+                      File audio mẫu của người nói:
+                    </Typography>
+                    
+                    <Button
+                      variant="text"
+                      component="label"
+                      startIcon={<AudioFile />}
+                      size="small"
+                      disabled={isUploading}
+                    >
+                      {speaker.audioUrl ? 'Thay đổi audio' : 'Chọn file audio'}
+                      <input
+                        type="file"
+                        hidden
+                        accept="audio/*"
+                        onChange={(e) => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            handleSpeakerAudioFileSelect(index, file);
+                          }
+                        }}
+                      />
+                    </Button>
+                    
+                    {speaker.audioUrl && (
+                      <audio controls style={{ width: '100%', marginTop: 8 }}>
+                        <source src={speaker.audioUrl} type="audio/mpeg" />
+                      </audio>
+                    )}
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+
+        {errors.speakers && (
+          <Typography variant="caption" color="error" display="block" mt={1}>
+            {errors.speakers}
+          </Typography>
+        )}
+      </Paper>
 
       {/* Statements Section */}
-      <Card sx={{ mb: 3 }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6">
-              Statements ({formData.statements.length})
-            </Typography>
-            <Button
-              startIcon={<AddIcon />}
-              onClick={addStatement}
-              variant="outlined"
-              size="small"
-            >
-              Add Statement
-            </Button>
-          </Box>
+      <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+          <Typography variant="h6">
+            Câu nói ({formData.statements.length})
+          </Typography>
+          <Button
+            startIcon={<AddIcon />}
+            onClick={addStatement}
+            variant="outlined"
+            size="small"
+          >
+            Thêm câu nói
+          </Button>
+        </Box>
 
-          {errors.statement_content && (
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              {errors.statement_content}
-            </Alert>
-          )}
-
-          {formData.statements.map((statement, index) => (
-            <Paper key={statement.id} variant="outlined" sx={{ p: 2, mb: 2 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="subtitle1" fontWeight="bold">
-                  Statement {index + 1}
-                </Typography>
-                {formData.statements.length > 1 && (
-                  <IconButton 
-                    size="small" 
+        {formData.statements.map((statement, index) => (
+          <Box key={statement.id} mb={2}>
+            <Card variant="outlined">
+              <CardContent>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                  <Typography variant="subtitle2">
+                    Câu nói {index + 1}
+                  </Typography>
+                  <IconButton
                     onClick={() => removeStatement(index)}
+                    disabled={formData.statements.length <= 1}
                     color="error"
+                    size="small"
                   >
                     <DeleteIcon />
                   </IconButton>
-                )}
-              </Box>
+                </Box>
 
-              <Grid container spacing={2}>
-                <Grid item xs={12} md={8}>
-                  <TextField
-                    fullWidth
-                    multiline
-                    rows={2}
-                    label="Statement Text"
-                    value={statement.statement}
-                    onChange={(e) => handleStatementChange(index, 'statement', e.target.value)}
-                    placeholder="What the speaker says or the statement to be matched"
-                    error={!statement.statement.trim()}
-                  />
-                </Grid>
+                <TextField
+                  label="Nội dung câu nói"
+                  value={statement.statement}
+                  onChange={(e) => handleStatementChange(index, 'statement', e.target.value)}
+                  fullWidth
+                  multiline
+                  rows={3}
+                  size="small"
+                  margin="normal"
+                />
+              </CardContent>
+            </Card>
+          </Box>
+        ))}
 
-                <Grid item xs={6} md={2}>
-                  <FormControl fullWidth>
-                    <InputLabel>Spoken by</InputLabel>
-                    <Select
-                      value={statement.speaker_id}
-                      onChange={(e) => handleStatementChange(index, 'speaker_id', e.target.value)}
-                      label="Spoken by"
-                    >
-                      {formData.speakers.map((speaker) => (
-                        <MenuItem key={speaker.id} value={speaker.id}>
-                          {speaker.name}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-
-                <Grid item xs={6} md={2}>
-                  <TextField
-                    fullWidth
-                    label="Time Code"
-                    value={statement.time_code}
-                    onChange={(e) => handleStatementChange(index, 'time_code', e.target.value)}
-                    placeholder="1:30"
-                    helperText="Optional"
-                  />
-                </Grid>
-              </Grid>
-            </Paper>
-          ))}
-        </CardContent>
-      </Card>
-
-      {/* Options Section (for Statement Matching) */}
-      {formData.matching_type === 'statement' && (
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6">
-                Matching Options ({formData.options.length})
-              </Typography>
-              <Button
-                startIcon={<AddIcon />}
-                onClick={addOption}
-                variant="outlined"
-                size="small"
-              >
-                Add Option
-              </Button>
-            </Box>
-
-            {errors.options && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {errors.options}
-              </Alert>
-            )}
-
-            <Grid container spacing={2}>
-              {formData.options.map((option, index) => (
-                <Grid item xs={12} md={6} key={option.id}>
-                  <Paper variant="outlined" sx={{ p: 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                      <Typography variant="subtitle2" color="primary">
-                        Option {String.fromCharCode(65 + index)}
-                      </Typography>
-                      {formData.options.length > 1 && (
-                        <IconButton 
-                          size="small" 
-                          onClick={() => removeOption(index)}
-                          color="error"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      )}
-                    </Box>
-
-                    <TextField
-                      fullWidth
-                      multiline
-                      rows={2}
-                      label="Option Text"
-                      value={option.option_text}
-                      onChange={(e) => handleOptionChange(index, 'option_text', e.target.value)}
-                      sx={{ mb: 1 }}
-                      placeholder="Option for students to match with statements"
-                    />
-
-                    <FormControl fullWidth size="small">
-                      <InputLabel>Matches Statement</InputLabel>
-                      <Select
-                        value={option.matches_statement_id || ''}
-                        onChange={(e) => handleOptionChange(index, 'matches_statement_id', e.target.value)}
-                        label="Matches Statement"
-                      >
-                        <MenuItem value="">
-                          <em>No match (distractor)</em>
-                        </MenuItem>
-                        {formData.statements.map((statement, stmtIndex) => (
-                          <MenuItem key={statement.id} value={statement.id}>
-                            Statement {stmtIndex + 1}: {statement.statement.substring(0, 30)}...
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  </Paper>
-                </Grid>
-              ))}
-            </Grid>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Transcript Section */}
-      <Card>
-        <CardContent>
-          <Typography variant="h6" sx={{ mb: 2 }}>
-            Audio Transcript (Optional)
+        {errors.statements && (
+          <Typography variant="caption" color="error" display="block" mt={1}>
+            {errors.statements}
           </Typography>
-          
-          <TextField
-            fullWidth
-            multiline
-            rows={6}
-            label="Full Transcript"
-            value={formData.transcript}
-            onChange={(e) => handleChange('transcript', e.target.value)}
-            placeholder="Enter the complete transcript of the audio for reference..."
-            helperText="This helps with marking and validation. Include speaker labels."
-          />
-        </CardContent>
-      </Card>
+        )}
+      </Paper>
+
+      {/* Instructions */}
+      <TextField
+        label="Hướng dẫn"
+        value={formData.instructions}
+        onChange={(e) => handleChange('instructions', e.target.value)}
+        fullWidth
+        multiline
+        rows={2}
+        margin="normal"
+      />
 
       {/* Manual Validation Button */}
       <Button
@@ -644,22 +430,33 @@ const ListeningMatchingForm = ({ questionData, onChange, onValidate }) => {
         variant="contained"
         color="info"
         size="small"
-        sx={{ mt: 2, mb: 2 }}
-        disabled={isGeneratingAudio}
-        startIcon={isGeneratingAudio ? <VolumeIcon /> : <InfoIcon />}
+        sx={{ mb: 3, mt: 2 }}
+        disabled={isUploading}
+        startIcon={isUploading ? <Upload /> : <CheckCircle />}
       >
-        {isGeneratingAudio ? 'Đang tạo audio...' : 'Kiểm tra câu hỏi'}
+        {isUploading ? 'Đang tải audio...' : 'Kiểm tra câu hỏi'}
       </Button>
 
-      {/* Summary */}
-      <Paper sx={{ p: 2, mt: 3, backgroundColor: '#f9f9f9' }}>
-        <Typography variant="body2" color="text.secondary">
-          <strong>Summary:</strong> {formData.matching_type} matching task, 
-          {formData.speakers.length} speakers, {formData.statements.length} statements, 
-          {formData.matching_type === 'statement' ? formData.options.length : 0} options, 
-          {formData.time_limit} minutes, {formData.audio_length}s audio
-        </Typography>
-      </Paper>
+      {/* Validation Status */}
+      {isValidated && (
+        <Alert severity="success" icon={<CheckCircle />}>
+          Câu hỏi Listening Speaker Matching hợp lệ!
+        </Alert>
+      )}
+
+      {/* Show validation errors */}
+      {Object.keys(errors).length > 0 && (
+        <Alert severity="error" icon={<Warning />} sx={{ mt: 2 }}>
+          <Typography variant="body2">
+            Vui lòng sửa các lỗi sau:
+          </Typography>
+          <ul style={{ margin: '8px 0', paddingLeft: '20px' }}>
+            {Object.values(errors).map((error, index) => (
+              <li key={index}>{error}</li>
+            ))}
+          </ul>
+        </Alert>
+      )}
     </Box>
   );
 };

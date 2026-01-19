@@ -33,7 +33,7 @@ const {
   examSchemas,
   criteriaSchemas,
 } = require('../middleware/validation');
-const { apiLimiter } = require('../middleware/rateLimiter');
+const { apiLimiter, uploadLimiter } = require('../middleware/rateLimiter');
 
 // =====================================
 // DASHBOARD - BẢNG ĐIỀU KHIỂN
@@ -101,6 +101,14 @@ router.get(
   questionController.getQuestionDetails,
 );
 
+// GET /teacher/questions/:questionId - Get question details
+router.get(
+  '/questions/:questionId',
+  authMiddleware,
+  isTeacherOrAdmin,
+  questionController.getQuestionDetails,
+);
+
 // POST /teacher/questions/:questionId/upload-images - Upload ảnh cho câu hỏi
 router.post(
   '/questions/:questionId/upload-images',
@@ -110,6 +118,54 @@ router.post(
   questionController.uploadQuestionImages,
 );
 
+// POST /teacher/questions/:questionId/upload-audios - Upload audio files for questions
+router.post(
+  '/questions/:questionId/upload-audios',
+  authMiddleware,
+  isTeacherOrAdmin,
+  uploadLimiter,
+  require('../config/storage').upload.fields([
+    { name: 'mainAudio', maxCount: 1 },
+    { name: 'speakerAudios', maxCount: 10 }
+  ]),
+  questionController.uploadQuestionAudios,
+);
+
+// POST /teacher/upload/audio - Upload audio files for questions
+router.post(
+  '/upload/audio',
+  authMiddleware,
+  isTeacherOrAdmin,
+  uploadLimiter,
+  require('../config/storage').upload.single('audio'),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: 'No audio file provided'
+        });
+      }
+
+      const { type = 'general' } = req.body;
+      
+      res.json({
+        success: true,
+        message: 'Audio uploaded successfully',
+        audioUrl: req.file.filename,
+        originalName: req.file.originalname,
+        type: type
+      });
+    } catch (error) {
+      console.error('Audio upload error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to upload audio'
+      });
+    }
+  }
+);
+
 // PUT /teacher/questions/:questionId - Cập nhật câu hỏi
 router.put(
   '/questions/:questionId',
@@ -117,6 +173,14 @@ router.put(
   isTeacherOrAdmin,
   validate(questionSchemas.updateQuestion),
   questionController.updateQuestion,
+);
+
+// PATCH /teacher/questions/:questionId - Cập nhật media URL
+router.patch(
+  '/questions/:questionId',
+  authMiddleware,
+  isTeacherOrAdmin,
+  questionController.updateQuestionMediaUrl,
 );
 
 // DELETE /teacher/questions/:questionId - Xóa câu hỏi

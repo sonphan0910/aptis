@@ -11,7 +11,7 @@ const STORAGE_CONFIG = {
 
   // Giới hạn file upload
   limits: {
-    fileSize: 50 * 1024 * 1024, // Dung lượng tối đa 50MB
+    fileSize: 500 * 1024 * 1024, // Dung lượng tối đa 500MB (increased from 50MB)
     files: 1,                   // Tối đa 1 file mỗi lần upload
   },
 
@@ -33,6 +33,7 @@ const ensureUploadDirs = () => {
     path.join(STORAGE_CONFIG.basePath, 'avatars'),
     path.join(STORAGE_CONFIG.basePath, 'questions'),
     path.join(STORAGE_CONFIG.basePath, 'answers'),
+    path.join(STORAGE_CONFIG.basePath, 'audio'),
   ];
   dirs.forEach((dir) => {
     if (!fs.existsSync(dir)) {
@@ -53,7 +54,7 @@ const storage = multer.diskStorage({
     } else if (file.fieldname === 'avatar') {
       uploadDir = path.join(STORAGE_CONFIG.basePath, 'avatars');
     } else if (file.fieldname === 'audio') {
-      uploadDir = path.join(STORAGE_CONFIG.basePath, 'answers');
+      uploadDir = path.join(STORAGE_CONFIG.basePath, 'audio');
     } else if (file.fieldname === 'images') {
       // For question images
       uploadDir = path.join(STORAGE_CONFIG.basePath, 'questions');
@@ -75,17 +76,28 @@ const storage = multer.diskStorage({
   },
 });
 
-// Hàm kiểm tra loại file hợp lệ khi upload
+// Hàm kiểm tra loại file hợp lệ khi upload (DISABLED - allow all file types for audio)
 const fileFilter = (req, file, cb) => {
-  const allAllowedTypes = [
-    ...STORAGE_CONFIG.allowedTypes.image,
-    ...STORAGE_CONFIG.allowedTypes.audio,
-    ...STORAGE_CONFIG.allowedTypes.document,
-  ];
-  if (allAllowedTypes.includes(file.mimetype)) {
+  // ✅ Allow all file types for audio uploads
+  // For audio: no MIME type restriction
+  if (req.route && req.route.path.includes('upload-audios')) {
+    // Allow any file type for audio upload endpoint
+    cb(null, true);
+  } else if (req.route && req.route.path.includes('upload-audio')) {
+    // Allow any file type for audio upload endpoint
     cb(null, true);
   } else {
-    cb(new Error('Không hỗ trợ loại file này'), false);
+    // For other endpoints, enforce MIME type checking
+    const allAllowedTypes = [
+      ...STORAGE_CONFIG.allowedTypes.image,
+      ...STORAGE_CONFIG.allowedTypes.audio,
+      ...STORAGE_CONFIG.allowedTypes.document,
+    ];
+    if (allAllowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Không hỗ trợ loại file này'), false);
+    }
   }
 };
 

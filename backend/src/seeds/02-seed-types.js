@@ -86,13 +86,6 @@ async function seedQuestionTypes() {
     },
     {
       skill_type_id: listening.id,
-      code: 'LISTENING_GAP_FILL',
-      question_type_name: 'Gap Filling',
-      instruction_template: 'Listen and fill in the missing words.',
-      scoring_method: 'auto',
-    },
-    {
-      skill_type_id: listening.id,
       code: 'LISTENING_MATCHING',
       question_type_name: 'Speaker Matching',
       instruction_template: 'Listen to each speaker and match them with the correct option.',

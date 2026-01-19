@@ -28,6 +28,56 @@ exports.createExam = async (req, res, next) => {
       total_score: total_score || 0,
     });
 
+    // Get skill types for mapping
+    const skillTypes = await SkillType.findAll();
+    const skillMap = {};
+    skillTypes.forEach(skill => {
+      skillMap[skill.skill_type_name] = skill.id;
+    });
+
+    // Auto-create default sections for APTIS exam structure
+    const defaultSections = [
+      // Reading sections
+      { skill: 'Reading', part: 1, name: 'Gap Filling', questions: 1, duration: 5, instructions: 'Part 1: Gap Filling: Read carefully and answer all questions.' },
+      { skill: 'Reading', part: 2, name: 'Ordering', questions: 2, duration: 10, instructions: 'Part 2: Ordering: Read carefully and answer all questions.' },
+      { skill: 'Reading', part: 3, name: 'Matching', questions: 1, duration: 10, instructions: 'Part 3: Matching: Read carefully and answer all questions.' },
+      { skill: 'Reading', part: 4, name: 'Matching Headings', questions: 1, duration: 10, instructions: 'Part 4: Matching Headings: Read carefully and answer all questions.' },
+      
+      // Listening sections
+      { skill: 'Listening', part: 1, name: 'Multiple Choice', questions: 13, duration: 10, instructions: 'Part 1: Multiple Choice: Listen carefully and answer all questions.' },
+      { skill: 'Listening', part: 2, name: 'Speaker Matching', questions: 1, duration: 10, instructions: 'Part 2: Speaker Matching: Listen carefully and answer all questions.' },
+      { skill: 'Listening', part: 3, name: 'Statement Matching', questions: 1, duration: 10, instructions: 'Part 3: Statement Matching: Listen carefully and answer all questions.' },
+      { skill: 'Listening', part: 4, name: 'Extended MCQ', questions: 2, duration: 10, instructions: 'Part 4: Extended MCQ: Listen carefully and answer all questions.' },
+      
+      // Writing sections
+      { skill: 'Writing', part: 1, name: 'Form Filling (A1)', questions: 1, duration: 10, instructions: 'Part 1: Form Filling (A1): Follow the instructions carefully and complete within the time limit.' },
+      { skill: 'Writing', part: 2, name: 'Short Response (A2)', questions: 1, duration: 10, instructions: 'Part 2: Short Response (A2): Follow the instructions carefully and complete within the time limit.' },
+      { skill: 'Writing', part: 3, name: 'Chat Responses (B1)', questions: 1, duration: 10, instructions: 'Part 3: Chat Responses (B1): Follow the instructions carefully and complete within the time limit.' },
+      { skill: 'Writing', part: 4, name: 'Email Writing (B2)', questions: 1, duration: 20, instructions: 'Part 4: Email Writing (B2): Follow the instructions carefully and complete within the time limit.' },
+      
+      // Speaking sections
+      { skill: 'Speaking', part: 1, name: 'Personal Introduction', questions: 3, duration: 2, instructions: 'Part 1: Personal Introduction: Record your response clearly within the time limit.' },
+      { skill: 'Speaking', part: 2, name: 'Picture Description', questions: 3, duration: 2, instructions: 'Part 2: Picture Description: Record your response clearly within the time limit.' },
+      { skill: 'Speaking', part: 3, name: 'Comparison', questions: 3, duration: 2, instructions: 'Part 3: Comparison: Record your response clearly within the time limit.' },
+      { skill: 'Speaking', part: 4, name: 'Topic Discussion', questions: 1, duration: 6, instructions: 'Part 4: Topic Discussion: Record your response clearly within the time limit.' }
+    ];
+
+    // Create exam sections automatically
+    for (let i = 0; i < defaultSections.length; i++) {
+      const section = defaultSections[i];
+      const skillTypeId = skillMap[section.skill];
+      
+      if (skillTypeId) {
+        await ExamSection.create({
+          exam_id: exam.id,
+          skill_type_id: skillTypeId,
+          section_order: i + 1,
+          duration_minutes: section.duration,
+          instruction: section.instructions
+        });
+      }
+    }
+
     const examWithRelations = await Exam.findByPk(exam.id, {
       include: [
         {
@@ -35,6 +85,17 @@ exports.createExam = async (req, res, next) => {
           as: 'aptisType',
           attributes: ['id', 'code', 'aptis_type_name', 'description'],
         },
+        {
+          model: ExamSection,
+          as: 'sections',
+          include: [
+            {
+              model: SkillType,
+              as: 'skillType',
+              attributes: ['id', 'code', 'skill_type_name']
+            }
+          ]
+        }
       ],
     });
 

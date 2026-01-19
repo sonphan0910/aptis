@@ -46,13 +46,13 @@ const authLimiter = rateLimit({
 
 /**
  * Giới hạn tốc độ upload file
- * Mỗi user chỉ được upload tối đa 10 file mỗi giờ
+ * Mỗi user chỉ được upload tối đa 500 file mỗi giờ
  * Nếu chưa đăng nhập thì tính theo IP
  * Ngăn chặn spam upload
  */
 const uploadLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 giờ
-  max:  100, // Tối đa 50 file
+  max:  500, // Tối đa 500 file (increased from 50)
   message: {
     success: false,
     error: {

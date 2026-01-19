@@ -11,9 +11,22 @@ const { delay } = require('../../utils/helpers');
 class AiServiceClient {
   /**
    * Call AI service with retry logic
+   * @param {string|object} prompt - Text prompt or {text, images} for vision
+   * @param {number} maxRetries - Max retry attempts
    */
   async callAiWithRetry(prompt, maxRetries = AI_SCORING_CONFIG.MAX_RETRIES) {
     let lastError;
+    let promptText = prompt;
+    let images = null;
+    
+    // Handle vision mode (prompt object with text and images)
+    if (typeof prompt === 'object' && prompt.text) {
+      promptText = prompt.text;
+      images = prompt.images || null;
+      if (images) {
+        console.log(`[callAiWithRetry] Vision mode enabled with ${images.length} image(s)`);
+      }
+    }
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -21,13 +34,18 @@ class AiServiceClient {
 
         // 🚀 OPTIMIZED: Minimal system prompt = faster processing
         const systemPrompt = 'Expert APTIS English assessor. Respond JSON only. Be precise with CEFR levels.';
-        const fullPrompt = `${systemPrompt}\n\n${prompt}`;
+        const fullPrompt = `${systemPrompt}\n\n${promptText}`;
         
         // Prepare options - handle models that don't support temperature
         const options = {
           max_completion_tokens: OPENAI_CONFIG.maxTokens,
           temperature: OPENAI_CONFIG.temperature
         };
+        
+        // Add images if provided
+        if (images) {
+          options.images = images;
+        }
         
         const content = await callAI(fullPrompt, options);
 
