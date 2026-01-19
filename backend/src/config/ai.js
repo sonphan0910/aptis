@@ -14,7 +14,7 @@ const OPENAI_CONFIG = {
   model: process.env.OPENAI_MODEL || 'gpt-4',
   baseURL: 'https://api.openai.com/v1',
   temperature: 1, // Lower for more consistent, deterministic scoring
-  maxTokens: 1024, // Enough for scoring JSON responses
+  maxTokens: 2048, // Enough for scoring JSON responses
 };
 
 // Determine which AI provider to use
@@ -59,13 +59,34 @@ const callOpenAI = async (prompt, options = {}) => {
   try {
     console.log(`[OpenAI] Calling model: ${OPENAI_CONFIG.model}`);
     
+    // Prepare content - support both text and vision (images)
+    let messageContent = prompt;
+    
+    // If images provided, build vision content
+    if (options.images && Array.isArray(options.images) && options.images.length > 0) {
+      console.log(`[OpenAI] Vision mode: Including ${options.images.length} image(s)`);
+      messageContent = [
+        {
+          type: 'text',
+          text: prompt
+        },
+        ...options.images.map(img => ({
+          type: 'image_url',
+          image_url: {
+            url: img.url || `data:${img.media_type || 'image/jpeg'};base64,${img.base64}`,
+            detail: 'high' // high detail for better analysis
+          }
+        }))
+      ];
+    }
+    
     // Prepare request body
     const requestBody = {
       model: OPENAI_CONFIG.model,
       messages: [
         {
           role: 'user',
-          content: prompt
+          content: messageContent
         }
       ],
       max_completion_tokens: options.max_completion_tokens || OPENAI_CONFIG.maxTokens,

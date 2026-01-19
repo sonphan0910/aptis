@@ -755,9 +755,10 @@ async function seedWritingQuestions(aptisType, teacher) {
   }
   
   // Task 4 (B2): Email Writing - 1 câu hỏi (3 email replies)
-  const task4Questions = [
-    "Email discussion about a class trip\n\nRead the email from your teacher:\n\nFrom: Teacher <teacher@school.com>\nSubject: School trip to the museum\n\nDear student,\n\nWe are planning a class trip to the museum. Do you want to go? What do you want to see there?\n\nPlease write back with your answer.\n\nTeacher\n\n---\n\n1. Email to a friend (50 words)\n\n2. Email to school manager (80-100 words)\n\n3. Formal discussion email (120-150 words)",
-  ];
+const task4Questions = [
+  "Email about a class trip\n\nRead the email from your teacher:\n\nFrom: Teacher <teacher@school.com>\nSubject: School trip to the museum\n\nDear student,\n\nWe are planning a class trip to the museum. Do you want to go? What do you want to see there?\n\nPlease write back with your answer.\n\nTeacher\n\n---\n\n1. Email to a friend (50 words)\n\n2. Email to school manager (80–100 words)"
+];
+
 
   for (let i = 0; i < 1; i++) {
     await Question.create({

@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 const {
   AttemptAnswer,
   AiScoringCriteria,
@@ -21,6 +22,108 @@ const FeedbackGenerator = require('./scoring/FeedbackGenerator');
 const AiServiceClient = require('./scoring/AiServiceClient');
 
 class AiScoringService {
+  /**
+   * Convert local image file to base64
+   * @param {string} filePath - Full path to image file
+   * @returns {Promise<string>} Base64 encoded image or null if file not found
+   */
+  async getImageAsBase64(filePath) {
+    try {
+      let resolvedPath = filePath;
+      
+      // If relative path, resolve from project root
+      if (!path.isAbsolute(filePath) && !filePath.startsWith('/')) {
+        resolvedPath = path.join(__dirname, '../../..', filePath);
+      }
+      
+      if (!fs.existsSync(resolvedPath)) {
+        console.warn(`[getImageAsBase64] ⚠️ File not found: ${resolvedPath}`);
+        return null;
+      }
+      
+      const fileBuffer = fs.readFileSync(resolvedPath);
+      const base64 = fileBuffer.toString('base64');
+      console.log(`[getImageAsBase64] ✅ Converted: ${path.basename(resolvedPath)}`);
+      return base64;
+    } catch (error) {
+      console.warn(`[getImageAsBase64] ⚠️ Error: ${error.message}`);
+      return null;
+    }
+  }
+  
+  /**
+   * Get MIME type from file extension
+   */
+  getMediaType(filePath) {
+    const ext = path.extname(filePath).toLowerCase();
+    const mimes = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.gif': 'image/gif', '.webp': 'image/webp' };
+    return mimes[ext] || 'image/jpeg';
+  }
+  
+  /**
+   * Extract images from question and prepare for vision API
+   * Converts local files to base64, keeps external URLs as-is
+   * @param {object} question - Question with additional_media
+   * @returns {Promise<array>} Array of images for OpenAI vision API
+   */
+  async prepareImagesForVision(question) {
+    const images = [];
+    
+    if (!question.additional_media) return images;
+    
+    try {
+      const media = typeof question.additional_media === 'string' 
+        ? JSON.parse(question.additional_media) 
+        : question.additional_media;
+      
+      if (!Array.isArray(media)) return images;
+      
+      const imageMedia = media.filter(m => m.type === 'image');
+      console.log(`[prepareImagesForVision] Found ${imageMedia.length} image(s) in question`);
+      
+      for (let i = 0; i < imageMedia.length; i++) {
+        const img = imageMedia[i];
+        
+        if (img.url) {
+          if (img.url.startsWith('http')) {
+            // External URL - use directly
+            console.log(`[prepareImagesForVision] Using external URL: ${img.url}`);
+            images.push({ url: img.url, description: img.description || `Image ${i + 1}` });
+          } else {
+            // Local file path - convert to base64
+            console.log(`[prepareImagesForVision] Converting local file: ${img.url}`);
+            const base64 = await this.getImageAsBase64(img.url);
+            if (base64) {
+              images.push({
+                base64,
+                media_type: this.getMediaType(img.url),
+                description: img.description || `Image ${i + 1}`
+              });
+            }
+          }
+        } else if (img.file_path) {
+          console.log(`[prepareImagesForVision] Converting file_path: ${img.file_path}`);
+          const base64 = await this.getImageAsBase64(img.file_path);
+          if (base64) {
+            images.push({
+              base64,
+              media_type: this.getMediaType(img.file_path),
+              description: img.description || `Image ${i + 1}`
+            });
+          }
+        }
+      }
+      
+      if (images.length > 0) {
+        console.log(`[prepareImagesForVision] ✅ Prepared ${images.length} image(s) for vision API`);
+      }
+    } catch (error) {
+      console.warn(`[prepareImagesForVision] ⚠️ Error: ${error.message}`);
+    }
+    
+    return images;
+  }
+  
   /**
    * Validate CEFR level - enforce consistency between score and CEFR level
    * If AI provides inconsistent CEFR level, correct it based on score percentage
@@ -588,11 +691,21 @@ class AiScoringService {
         }
       }
 
-      console.log(`[scoreEntireAnswer] Building prompt for ${criteria.length} criteria`);
-      // Build comprehensive prompt with all criteria
-      const prompt = this.buildComprehensiveScoringPrompt(answerText, question, criteria, taskType);
+      console.log(`[scoreEntireAnswer] Building prompt for ${criteria.length} criteria with vision support`);
+      
+      // Build comprehensive prompt with vision API support
+      let prompt;
+      const questionTypeCode = question.questionType?.code || taskType;
+      
+      // For non-writing questions with images, use vision API
+      if (!questionTypeCode.toLowerCase().includes('writing') && question.additional_media) {
+        prompt = await this.buildGenericScoringPromptWithVision(answerText, question, criteria, taskType, this.getMaxScoreFromCriteria(criteria, question));
+      } else {
+        prompt = this.buildComprehensiveScoringPrompt(answerText, question, criteria, taskType);
+      }
 
-      // Call AI service
+      // Call AI service with optional vision support
+      console.log(`[scoreEntireAnswer] Calling AI service...`);
       const aiResponse = await AiServiceClient.callAiWithRetry(prompt);
       console.log(`[scoreEntireAnswer] Raw AI response: ${aiResponse.substring(0, 200)}...`);
       
@@ -925,6 +1038,67 @@ Return assessment in this JSON format:
   /**
    * Generic scoring prompt for non-writing tasks
    */
+  /**
+   * Generic scoring prompt for non-writing tasks
+   * Now returns {text, images} to support vision API
+   */
+  async buildGenericScoringPromptWithVision(answerText, question, criteria, taskType, maxScore) {
+    const criteriaList = criteria.map(c => `- ${c.criteria_name}: ${c.description || c.rubric_prompt}`).join('\n');
+    
+    const isWritingTask = taskType.toLowerCase().includes('writing') || 
+                          question.questionType?.code?.includes('WRITING');
+    
+    const specialInstructions = isWritingTask ? 
+      `\nSPECIAL INSTRUCTIONS FOR WRITING ASSESSMENT:
+- In "suggestions", provide SPECIFIC text corrections using exact quotes
+- Format: 'Change "student's text" to "corrected text"'
+- Focus on grammar, vocabulary, spelling, and structure errors
+- Give concrete fixes, not general advice
+- Example: 'Change "I go to school yesterday" to "I went to school yesterday"'` : '';
+    
+    // Prepare images for vision API (convert local files to base64)
+    const images = await this.prepareImagesForVision(question);
+    
+    // Build text prompt
+    let visualContext = '';
+    if (images.length > 0) {
+      visualContext = `\n\nVISUAL CONTEXT: The question includes ${images.length} image(s) (shown below). Consider:
+- Does the student accurately describe/discuss what's shown in the image(s)?
+- Did they respond appropriately to the visual prompts?
+- Did they use relevant vocabulary related to the visual content?
+- For comparison tasks: Did they identify similarities and differences between images?`;
+    }
+    
+    const promptText = `You are an expert language assessor. Score this ${taskType} response holistically using ALL the following criteria:
+
+${criteriaList}
+
+Question: ${question.content}${visualContext}
+Student Response: ${answerText}${specialInstructions}
+
+IMPORTANT SCORING GUIDELINES:
+- Maximum possible score is ${maxScore} points
+- Be consistent between numerical score and CEFR level:
+  * 0-30% (0-${Math.round(maxScore * 0.3)}): A1 (Beginner)
+  * 30-50% (${Math.round(maxScore * 0.3)}-${Math.round(maxScore * 0.5)}): A2 (Elementary)
+  * 50-60% (${Math.round(maxScore * 0.5)}-${Math.round(maxScore * 0.6)}): B1 (Intermediate)
+  * 60-70% (${Math.round(maxScore * 0.6)}-${Math.round(maxScore * 0.7)}): B1-B2 
+  * 70-80% (${Math.round(maxScore * 0.7)}-${Math.round(maxScore * 0.8)}): B2 (Upper-Intermediate)
+  * 80-90% (${Math.round(maxScore * 0.8)}-${Math.round(maxScore * 0.9)}): B2-C1
+  * 90-100% (${Math.round(maxScore * 0.9)}-${maxScore}): C1-C2 (Advanced/Proficient)
+
+Provide a comprehensive assessment considering ALL criteria above. For WRITING tasks, focus heavily on SPECIFIC TEXT CORRECTIONS in your suggestions.
+
+Return your response in this exact JSON format:
+{
+  "score": [numerical score out of ${maxScore} - be accurate and consistent with CEFR level],
+  "cefr_level": "[CEFR level: A1, A2, B1, B2, C1, or C2 - must match score percentage]",
+  "comment": "[overall assessment combining all criteria]",
+  "suggestions": "[For writing: Provide specific text corrections using 'Change X to Y' format. For speaking: Pronunciation/fluency tips.]"
+}`;   // Return both text prompt and images for vision API support
+    return { text: promptText, images };
+  }
+
   buildGenericScoringPrompt(answerText, question, criteria, taskType, maxScore) {
     const criteriaList = criteria.map(c => `- ${c.criteria_name}: ${c.description || c.rubric_prompt}`).join('\n');
     

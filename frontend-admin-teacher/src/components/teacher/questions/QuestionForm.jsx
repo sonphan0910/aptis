@@ -32,8 +32,8 @@ import {
 
 // Listening components
 import { 
-  ListeningMCQForm, 
-  ListeningGapFillingForm,
+  ListeningMCQSingleForm, 
+  ListeningMCQMultiForm,
   ListeningMatchingForm
 } from './listening';
 
@@ -220,11 +220,12 @@ export default function QuestionForm({
       
       // === LISTENING COMPONENTS ===
       case 'LISTENING_MCQ':
-        return <ListeningMCQForm {...props} />;
-      case 'LISTENING_GAP_FILL':
-        return <ListeningGapFillingForm {...props} />;
-      case 'LISTENING_MATCHING':
+        return <ListeningMCQSingleForm {...props} />;
+      case 'LISTENING_MCQ_MULTI':
+        return <ListeningMCQMultiForm {...props} />;
       case 'LISTENING_STATEMENT_MATCHING':
+        return <ListeningMCQMultiForm {...props} />;
+      case 'LISTENING_MATCHING':
         return <ListeningMatchingForm {...props} />;
       
       // === SPEAKING COMPONENTS ===

@@ -158,9 +158,10 @@ class SpeechToTextService {
         const fileName = file.filename;
         const filePath = file.path;
         
+        // URL should match actual storage path: /uploads/audio/{filename}
         return {
           path: filePath,
-          url: `/uploads/${fileName}`, // Direct filename since multer saves to uploads/
+          url: `/uploads/audio/${fileName}`, // Include /audio subfolder in URL
           fileName,
           originalName: file.originalname,
           size: file.size,

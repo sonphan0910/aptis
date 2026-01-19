@@ -158,6 +158,14 @@ export const questionApi = {
     return response.data;
   },
 
+  // Get question details by ID
+  getQuestionDetails: async (questionId) => {
+    const response = await apiClient.get(API_ENDPOINTS.TEACHER.QUESTIONS.BY_ID(questionId));
+    const data = getResponseData(response);
+    // Handle nested data structure from backend
+    return data?.data || data;
+  },
+
   // Get filter options from API
   getFilterOptions: async () => {
     const response = await apiClient.get(API_ENDPOINTS.TEACHER.QUESTIONS.FILTER_OPTIONS);
@@ -182,4 +190,145 @@ export const questionApi = {
     );
     return response.data;
   },
+
+  // Upload audio files for a question (similar to uploadQuestionImages)
+  uploadQuestionAudios: async (questionId, audioFiles) => {
+    const formData = new FormData();
+    
+    if (audioFiles.mainAudio) {
+      formData.append('mainAudio', audioFiles.mainAudio);
+    }
+    
+    if (audioFiles.speakerAudios && audioFiles.speakerAudios.length > 0) {
+      audioFiles.speakerAudios.forEach(file => {
+        formData.append('speakerAudios', file);
+      });
+    }
+
+    const response = await apiClient.post(
+      `/teacher/questions/${questionId}/upload-audios`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+    return response.data;
+  },
+
+  // Upload audio files for questions
+  uploadAudioFile: async (audioFile, type = 'general') => {
+    const formData = new FormData();
+    formData.append('audio', audioFile);
+    formData.append('type', type);
+
+    const response = await apiClient.post(
+      '/teacher/upload/audio',
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
+    return response.data;
+  },
+
+  // Update question media URL after upload
+  updateQuestionMediaUrl: async (questionId, mediaUrl) => {
+    const response = await apiClient.patch(
+      `${API_ENDPOINTS.TEACHER.QUESTIONS.BASE}/${questionId}`,
+      { media_url: mediaUrl }
+    );
+    return response.data;
+  },
+
+  // Create question and upload audio files workflow
+  createQuestionWithAudio: async (formData, audioFiles) => {
+    try {
+      // Step 1: Create question first (using existing createQuestion method)
+      console.log('🔹 Step 1: Creating question...');
+      const question = await questionApi.createQuestion(formData);
+      const questionId = question.id;
+      console.log('✅ Question created with ID:', questionId);
+
+      let mainAudioUrl = null;
+      const audioUrls = {};
+
+      // Step 2: Upload main audio if provided
+      if (audioFiles.mainAudio) {
+        console.log('🔹 Step 2: Uploading main audio...');
+        const uploadResult = await questionApi.uploadAudioFile(audioFiles.mainAudio, 'listening_main');
+        if (uploadResult.success) {
+          mainAudioUrl = `/uploads/audio/${uploadResult.audioUrl}`;
+          console.log('✅ Main audio uploaded:', mainAudioUrl);
+        }
+      }
+
+      // Step 3: Upload speaker audio files if provided
+      if (audioFiles.speakerAudios && audioFiles.speakerAudios.length > 0) {
+        console.log('🔹 Step 3: Uploading speaker audios...');
+        for (let i = 0; i < audioFiles.speakerAudios.length; i++) {
+          const speakerFile = audioFiles.speakerAudios[i];
+          if (speakerFile) {
+            const uploadResult = await questionApi.uploadAudioFile(speakerFile, 'speaker_sample');
+            if (uploadResult.success) {
+              audioUrls[`speaker_${i}`] = `/uploads/audio/${uploadResult.audioUrl}`;
+              console.log(`✅ Speaker ${i} audio uploaded:`, audioUrls[`speaker_${i}`]);
+            }
+          }
+        }
+      }
+
+      // Step 4: Update question with main audio URL if uploaded
+      if (mainAudioUrl) {
+        console.log('🔹 Step 4: Updating question media URL...');
+        await questionApi.updateQuestionMediaUrl(questionId, mainAudioUrl);
+      }
+
+      // Step 5: Update question content with all audio URLs
+      if (Object.keys(audioUrls).length > 0 || mainAudioUrl) {
+        console.log('🔹 Step 5: Updating question content with audio URLs...');
+        const contentData = JSON.parse(formData.content);
+        if (mainAudioUrl) {
+          contentData.audioUrl = mainAudioUrl;
+        }
+        if (Object.keys(audioUrls).length > 0) {
+          contentData.audioUrls = audioUrls;
+          
+          // Update speakers with their audio URLs
+          if (contentData.speakers) {
+            contentData.speakers = contentData.speakers.map((speaker, index) => ({
+              ...speaker,
+              audioUrl: audioUrls[`speaker_${index}`] || speaker.audioUrl
+            }));
+          }
+        }
+
+        // Update question with new content containing audio URLs
+        await questionApi.updateQuestion(questionId, {
+          ...formData,
+          content: JSON.stringify(contentData)
+        });
+        console.log('✅ Question content updated with audio URLs');
+      }
+
+      return {
+        success: true,
+        question: question,
+        audioUrls: {
+          main: mainAudioUrl,
+          ...audioUrls
+        }
+      };
+    } catch (error) {
+      console.error('❌ Error creating question with audio:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  },
+
 };

@@ -1,4 +1,12 @@
-const { Exam, ExamSection, Question } = require('../models');
+const { 
+  Exam, 
+  ExamSection, 
+  ExamSectionQuestion,
+  Question, 
+  QuestionType, 
+  SkillType, 
+  AptisType 
+} = require('../models');
 const { Op } = require('sequelize');
 const { NotFoundError, ValidationError, BusinessLogicError } = require('../utils/errors');
 const { paginate, generateCode } = require('../utils/helpers');
@@ -43,12 +51,24 @@ class ExamService {
           as: 'sections',
           include: [
             {
-              model: Question,
-              as: 'questions',
+              model: SkillType,
+              as: 'skillType',
             },
-          ],
-        },
-      ],
+            {
+              model: ExamSectionQuestion,
+              as: 'questions',
+              // ✅ Simple: only basic question info, no deep includes
+              include: [
+                {
+                  model: Question,
+                  as: 'Question',
+                  attributes: ['id', 'difficulty', 'status'] // Basic info only
+                }
+              ]
+            }
+          ]
+        }
+      ]
     });
 
     if (!exam) {

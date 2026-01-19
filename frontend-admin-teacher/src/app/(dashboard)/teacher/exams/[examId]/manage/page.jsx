@@ -52,6 +52,7 @@ import {
 import { showNotification } from '@/store/slices/uiSlice';
 import { usePublicData } from '@/hooks/usePublicData';
 import { examApi } from '@/services/examService';
+import { LazyQuestionDisplay } from '@/components/teacher/questions/LazyQuestionDisplay';
 
 export default function ExamManagePage() {
   const router = useRouter();
@@ -538,26 +539,14 @@ export default function ExamManagePage() {
                             </ListItemIcon>
                             <ListItemText
                               primary={
-                                <Typography variant="body2" fontWeight={500}>
-                                  Câu {question.question_order}: {question.Question?.title || 'N/A'}
-                                </Typography>
+                                <LazyQuestionDisplay 
+                                  questionId={question.question_id}
+                                  questionOrder={question.question_order}
+                                  maxScore={question.max_score}
+                                  compact={false}
+                                />
                               }
-                              secondary={
-                                <Box display="flex" gap={1} sx={{ mt: 0.5 }}>
-                                  <Chip 
-                                    size="small" 
-                                    label={`Điểm: ${question.max_score}`}
-                                    variant="outlined"
-                                  />
-                                  {question.Question?.question_type && (
-                                    <Chip 
-                                      size="small" 
-                                      label={question.Question.question_type}
-                                      variant="outlined"
-                                    />
-                                  )}
-                                </Box>
-                              }
+                              secondary={null}
                             />
                             <IconButton
                               size="small"
@@ -734,59 +723,108 @@ export default function ExamManagePage() {
         onClose={() => setOpenQuestionDialog(false)}
         maxWidth="md"
         fullWidth
+        PaperProps={{
+          sx: { maxHeight: '90vh' }
+        }}
       >
-        <DialogTitle>
-          Thêm câu hỏi vào phần: {selectedSection?.skillType?.skill_type_name}
+        <DialogTitle sx={{ py: 1.5 }}>
+          Thêm câu hỏi: {selectedSection?.skillType?.skill_type_name}
         </DialogTitle>
-        <DialogContent>
-          <Box sx={{ mt: 2 }}>
+        <DialogContent dividers sx={{ py: 1, bgcolor: 'background.paper' }}>
+          <Box sx={{ mt: 0 }}>
             {questionsLoading ? (
-              <Alert severity="info">Đang tải danh sách câu hỏi...</Alert>
+              <Alert severity="info" sx={{ py: 0.5 }}>Đang tải danh sách câu hỏi...</Alert>
             ) : availableQuestions.length > 0 ? (
               <Box>
-                <Typography variant="body2" sx={{ mb: 2 }}>
-                  Tìm thấy {availableQuestions.length} câu hỏi phù hợp
+                <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+                  Tìm thấy {availableQuestions.length} câu hỏi phù hợp (hiển thị 10 đầu tiên)
                 </Typography>
-                <List>
-                  {availableQuestions.slice(0, 10).map((question, index) => (
-                    <ListItem key={question.id} divider>
-                      <ListItemText
-                        primary={`Câu ${index + 1}: ${question.content?.substring(0, 100)}...`}
-                        secondary={`Độ khó: ${question.difficulty} | Loại: ${question.questionType?.name || 'N/A'}`}
-                      />
-                      <ListItemSecondaryAction>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          onClick={() => handleAddQuestionClick(question)}
-                          disabled={addingQuestion}
-                        >
-                          Thêm
-                        </Button>
-                      </ListItemSecondaryAction>
-                    </ListItem>
-                  ))}
+                <List sx={{ py: 0 }}>
+                  {availableQuestions.slice(0, 10).map((question, index) => {
+                    // Extract and format content
+                    const renderContent = (() => {
+                      try {
+                        const content = question.content;
+                        if (!content) return '';
+                        return typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+                      } catch (e) {
+                        return '';
+                      }
+                    })();
+
+                    return (
+                      <ListItem 
+                        key={question.id} 
+                        divider 
+                        sx={{ 
+                          py: 1.5, 
+                          px: 1,
+                          flexDirection: 'column',
+                          alignItems: 'flex-start'
+                        }}
+                        secondaryAction={
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => handleAddQuestionClick(question)}
+                            disabled={addingQuestion}
+                            sx={{ ml: 1 }}
+                          >
+                            Thêm
+                          </Button>
+                        }
+                      >
+                        <Box sx={{ width: '100%', mb: 0.5 }}>
+                          <Typography variant="caption" fontWeight={600}>
+                            Q{index + 1} (ID: {question.id}) • {question.question_type} • {question.skill} • {question.difficulty}
+                          </Typography>
+                        </Box>
+                        {renderContent && (
+                          <Box 
+                            component="pre"
+                            sx={{ 
+                              width: '100%',
+                              bgcolor: '#f5f5f5',
+                              p: 1,
+                              borderRadius: 0.5,
+                              fontSize: '0.75rem',
+                              fontFamily: 'monospace',
+                              whiteSpace: 'pre-wrap',
+                              wordBreak: 'break-word',
+                              maxHeight: '200px',
+                              overflow: 'auto',
+                              border: '1px solid #e0e0e0',
+                              margin: 0,
+                              color: '#333'
+                            }}
+                          >
+                            {renderContent}
+                          </Box>
+                        )}
+                      </ListItem>
+                    );
+                  })}
                 </List>
               </Box>
             ) : (
-              <Alert severity="warning">
-                Không tìm thấy câu hỏi nào phù hợp với kỹ năng này. Bạn cần tạo câu hỏi trước khi thêm vào phần thi.
+              <Alert severity="warning" sx={{ py: 0.5 }}>
+                Không tìm thấy câu hỏi nào. Tạo câu hỏi trước khi thêm vào phần thi.
               </Alert>
             )}
           </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenQuestionDialog(false)}>
+        <DialogActions sx={{ py: 1, px: 2 }}>
+          <Button onClick={() => setOpenQuestionDialog(false)} size="small">
             Đóng
           </Button>
           <Button 
             variant="contained"
+            size="small"
             onClick={() => {
-              // Navigate to question creation
               window.open('/teacher/questions/new', '_blank');
             }}
           >
-            Tạo câu hỏi mới
+            Tạo mới
           </Button>
         </DialogActions>
       </Dialog>
@@ -852,10 +890,14 @@ export default function ExamManagePage() {
           {selectedQuestion && (
             <Box sx={{ mt: 2 }}>
               <Alert severity="info" sx={{ mb: 2 }}>
-                <strong>{selectedQuestion.title || selectedQuestion.content?.substring(0, 100)}</strong>
-                <br />
+                <LazyQuestionDisplay 
+                  questionId={selectedQuestion.id}
+                  questionOrder={1}
+                  maxScore={1}
+                  compact={false}
+                />
                 <Typography variant="caption" display="block" sx={{ mt: 1 }}>
-                  Loại: {selectedQuestion.question_type} | Độ khó: {selectedQuestion.difficulty}
+                  Loại: {selectedQuestion.questionType?.question_type_name || selectedQuestion.questionType?.code || 'N/A'} | Độ khó: {selectedQuestion.difficulty}
                 </Typography>
               </Alert>
 

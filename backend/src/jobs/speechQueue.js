@@ -112,30 +112,46 @@ async function processJob(job) {
   const { answerId, audioUrl, language = 'en' } = job.data;
   
   // Convert relative URL to absolute file path
-  // audioUrl is like: /uploads/audio-xxx.webm or /uploads/audio/audio-xxx.webm
+  // audioUrl can be:
+  // - /uploads/audio/audio-xxx.webm (new format with /audio subfolder)
+  // - /uploads/audio-xxx.webm (old format without subfolder)
   let absolutePath = audioUrl;
   
   // If it's a relative URL (starts with /uploads), convert to absolute path
   if (audioUrl.startsWith('/uploads/')) {
-    // Remove /uploads/ prefix and get filename
+    // Remove /uploads/ prefix and get filename/path
     const relativePath = audioUrl.replace(/^\/uploads\//, '');
     
-    // Build absolute path: backend directory + basePath + filename
-    // If basePath is relative, join with backend directory
+    // Check if relativePath already contains 'audio/' subfolder
+    const hasAudioSubfolder = relativePath.startsWith('audio/');
+    
+    // Build absolute path: backend directory + basePath + subfolder (if needed) + filename
     if (path.isAbsolute(STORAGE_CONFIG.basePath)) {
-      absolutePath = path.join(STORAGE_CONFIG.basePath, relativePath);
+      // If basePath is absolute, use it directly
+      if (hasAudioSubfolder) {
+        // URL already has /audio/ → use path as-is
+        absolutePath = path.join(STORAGE_CONFIG.basePath, relativePath);
+      } else {
+        // URL doesn't have /audio/ → add it
+        absolutePath = path.join(STORAGE_CONFIG.basePath, 'audio', relativePath);
+      }
     } else {
       // basePath is relative (e.g., 'uploads'), join with backend root
       const backendRoot = path.resolve(__dirname, '../../'); // Go up to backend/
-      absolutePath = path.join(backendRoot, STORAGE_CONFIG.basePath, relativePath);
+      if (hasAudioSubfolder) {
+        // URL already has /audio/ → use path as-is
+        absolutePath = path.join(backendRoot, STORAGE_CONFIG.basePath, relativePath);
+      } else {
+        // URL doesn't have /audio/ → add it
+        absolutePath = path.join(backendRoot, STORAGE_CONFIG.basePath, 'audio', relativePath);
+      }
     }
-    
     console.log(`[speechQueue] Converted relative URL to absolute path:`);
     console.log(`[speechQueue] - URL: ${audioUrl}`);
     console.log(`[speechQueue] - Path: ${absolutePath}`);
   }
   
-  // Gọi service chuyển đổi audio sang text
+  // Call service to convert audio to text
   const transcription = await SpeechToTextService.convertAudioToText(absolutePath, language);
   return transcription;
 }

@@ -140,6 +140,91 @@ exports.uploadQuestionImages = async (req, res, next) => {
   }
 };
 
+exports.uploadQuestionAudios = async (req, res, next) => {
+  try {
+    console.log('🎧 Upload audios endpoint called');
+    console.log('Question ID:', req.params.questionId);
+    console.log('Files received:', req.files);
+    
+    const { questionId } = req.params;
+    const { mainAudio, speakerAudios } = req.files || {};
+
+    if (!mainAudio && !speakerAudios) {
+      console.error('❌ No audio files in request');
+      throw new BadRequestError('No audio files provided');
+    }
+
+    // Find question
+    const question = await Question.findByPk(questionId);
+    if (!question) {
+      console.error('❌ Question not found:', questionId);
+      throw new NotFoundError('Question not found');
+    }
+
+    const audioData = {};
+    
+    // Process main audio
+    if (mainAudio && mainAudio[0]) {
+      audioData.mainAudioUrl = `/uploads/audio/${mainAudio[0].filename}`;
+      console.log('📁 Main audio processed:', audioData.mainAudioUrl);
+    }
+    
+    // Process speaker audios
+    if (speakerAudios && speakerAudios.length > 0) {
+      audioData.speakerAudioUrls = speakerAudios.map(file => 
+        `/uploads/audio/${file.filename}`
+      );
+      console.log('📁 Speaker audios processed:', audioData.speakerAudioUrls);
+    }
+
+    // Update question content with audio URLs
+    let updatedContent = {};
+    try {
+      if (question.content) {
+        updatedContent = JSON.parse(question.content);
+      }
+    } catch (error) {
+      console.warn('Question content is not valid JSON, creating new structure');
+    }
+
+    // Update URLs in content
+    if (audioData.mainAudioUrl) {
+      updatedContent.audioUrl = audioData.mainAudioUrl;
+      // Also update media_url for main audio
+      await question.update({ media_url: audioData.mainAudioUrl });
+    }
+    
+    if (audioData.speakerAudioUrls) {
+      // Update speakers with their audio URLs
+      if (updatedContent.speakers && Array.isArray(updatedContent.speakers)) {
+        updatedContent.speakers = updatedContent.speakers.map((speaker, index) => ({
+          ...speaker,
+          audioUrl: audioData.speakerAudioUrls[index] || speaker.audioUrl
+        }));
+      }
+    }
+
+    // Update question with new content containing audio URLs
+    await question.update({
+      content: JSON.stringify(updatedContent)
+    });
+
+    console.log('✅ Audios uploaded and question updated:', audioData);
+
+    res.status(200).json({
+      success: true,
+      message: 'Audio files uploaded successfully',
+      data: {
+        questionId: question.id,
+        audioData: audioData,
+      },
+    });
+  } catch (error) {
+    console.error('❌ Audio upload error:', error);
+    next(error);
+  }
+};
+
 exports.getQuestions = async (req, res, next) => {
   try {
     const {
@@ -297,6 +382,30 @@ exports.updateQuestion = async (req, res, next) => {
     res.json({
       success: true,
       data: question,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Update only media URL for a question
+exports.updateQuestionMediaUrl = async (req, res, next) => {
+  try {
+    const { questionId } = req.params;
+    const { media_url } = req.body;
+
+    const question = await Question.findByPk(questionId);
+
+    if (!question) {
+      throw new NotFoundError('Question not found');
+    }
+
+    await question.update({ media_url });
+
+    res.json({
+      success: true,
+      data: { id: question.id, media_url: question.media_url },
+      message: 'Media URL updated successfully'
     });
   } catch (error) {
     next(error);

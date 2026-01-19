@@ -30,6 +30,7 @@ import { QuestionPreview } from '@/components/teacher/questions/common';
 import { createQuestion } from '@/store/slices/questionSlice';
 import { showNotification } from '@/store/slices/uiSlice';
 import { usePublicData } from '@/hooks/usePublicData';
+import { questionApi } from '@/services/questionService';
 
 const steps = ['Chọn APTIS & Kỹ năng', 'Chọn loại câu hỏi', 'Nhập thông tin', 'Xem trước'];
 
@@ -43,6 +44,7 @@ export default function NewQuestionPage() {
   const [selectedAptis, setSelectedAptis] = useState('');
   const [selectedSkill, setSelectedSkill] = useState('');
   const [selectedQuestionType, setSelectedQuestionType] = useState('');
+  const [showListeningMCQSubTypes, setShowListeningMCQSubTypes] = useState(false);
   const [filteredQuestionTypes, setFilteredQuestionTypes] = useState([]);
   const [questionData, setQuestionData] = useState({
     aptis_type_id: '',
@@ -90,6 +92,30 @@ export default function NewQuestionPage() {
       ...prev,
       question_type_id: questionType.id
     }));
+    handleNext();
+  };
+
+  const handleListeningMCQSubTypeSelect = (subType) => {
+    // Map sub-type to actual question type code
+    const codeMap = {
+      'LISTENING_MCQ': 'LISTENING_MCQ_SINGLE',
+      'LISTENING_MCQ_MULTI': 'LISTENING_MCQ_MULTI'
+    };
+    
+    const modifiedQuestionType = {
+      ...selectedQuestionType,
+      code: codeMap[subType],
+      question_type_name: subType === 'LISTENING_MCQ' 
+        ? 'Listening MCQ - Single Question' 
+        : 'Listening MCQ - Multiple Questions'
+    };
+    
+    setSelectedQuestionType(modifiedQuestionType);
+    setQuestionData(prev => ({
+      ...prev,
+      question_type_id: modifiedQuestionType.id
+    }));
+    setShowListeningMCQSubTypes(false);
     handleNext();
   };
 
@@ -181,6 +207,7 @@ export default function NewQuestionPage() {
             setSelectedAptis('');
             setSelectedSkill('');
             setSelectedQuestionType('');
+            setShowListeningMCQSubTypes(false);
             setFilteredQuestionTypes([]);
             setQuestionData({
               aptis_type_id: '',
@@ -198,6 +225,116 @@ export default function NewQuestionPage() {
           }
         } else {
           throw new Error(parentResult.payload || 'Không thể tạo câu hỏi chính');
+        }
+      } else if (selectedSkill?.skill_type_code === 'listening' && questionData.content) {
+        // XỬ LÝ LISTENING QUESTIONS - TẠO QUESTION TRƯỚC, UPLOAD AUDIO SAU
+        console.log('🎧 Processing Listening Questions...');
+        
+        // Parse content to extract audio files
+        let contentData;
+        try {
+          contentData = JSON.parse(questionData.content);
+        } catch (error) {
+          throw new Error('Dữ liệu nội dung câu hỏi listening không hợp lệ');
+        }
+
+        // Prepare question data for creation (CLEAN - no file objects)
+        const questionDataForCreation = {
+          ...questionData,
+          aptis_type_id: selectedAptis,
+          skill_type_id: selectedSkill,
+          question_type_id: selectedQuestionType.id,
+          aptis_type_code: aptisTypes.find(a => a.id == selectedAptis)?.aptis_type_code,
+          skill_type_code: skillTypes.find(s => s.id == selectedSkill)?.skill_type_code,
+          question_type_code: selectedQuestionType?.code,
+          status: 'draft',
+          // Clean content without file objects for database storage
+          content: JSON.stringify({
+            ...contentData,
+            audioFile: undefined,
+            audioUrl: '', // Will be updated after upload
+            speakers: contentData.speakers?.map(speaker => ({
+              ...speaker,
+              audioFile: undefined,
+              audioUrl: speaker.audioUrl || '' // Keep existing URL or empty
+            })) || undefined
+          })
+        };
+
+        // Extract audio files for upload (similar to image extraction)
+        const audioFiles = {
+          mainAudio: contentData.audioFile || null,
+          speakerAudios: []
+        };
+
+        // Extract speaker audio files
+        if (contentData.speakers && Array.isArray(contentData.speakers)) {
+          contentData.speakers.forEach(speaker => {
+            if (speaker.audioFile && speaker.audioFile instanceof File) {
+              audioFiles.speakerAudios.push(speaker.audioFile);
+            }
+          });
+        }
+
+        console.log('Audio files to upload:', {
+          mainAudio: audioFiles.mainAudio ? audioFiles.mainAudio.name : null,
+          speakerCount: audioFiles.speakerAudios.length,
+          speakerFiles: audioFiles.speakerAudios.map(f => f.name)
+        });
+
+        // STEP 1: Create listening question (without audio)
+        console.log('STEP 1: Creating listening question (without audio):', questionDataForCreation);
+        const listeningResult = await dispatch(createQuestion(questionDataForCreation));
+        
+        if (createQuestion.fulfilled.match(listeningResult)) {
+          const questionId = listeningResult.payload.id;
+          console.log('✅ Listening question created with ID:', questionId);
+          
+          // STEP 2: Upload audio files if provided (similar to image workflow)
+          const hasAudioFiles = audioFiles.mainAudio || audioFiles.speakerAudios.length > 0;
+          if (hasAudioFiles) {
+            console.log('STEP 2: Uploading audio files...');
+            try {
+              const uploadResult = await questionApi.uploadQuestionAudios(questionId, audioFiles);
+              console.log('✅ Audio files uploaded successfully:', uploadResult);
+            } catch (uploadError) {
+              console.error('❌ Failed to upload audio files:', uploadError);
+              dispatch(showNotification({
+                message: 'Tạo câu hỏi thành công nhưng upload audio thất bại. Vui lòng thêm audio sau.',
+                type: 'warning'
+              }));
+            }
+          }
+          
+          dispatch(showNotification({
+            message: 'Tạo câu hỏi Listening thành công!',
+            type: 'success'
+          }));
+          
+          if (shouldContinue) {
+            // Reset form
+            setActiveStep(0);
+            setSelectedAptis('');
+            setSelectedSkill('');
+            setSelectedQuestionType('');
+            setShowListeningMCQSubTypes(false);
+            setFilteredQuestionTypes([]);
+            setQuestionData({
+              aptis_type_id: '',
+              skill_type_id: '',
+              question_type_id: '',
+              difficulty: 'medium',
+              title: '',
+              content: '',
+              media_url: '',
+              duration_seconds: null,
+              status: 'draft'
+            });
+          } else {
+            router.push('/teacher/questions');
+          }
+        } else {
+          throw new Error(listeningResult.payload || 'Không thể tạo câu hỏi listening');
         }
       } else {
 
@@ -227,6 +364,7 @@ export default function NewQuestionPage() {
             setSelectedAptis('');
             setSelectedSkill('');
             setSelectedQuestionType('');
+            setShowListeningMCQSubTypes(false);
             setFilteredQuestionTypes([]);
             setQuestionData({
               aptis_type_id: '',
@@ -370,6 +508,12 @@ export default function NewQuestionPage() {
             ) : (
               <Grid container spacing={3}>
                 {filteredQuestionTypes.map((type) => {
+                  // Skip Gap Filling for Listening
+                  if (selectedSkillData?.skill_type_code === 'listening' && 
+                      type.code === 'LISTENING_GAP_FILL') {
+                    return null;
+                  }
+                  
                   const isAIScoring = type.scoring_method === 'ai';
                   return (
                     <Grid item xs={12} md={6} key={type.id}>
@@ -382,7 +526,27 @@ export default function NewQuestionPage() {
                           '&:hover': { borderColor: 'primary.light' },
                           height: '100%'
                         }}
-                        onClick={() => handleQuestionTypeSelect(type)}
+                        onClick={() => {
+                          // Special handling for Statement Matching - convert to Multiple Questions MCQ
+                          if (type.code === 'LISTENING_STATEMENT_MATCHING' && selectedSkillData?.skill_type_code === 'listening') {
+                            // Find the actual LISTENING_MCQ type to get correct ID
+                            const mcqType = filteredQuestionTypes.find(t => t.code === 'LISTENING_MCQ');
+                            const modifiedType = {
+                              ...type,
+                              code: 'LISTENING_MCQ_MULTI',
+                              question_type_name: 'Multiple Questions',
+                              id: mcqType?.id || type.id  // Use MCQ's ID, not Statement Matching's ID
+                            };
+                            setSelectedQuestionType(modifiedType);
+                            setQuestionData(prev => ({
+                              ...prev,
+                              question_type_id: mcqType?.id || type.id  // Use MCQ's ID
+                            }));
+                            handleNext();
+                          } else {
+                            handleQuestionTypeSelect(type);
+                          }
+                        }}
                       >
                         <CardContent>
                           <Box display="flex" alignItems="center" mb={2}>
@@ -393,7 +557,9 @@ export default function NewQuestionPage() {
                             )}
                             <Box>
                               <Typography variant="h6" gutterBottom>
-                                {type.question_type_name}
+                                {type.code === 'LISTENING_STATEMENT_MATCHING' && selectedSkillData?.skill_type_code === 'listening' 
+                                  ? 'Multiple Questions' 
+                                  : type.question_type_name}
                               </Typography>
                               <Chip 
                                 label={isAIScoring ? 'AI Scoring' : 'Auto Scoring'} 
@@ -403,14 +569,18 @@ export default function NewQuestionPage() {
                             </Box>
                           </Box>
                           <Typography variant="body2" color="text.secondary">
-                            {type.instruction_template || 
-                             (isAIScoring ? 'Câu hỏi sẽ được AI chấm điểm tự động' : 'Câu hỏi sẽ được chấm điểm tự động')}
+                            {type.code === 'LISTENING_STATEMENT_MATCHING' && selectedSkillData?.skill_type_code === 'listening'
+                              ? 'Nhiều câu hỏi chia sẻ cùng 1 file audio. Phù hợp cho Part 4 Listening.'
+                              : (type.instruction_template || 
+                                (isAIScoring ? 'Câu hỏi sẽ được AI chấm điểm tự động' : 'Câu hỏi sẽ được chấm điểm tự động'))}
                           </Typography>
                         </CardContent>
                       </Card>
                     </Grid>
                   );
                 })}
+                
+                {/* Separate Multiple Questions MCQ card removed - now uses Statement Matching slot */}
               </Grid>
             )}
             
