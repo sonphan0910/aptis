@@ -115,7 +115,9 @@ export default function SubmissionsPage() {
 
   const handleGradeSubmission = (submission) => {
     // Navigate to same page as view but with grading mode
-    router.push(`/teacher/submissions/${submission.attempt?.id}?mode=grade`);
+    // Pass the answer ID so it knows which question to grade
+    const answerId = submission.id; // submission.id is the answer ID in the SubmissionList
+    router.push(`/teacher/submissions/${submission.attempt?.id}?mode=grade&answerId=${answerId}`);
   };
 
   const handleRegradeSubmissions = async (answerIds, regradeType) => {

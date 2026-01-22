@@ -40,6 +40,7 @@ export default function SubmissionDetailPage() {
   const searchParams = useSearchParams();
   const attemptId = params.attemptId;
   const mode = searchParams.get('mode') || 'view';
+  const answerId = searchParams.get('answerId'); // Get the answer ID from query param
   
   const [submissionDetail, setSubmissionDetail] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -60,12 +61,22 @@ export default function SubmissionDetailPage() {
   }, [attemptId]);
 
   useEffect(() => {
-    if (submissionDetail?.answers?.[0]) {
-      const answer = submissionDetail.answers[0];
-      setScore(answer.final_score || answer.score || 0);
-      setFeedback(answer.manual_feedback || '');
+    if (submissionDetail?.answers) {
+      // Find the specific answer if answerId is provided, otherwise use first
+      let answer;
+      if (answerId) {
+        answer = submissionDetail.answers.find(a => a.id === parseInt(answerId));
+      }
+      if (!answer) {
+        answer = submissionDetail.answers[0];
+      }
+      
+      if (answer) {
+        setScore(answer.final_score || answer.score || 0);
+        setFeedback(answer.manual_feedback || '');
+      }
     }
-  }, [submissionDetail]);
+  }, [submissionDetail, answerId]);
 
   const loadSubmissionDetail = async () => {
     setLoading(true);
@@ -88,10 +99,23 @@ export default function SubmissionDetailPage() {
 
     setSaving(true);
     try {
-      const answerId = submissionDetail.answers[0].id;
+      // Find the correct answer
+      let targetAnswer;
+      if (answerId) {
+        targetAnswer = submissionDetail.answers.find(a => a.id === parseInt(answerId));
+      }
+      if (!targetAnswer) {
+        targetAnswer = submissionDetail.answers[0];
+      }
+      
+      if (!targetAnswer?.id) {
+        showNotification('Không thể xác định câu trả lời', 'error');
+        setSaving(false);
+        return;
+      }
       
       // Chỉ gửi final_score và manual_feedback thôi
-      await submissionApi.submitAnswerReview(answerId, {
+      await submissionApi.submitAnswerReview(targetAnswer.id, {
         final_score: score,
         manual_feedback: feedback
       });
@@ -163,7 +187,16 @@ export default function SubmissionDetailPage() {
   }
 
   const { skill, student, exam, answers } = submissionDetail;
-  const answer = answers && answers.length > 0 ? answers[0] : null;
+  
+  // Find the specific answer if answerId is provided, otherwise use first
+  let answer;
+  if (answerId && answers) {
+    answer = answers.find(a => a.id === parseInt(answerId));
+  }
+  if (!answer && answers) {
+    answer = answers[0];
+  }
+  
   const question = answer?.question || {};
   const maxScore = answer?.max_score || 100;
   const scorePercentage = maxScore ? (score / maxScore) * 100 : 0;
