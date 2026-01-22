@@ -21,6 +21,19 @@ import {
   RadioButtonChecked
 } from '@mui/icons-material';
 
+// Helper function to get full URL for backend resources
+const getBackendUrl = (path) => {
+  if (!path) return '';
+  // If already a full URL, return as is
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
+  // If relative path, prepend backend URL
+  const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+  const baseUrl = backendUrl.replace('/api', ''); // Remove /api suffix
+  return `${baseUrl}${path}`;
+};
+
 /**
  * Component hiển thị chi tiết câu trả lời của học sinh
  */
@@ -161,6 +174,8 @@ function TextAnswerRenderer({ answer, question }) {
 
 // Audio Answer Renderer
 function AudioAnswerRenderer({ answer, question }) {
+  const audioUrl = getBackendUrl(answer.audio_url);
+  
   return (
     <Box>
       <Box display="flex" alignItems="center" gap={1} mb={2}>
@@ -170,7 +185,7 @@ function AudioAnswerRenderer({ answer, question }) {
       
       <Box sx={{ p: 2, bgcolor: 'secondary.50', borderRadius: 1 }}>
         <audio controls style={{ width: '100%', marginBottom: '16px' }}>
-          <source src={answer.audio_url} type="audio/mpeg" />
+          <source src={audioUrl} type="audio/mpeg" />
           Trình duyệt không hỗ trợ audio.
         </audio>
         
