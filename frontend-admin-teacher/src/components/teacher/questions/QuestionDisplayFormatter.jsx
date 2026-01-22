@@ -27,7 +27,7 @@ export const ReadingGapFillDisplay = ({ questionContent }) => {
   return (
     <Box>
       <Typography variant="subtitle2" color="primary" gutterBottom>
-        📖 Reading - Gap Filling
+        Reading - Gap Filling
       </Typography>
       {content.prompt && (
         <Typography variant="body2" sx={{ mb: 1, fontStyle: 'italic' }}>
@@ -63,7 +63,7 @@ export const ReadingOrderingDisplay = ({ questionContent }) => {
   return (
     <Box>
       <Typography variant="subtitle2" color="primary" gutterBottom>
-        🔄 Reading - Ordering
+        Reading - Ordering
       </Typography>
       <Typography variant="body2" fontWeight={500} sx={{ mb: 1 }}>
         {content.title}
@@ -87,7 +87,7 @@ export const ReadingMatchingDisplay = ({ questionContent }) => {
   return (
     <Box>
       <Typography variant="subtitle2" color="primary" gutterBottom>
-        🔗 Reading - Matching
+        Reading - Matching
       </Typography>
       <Paper variant="outlined" sx={{ p: 2, mb: 1, bgcolor: 'grey.50' }}>
         <Typography variant="body2" style={{ lineHeight: 1.6 }}>
@@ -114,7 +114,7 @@ export const ReadingMatchingHeadingsDisplay = ({ questionContent }) => {
   return (
     <Box>
       <Typography variant="subtitle2" color="primary" gutterBottom>
-        📋 Reading - Matching Headings
+        Reading - Matching Headings
       </Typography>
       <Typography variant="body2" sx={{ mb: 1 }}>
         {content.title || content.instructions?.substring(0, 100) || 'Heading matching question'}
@@ -138,7 +138,7 @@ export const ListeningMCQDisplay = ({ questionContent }) => {
   return (
     <Box>
       <Typography variant="subtitle2" color="primary" gutterBottom>
-        🎧 Listening - MCQ
+        Listening - MCQ
       </Typography>
       <Typography variant="body2" fontWeight={500} sx={{ mb: 1 }}>
         {content.title || content.summary || 'Listening MCQ Question'}
@@ -170,7 +170,7 @@ export const ListeningMatchingDisplay = ({ questionContent }) => {
   return (
     <Box>
       <Typography variant="subtitle2" color="primary" gutterBottom>
-        🎧 Listening - Speaker Matching
+        Listening - Speaker Matching
       </Typography>
       <Typography variant="body2" fontWeight={500} sx={{ mb: 1 }}>
         {content.title || 'Speaker Matching Exercise'}
@@ -196,7 +196,7 @@ export const WritingTaskDisplay = ({ questionContent }) => {
   return (
     <Box>
       <Typography variant="subtitle2" color="primary" gutterBottom>
-        ✍️ Writing Task
+        Writing Task
       </Typography>
       <Typography variant="body2" fontWeight={500} sx={{ mb: 1 }}>
         {content.title || content.task_type || 'Writing Exercise'}
@@ -226,7 +226,7 @@ export const SpeakingTaskDisplay = ({ questionContent }) => {
   return (
     <Box>
       <Typography variant="subtitle2" color="primary" gutterBottom>
-        🗣️ Speaking Task
+        Speaking Task
       </Typography>
       <Typography variant="body2" fontWeight={500} sx={{ mb: 1 }}>
         {content.title || content.task_type || 'Speaking Exercise'}
@@ -302,7 +302,7 @@ export const QuestionDisplayFormatter = ({ question, questionType }) => {
   return (
     <Box>
       <Typography variant="subtitle2" color="primary" gutterBottom>
-        ❓ {type.toUpperCase()} Question
+        {type.toUpperCase()} Question
       </Typography>
       <Typography variant="body2">
         {typeof content === 'string' ? content.substring(0, 150) : JSON.stringify(content).substring(0, 150)}

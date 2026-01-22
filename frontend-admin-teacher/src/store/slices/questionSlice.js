@@ -38,11 +38,14 @@ const initialState = {
 // Async thunks
 export const fetchQuestions = createAsyncThunk(
   'questions/fetchQuestions',
-  async ({ page = 1, limit = 10, filters = {} }, { rejectWithValue }) => {
+  async (params, { rejectWithValue }) => {
     try {
-      const response = await questionApi.getQuestions({ page, limit, ...filters });
+      console.log('[Redux fetchQuestions] Params received:', params);
+      const response = await questionApi.getQuestions(params);
+      console.log('[Redux fetchQuestions] Response:', response);
       return response;
     } catch (error) {
+      console.error('[Redux fetchQuestions] Error:', error);
       return rejectWithValue(error.message || 'Failed to fetch questions');
     }
   }
@@ -229,8 +232,11 @@ export const fetchFilterOptions = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const response = await questionApi.getFilterOptions();
+      console.log('[fetchFilterOptions] Raw response:', response);
+      console.log('[fetchFilterOptions] ✅ Filter options loaded:', response);
       return response;
     } catch (error) {
+      console.error('[fetchFilterOptions] ❌ Error:', error.message);
       return rejectWithValue(error.message || 'Failed to fetch filter options');
     }
   }
@@ -277,13 +283,16 @@ const questionSlice = createSlice({
         state.error = null;
       })
       .addCase(fetchQuestions.fulfilled, (state, action) => {
+        console.log('[Redux] fetchQuestions.fulfilled payload:', action.payload);
         state.isLoading = false;
-        state.questions = action.payload.data;
+        // Handle both formats: direct array or wrapped in {data: array}
+        const questionsData = action.payload?.data || action.payload?.questions || action.payload;
+        state.questions = Array.isArray(questionsData) ? questionsData : [];
         state.pagination = {
-          page: action.payload.page,
-          limit: action.payload.limit,
-          total: action.payload.total,
-          totalPages: action.payload.totalPages,
+          page: action.payload?.page || 1,
+          limit: action.payload?.limit || 10,
+          total: action.payload?.total || 0,
+          totalPages: action.payload?.totalPages || 0,
         };
         state.error = null;
       })
@@ -487,12 +496,15 @@ const questionSlice = createSlice({
     builder
       .addCase(fetchFilterOptions.pending, (state) => {
         state.error = null;
+        console.log('[Redux] fetchFilterOptions pending...');
       })
       .addCase(fetchFilterOptions.fulfilled, (state, action) => {
+        console.log('[Redux] fetchFilterOptions fulfilled with data:', action.payload);
         state.filterOptions = action.payload;
         state.error = null;
       })
       .addCase(fetchFilterOptions.rejected, (state, action) => {
+        console.error('[Redux] fetchFilterOptions rejected:', action.payload);
         state.error = action.payload;
       });
   },

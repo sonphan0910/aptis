@@ -741,6 +741,12 @@ exports.deleteQuestion = async (req, res, next) => {
       await StorageService.deleteFile(question.media_url);
     }
 
+    // Xóa tất cả QuestionItem và QuestionOption liên quan (cascade)
+    await Promise.all([
+      require('../../models').QuestionItem.destroy({ where: { question_id: questionId } }),
+      require('../../models').QuestionOption.destroy({ where: { question_id: questionId } })
+    ]);
+
     await question.destroy();
 
     res.json({

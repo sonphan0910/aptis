@@ -112,9 +112,9 @@ export const DEFAULT_FILTER_OPTIONS = {
 // Helper function to get difficulty label
 export const getDifficultyLabel = (difficulty) => {
   const labels = {
-    [DIFFICULTY_LEVELS.EASY]: 'Dễ',
-    [DIFFICULTY_LEVELS.MEDIUM]: 'Trung bình',
-    [DIFFICULTY_LEVELS.HARD]: 'Khó'
+    [DIFFICULTY_LEVELS.EASY]: 'Easy',
+    [DIFFICULTY_LEVELS.MEDIUM]: 'Medium',
+    [DIFFICULTY_LEVELS.HARD]: 'Hard'
   };
   return labels[difficulty] || difficulty;
 };

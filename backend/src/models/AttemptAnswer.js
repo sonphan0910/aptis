@@ -105,9 +105,9 @@ const AttemptAnswer = sequelize.define(
       allowNull: true,
     },
     needs_review: {
-      // Cờ đánh dấu câu trả lời cần xem xét thêm (VD: AI không chắc chắn)
+      // Cờ đánh dấu câu trả lời cần xem xét thêm
       type: DataTypes.BOOLEAN,
-      defaultValue: false,
+      defaultValue: true,
     },
     reviewed_by: {
       // ID của giáo viên đã xem xét/chấm lại

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import {
   Box,
@@ -16,16 +16,17 @@ import {
   MenuItem,
   Chip,
   Grid,
-  IconButton
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
-import { Search, Add, FilterList, Visibility } from '@mui/icons-material';
+import { Search, Add, FilterList, Visibility, Delete, Clear } from '@mui/icons-material';
+import { Edit } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
-import { fetchQuestions, fetchFilterOptions } from '@/store/slices/questionSlice';
+import { fetchQuestions, fetchFilterOptions, deleteQuestion } from '@/store/slices/questionSlice';
 import { 
-  DEFAULT_FILTER_OPTIONS,
-  DEFAULT_APTIS_TYPES,
-  DEFAULT_SKILLS,
-  DEFAULT_QUESTION_TYPES,
   getDifficultyColor, 
   getStatusColor 
 } from '@/constants/filterOptions';
@@ -46,14 +47,16 @@ export default function QuestionList({
   
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
-    question_type: '',
-    aptis_type: '',
-    skill: '',
+    question_type: '', // Maps to question_type_id in backend
+    aptis_type: '',   // Maps to aptis_type_id in backend
+    skill: '',        // Maps to skill_type_id through QuestionType join
     difficulty: '',
     status: ''
   });
   const [previewQuestion, setPreviewQuestion] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [questionToDelete, setQuestionToDelete] = useState(null);
 
   // Prevent hydration mismatch
   useEffect(() => {
@@ -67,28 +70,104 @@ export default function QuestionList({
     }
   }, [isClient]);
 
+  // Log filterOptions for debugging
   useEffect(() => {
-    if (isClient) {
-      handleFetchQuestions();
+    if (filterOptions && Object.keys(filterOptions).length > 0) {
+      console.log('[QuestionList] ✅ FilterOptions loaded:', filterOptions);
+      console.log('[QuestionList] Skills data:', filterOptions.skills);
+      console.log('[QuestionList] AptisTypes data:', filterOptions.aptisTypes);
     }
-  }, [searchTerm, filters]);
+  }, [filterOptions]);
+
+  // Debounce search and filters - separate from filter state changes
+  useEffect(() => {
+    if (!isClient) return;
+    
+    // Create a JSON string to compare filter changes
+    const currentFilterString = JSON.stringify({ searchTerm, ...filters });
+    
+    const timeoutId = setTimeout(() => {
+      console.log('[QuestionList] Fetching with filters:', { searchTerm, ...filters });
+      handleFetchQuestions(1); // Reset to page 1 when filters change
+    }, 500); // 500ms debounce delay
+    
+    return () => clearTimeout(timeoutId);
+  }, [searchTerm, filters, isClient]);
 
   const handleFetchQuestions = (page = 1) => {
+    // Map filter field names to backend API names
+    const apiFilters = {
+      question_type_id: filters.question_type ? parseInt(filters.question_type) : undefined,
+      aptis_type_id: filters.aptis_type ? parseInt(filters.aptis_type) : undefined,
+      skill_type_id: filters.skill ? parseInt(filters.skill) : undefined,
+      difficulty: filters.difficulty || undefined,
+      status: filters.status || undefined,
+      search: searchTerm || undefined
+    };
+    
+    // Remove undefined values
+    const cleanFilters = Object.fromEntries(
+      Object.entries(apiFilters).filter(([, v]) => v !== undefined)
+    );
+    
+    console.log('[QuestionList] API filters being sent:', cleanFilters);
+    
     dispatch(fetchQuestions({
       page,
       limit: 10,
-      search: searchTerm,
-      ...filters
+      ...cleanFilters
     }));
   };
 
   const handleFilterChange = (field, value) => {
-    setFilters({ ...filters, [field]: value });
+    console.log(`[QuestionList] Filter changed: ${field} = ${value}`);
+    setFilters(prev => {
+      const newFilters = { ...prev, [field]: value };
+      console.log('[QuestionList] New filters state:', newFilters);
+      return newFilters;
+    });
+  };
+
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setFilters({
+      question_type: '',
+      aptis_type: '',
+      skill: '',
+      difficulty: '',
+      status: ''
+    });
   };
 
   const handlePreview = (question) => {
     setPreviewQuestion(question);
     setPreviewOpen(true);
+  };
+
+  const handleDelete = async (questionId) => {
+    const questionToDelete = questions.find(q => q.id === questionId);
+    setQuestionToDelete(questionToDelete);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!questionToDelete) return;
+    
+    try {
+      await dispatch(deleteQuestion(questionToDelete.id)).unwrap();
+      // Refresh the list after deletion
+      handleFetchQuestions(pagination.page);
+      setDeleteDialogOpen(false);
+      setQuestionToDelete(null);
+    } catch (error) {
+      console.error('Error deleting question:', error);
+      alert('Có lỗi xảy ra khi xóa câu hỏi: ' + error);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteDialogOpen(false);
+    setQuestionToDelete(null);
   };
 
   // Helper function to extract title and description from JSON content
@@ -154,15 +233,6 @@ export default function QuestionList({
               <Typography variant="body2" fontWeight="bold">
                 {title}
               </Typography>
-              {row.is_used_in_exam && (
-                <Chip
-                  label="Đã thêm"
-                  size="small"
-                  color="success"
-                  variant="filled"
-                  sx={{ height: 20 }}
-                />
-              )}
             </Box>
             {description && (
               <Typography variant="caption" color="text.secondary">
@@ -201,11 +271,17 @@ export default function QuestionList({
       id: 'difficulty',
       label: 'Độ khó',
       render: (row) => (
-        <Chip 
-          label={row.difficulty?.charAt(0).toUpperCase() + row.difficulty?.slice(1) || 'N/A'} 
-          size="small"
-          color={getDifficultyColor(row.difficulty)}
-        />
+        (() => {
+          const color = getDifficultyColor(row.difficulty);
+          return (
+            <Chip
+              label={row.difficulty?.charAt(0).toUpperCase() + row.difficulty?.slice(1) || 'N/A'}
+              size="small"
+              color={color}
+              sx={color !== 'default' ? { color: 'white' } : {}}
+            />
+          );
+        })()
       )
     },
     {
@@ -218,6 +294,7 @@ export default function QuestionList({
           size="small"
           variant={row.usage_count > 0 ? 'filled' : 'outlined'}
           color={row.usage_count > 0 ? 'success' : 'default'}
+          sx={row.usage_count > 0 ? { color: 'white' } : {}}
         />
       )
     },
@@ -234,11 +311,25 @@ export default function QuestionList({
         <Box>
           <IconButton
             size="small"
-            onClick={() => handlePreview(row)}
-            color="info"
+            onClick={() => router.push(`/teacher/questions/edit/${row.id}`)}
+            color="primary"
+            title="Sửa câu hỏi"
           >
-            <Visibility />
+            <Edit />
           </IconButton>
+          {showActions && !readOnlyMode && (
+            <span title={row.usage_count > 0 ? 'Không thể xóa vì đã được sử dụng trong đề thi' : 'Xóa câu hỏi'}>
+              <IconButton
+                size="small"
+                onClick={() => handleDelete(row.id)}
+                color="error"
+                sx={{ ml: 1 }}
+                disabled={row.usage_count > 0}
+              >
+                <Delete />
+              </IconButton>
+            </span>
+          )}
         </Box>
       )
     }
@@ -257,163 +348,6 @@ export default function QuestionList({
         <Typography variant="h6" color="text.secondary">
           Đang tải danh sách câu hỏi...
         </Typography>
-      </Box>
-    );
-  }
-
-  if (viewMode === 'grid') {
-    return (
-      <Box>
-        {/* Header and Filters */}
-        <Box mb={3}>
-          <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-            <Typography variant="h6">Danh sách câu hỏi</Typography>
-            {showActions && (
-              <Button
-                variant="contained"
-                startIcon={<Add />}
-                onClick={() => router.push('/teacher/questions/new')}
-              >
-                Tạo câu hỏi mới
-              </Button>
-            )}
-          </Box>
-
-          {/* Search and Filter */}
-          <Grid container spacing={2}>
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                placeholder="Tìm kiếm câu hỏi..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Search />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Grid>
-            <Grid item xs={6} md={2}>
-              <FormControl fullWidth>
-                <InputLabel>Loại APTIS</InputLabel>
-                <Select
-                  value={filters.aptis_type}
-                  label="Loại APTIS"
-                  onChange={(e) => handleFilterChange('aptis_type', e.target.value)}
-                >
-                  <MenuItem value="">Tất cả</MenuItem>
-                  {(filterOptions?.aptisTypes || DEFAULT_FILTER_OPTIONS.aptisTypes).map((option) => (
-                    <MenuItem key={option.value} value={option.value}>
-                      {option.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={6} md={2}>
-              <FormControl fullWidth>
-                <InputLabel>Kỹ năng</InputLabel>
-                <Select
-                  value={filters.skill}
-                  label="Kỹ năng"
-                  onChange={(e) => handleFilterChange('skill', e.target.value)}
-                >
-                  <MenuItem value="">Tất cả</MenuItem>
-                  {(filterOptions?.skills || DEFAULT_FILTER_OPTIONS.skills).map((option) => (
-                    <MenuItem key={option.value} value={option.value}>
-                      {option.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={6} md={2}>
-              <FormControl fullWidth>
-                <InputLabel>Loại câu</InputLabel>
-                <Select
-                  value={filters.question_type}
-                  label="Loại câu"
-                  onChange={(e) => handleFilterChange('question_type', e.target.value)}
-                >
-                  <MenuItem value="">Tất cả</MenuItem>
-                  {(filterOptions?.questionTypes || DEFAULT_FILTER_OPTIONS.questionTypes).map((option) => (
-                    <MenuItem key={option.value} value={option.value}>
-                      {option.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={6} md={2}>
-              <FormControl fullWidth>
-                <InputLabel>Độ khó</InputLabel>
-                <Select
-                  value={filters.difficulty}
-                  label="Độ khó"
-                  onChange={(e) => handleFilterChange('difficulty', e.target.value)}
-                >
-                  <MenuItem value="">Tất cả</MenuItem>
-                  {DEFAULT_FILTER_OPTIONS.difficulties.map((option) => (
-                    <MenuItem key={option.value} value={option.value}>
-                      {option.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={6} md={2}>
-              <FormControl fullWidth>
-                <InputLabel>Trạng thái</InputLabel>
-                <Select
-                  value={filters.status || ''}
-                  label="Trạng thái"
-                  onChange={(e) => handleFilterChange('status', e.target.value)}
-                >
-                  <MenuItem value="">Tất cả</MenuItem>
-                  {DEFAULT_FILTER_OPTIONS.statuses.map((option) => (
-                    <MenuItem key={option.value} value={option.value}>
-                      {option.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-          </Grid>
-        </Box>
-
-        {/* Questions Grid */}
-        <Grid container spacing={3}>
-          {(questions || []).map((question) => (
-            <Grid item xs={12} sm={6} md={4} key={question.id}>
-              <QuestionCard 
-                question={question}
-                onPreview={() => handlePreview(question)}
-                showActions={showActions}
-              />
-            </Grid>
-          ))}
-          {(!questions || questions.length === 0) && !loading && (
-            <Grid item xs={12}>
-              <Box sx={{ textAlign: 'center', py: 8 }}>
-                <Typography variant="h6" color="text.secondary">
-                  Không tìm thấy câu hỏi nào
-                </Typography>
-              </Box>
-            </Grid>
-          )}
-        </Grid>
-
-        {/* Preview Dialog */}
-        {isClient && (
-          <QuestionPreview
-            open={previewOpen}
-            onClose={() => setPreviewOpen(false)}
-            question={previewQuestion}
-          />
-        )}
       </Box>
     );
   }
@@ -441,31 +375,15 @@ export default function QuestionList({
               />
 
               <FormControl size="small" sx={{ minWidth: 120 }}>
-                <InputLabel>Loại APTIS</InputLabel>
-                <Select
-                  value={filters.aptis_type}
-                  label="Loại APTIS"
-                  onChange={(e) => setFilters(prev => ({ ...prev, aptis_type: e.target.value }))}
-                >
-                  <MenuItem value="">Tất cả</MenuItem>
-                  {(filterOptions?.aptisTypes || DEFAULT_FILTER_OPTIONS.aptisTypes).map((option) => (
-                    <MenuItem key={option.value} value={option.value}>
-                      {option.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <FormControl size="small" sx={{ minWidth: 120 }}>
                 <InputLabel>Kỹ năng</InputLabel>
                 <Select
-                  value={filters.skill}
+                  value={filters.skill || ''}
                   label="Kỹ năng"
-                  onChange={(e) => setFilters(prev => ({ ...prev, skill: e.target.value }))}
+                  onChange={(e) => handleFilterChange('skill', String(e.target.value))}
                 >
                   <MenuItem value="">Tất cả</MenuItem>
-                  {(filterOptions?.skills || DEFAULT_FILTER_OPTIONS.skills).map((option) => (
-                    <MenuItem key={option.value} value={option.value}>
+                  {(filterOptions?.skills || []).map((option) => (
+                    <MenuItem key={option.id} value={String(option.id)}>
                       {option.label}
                     </MenuItem>
                   ))}
@@ -475,13 +393,13 @@ export default function QuestionList({
               <FormControl size="small" sx={{ minWidth: 120 }}>
                 <InputLabel>Loại câu</InputLabel>
                 <Select
-                  value={filters.question_type}
+                  value={filters.question_type || ''}
                   label="Loại câu"
-                  onChange={(e) => setFilters(prev => ({ ...prev, question_type: e.target.value }))}
+                  onChange={(e) => handleFilterChange('question_type', String(e.target.value))}
                 >
                   <MenuItem value="">Tất cả</MenuItem>
-                  {(filterOptions?.questionTypes || DEFAULT_FILTER_OPTIONS.questionTypes).map((option) => (
-                    <MenuItem key={option.value} value={option.value}>
+                  {(filterOptions?.questionTypes || []).map((option) => (
+                    <MenuItem key={option.id} value={String(option.id)}>
                       {option.label}
                     </MenuItem>
                   ))}
@@ -491,12 +409,12 @@ export default function QuestionList({
               <FormControl size="small" sx={{ minWidth: 120 }}>
                 <InputLabel>Độ khó</InputLabel>
                 <Select
-                  value={filters.difficulty}
+                  value={filters.difficulty || ''}
                   label="Độ khó"
-                  onChange={(e) => setFilters(prev => ({ ...prev, difficulty: e.target.value }))}
+                  onChange={(e) => handleFilterChange('difficulty', e.target.value)}
                 >
                   <MenuItem value="">Tất cả</MenuItem>
-                  {DEFAULT_FILTER_OPTIONS.difficulties.map((option) => (
+                  {(filterOptions?.difficulties || []).map((option) => (
                     <MenuItem key={option.value} value={option.value}>
                       {option.label}
                     </MenuItem>
@@ -504,21 +422,17 @@ export default function QuestionList({
                 </Select>
               </FormControl>
 
-              <FormControl size="small" sx={{ minWidth: 120 }}>
-                <InputLabel>Trạng thái</InputLabel>
-                <Select
-                  value={filters.status || ''}
-                  label="Trạng thái"
-                  onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-                >
-                  <MenuItem value="">Tất cả</MenuItem>
-                  {DEFAULT_FILTER_OPTIONS.statuses.map((option) => (
-                    <MenuItem key={option.value} value={option.value}>
-                      {option.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+            
+
+              <Button
+                variant="outlined"
+                startIcon={<Clear />}
+                onClick={handleClearFilters}
+                size="small"
+                sx={{ ml: 2 }}
+              >
+                Xóa bộ lọc
+              </Button>
             </Box>
           </CardContent>
         </Card>
@@ -540,6 +454,39 @@ export default function QuestionList({
           question={previewQuestion}
         />
       )}
+      
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleCancelDelete}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          Xác nhận xóa câu hỏi
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            Bạn có chắc chắn muốn xóa câu hỏi "{questionToDelete?.title || 'này'}" không?
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Hành động này không thể hoàn tác.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelDelete} color="primary">
+            Hủy
+          </Button>
+          <Button 
+            onClick={handleConfirmDelete} 
+            color="error" 
+            variant="contained"
+            autoFocus
+          >
+            Xóa
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

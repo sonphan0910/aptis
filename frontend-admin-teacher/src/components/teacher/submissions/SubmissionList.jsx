@@ -96,19 +96,33 @@ export default function SubmissionList({
     }
   };
 
-  const getSkillTypeChip = (skillType) => {
+  const getSkillTypeFromQuestionCode = (questionCode) => {
+    if (!questionCode) return null;
+    if (questionCode.startsWith('WRITING_')) return 'WRITING';
+    if (questionCode.startsWith('SPEAKING_')) return 'SPEAKING';
+    if (questionCode.startsWith('LISTENING_')) return 'LISTENING';
+    if (questionCode.startsWith('READING_')) return 'READING';
+    return null;
+  };
+
+  const getSkillTypeChip = (skillType, questionCode) => {
+    // If selectedSkill is not available, derive from question code
+    const derivedSkill = !skillType && questionCode 
+      ? getSkillTypeFromQuestionCode(questionCode) 
+      : skillType;
+
     const skillConfig = {
-      'WRITING': { label: 'Writing', color: 'primary', icon: '✍️' },
-      'SPEAKING': { label: 'Speaking', color: 'secondary', icon: '🗣️' },
-      'LISTENING': { label: 'Listening', color: 'info', icon: '👂' },
-      'READING': { label: 'Reading', color: 'warning', icon: '📖' }
+      'WRITING': { label: 'Writing', color: 'primary', icon: '' },
+      'SPEAKING': { label: 'Speaking', color: 'secondary', icon: '' },
+      'LISTENING': { label: 'Listening', color: 'info', icon: '' },
+      'READING': { label: 'Reading', color: 'warning', icon: '' }
     };
     
-    const config = skillConfig[skillType] || { label: skillType, color: 'default', icon: '' };
+    const config = skillConfig[derivedSkill] || { label: derivedSkill || 'N/A', color: 'default', icon: '' };
     
     return (
       <Chip 
-        label={`${config.icon} ${config.label}`}
+        label={config.label}
         color={config.color}
         size="small"
         variant="outlined"
@@ -252,20 +266,23 @@ export default function SubmissionList({
                 <TableCell>
                   <Box>
                     <Typography variant="body2" fontWeight="medium">
-                      {submission.attempt?.student?.full_name}
+                      {submission.attempt?.student?.full_name || 'N/A'}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {submission.attempt?.student?.email}
+                      {submission.attempt?.student?.email || 'N/A'}
                     </Typography>
                   </Box>
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2">
-                    {submission.attempt?.exam?.title}
+                    {submission.attempt?.exam?.title || 'N/A'}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  {getSkillTypeChip(submission.attempt?.selectedSkill?.skill_type_name)}
+                  {getSkillTypeChip(
+                    submission.attempt?.selectedSkill?.skill_type_name || submission.attempt?.selectedSkill?.code,
+                    submission.question?.questionType?.code
+                  )}
                 </TableCell>
                 <TableCell>
                   <Box>
@@ -284,12 +301,12 @@ export default function SubmissionList({
                       />
                       {submission.answer_type === 'audio' && (
                         <Typography variant="caption" color="text.secondary">
-                          🎤 Âm thanh
+                          Âm thanh
                         </Typography>
                       )}
                       {submission.answer_type === 'text' && (
                         <Typography variant="caption" color="text.secondary">
-                          ✍️ Văn bản
+                          Văn bản
                         </Typography>
                       )}
                     </Box>
