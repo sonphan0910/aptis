@@ -96,7 +96,7 @@ export default function DataTable({
       
       {pagination && (
         <TablePagination
-          rowsPerPageOptions={[10, 25, 50]}
+          rowsPerPageOptions={[10]}
           component="div"
           count={pagination.total || 0}
           rowsPerPage={pagination.limit || 10}

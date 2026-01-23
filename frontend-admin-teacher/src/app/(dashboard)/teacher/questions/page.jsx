@@ -55,7 +55,7 @@ export default function QuestionsPage() {
         viewMode="table"
         showActions={true}
         showFilters={true}
-        readOnlyMode={true}
+        readOnlyMode={false}
       />
     </Box>
   );

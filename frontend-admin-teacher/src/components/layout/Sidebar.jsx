@@ -18,7 +18,6 @@ import {
   People as PeopleIcon,
   Grading as GradingIcon,
   Assessment as AssessmentIcon,
-  Rule as RuleIcon,
   QuestionAnswer,
   BarChart,
 } from '@mui/icons-material';
@@ -53,11 +52,6 @@ const teacherMenuItems = [
     icon: AssessmentIcon,
     path: ROUTES.TEACHER.REPORTS.LIST,
   },
-  {
-    title: 'Tiêu chí đánh giá',
-    icon: RuleIcon,
-    path: ROUTES.TEACHER.CRITERIA.LIST,
-  },
 ];
 
 // Menu items for Admin role
@@ -68,34 +62,14 @@ const adminMenuItems = [
     path: ROUTES.DASHBOARD,
   },
   {
-    title: 'Quản lý câu hỏi',
-    icon: QuizIcon,
-    path: ROUTES.TEACHER.QUESTIONS.LIST,
-  },
-  {
-    title: 'Quản lý bài thi',
-    icon: AssignmentIcon,
-    path: ROUTES.TEACHER.EXAMS.LIST,
-  },
-  {
     title: 'Quản lý người dùng',
     icon: PeopleIcon,
     path: ROUTES.ADMIN.USERS.LIST,
   },
   {
-    title: 'Chấm bài',
-    icon: GradingIcon,
-    path: ROUTES.TEACHER.SUBMISSIONS.LIST,
-  },
-  {
     title: 'Báo cáo & Thống kê',
     icon: AssessmentIcon,
     path: ROUTES.TEACHER.REPORTS.LIST,
-  },
-  {
-    title: 'Tiêu chí đánh giá',
-    icon: RuleIcon,
-    path: ROUTES.TEACHER.CRITERIA.LIST,
   },
 ];
 

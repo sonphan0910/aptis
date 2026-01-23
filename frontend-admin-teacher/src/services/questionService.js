@@ -10,7 +10,9 @@ export const questionApi = {
   // Get all questions with pagination and filters
   getQuestions: async (params) => {
     const response = await apiClient.get(API_ENDPOINTS.TEACHER.QUESTIONS.LIST, { params });
-    return getResponseData(response, { questions: [], total: 0 });
+    const data = getResponseData(response, { questions: [], total: 0 });
+    console.log('[questionService.getQuestions] Response data:', data);
+    return data;
   },
 
   // Get a single question by ID
@@ -167,9 +169,13 @@ export const questionApi = {
   },
 
   // Get filter options from API
+  // Get filter options for dropdowns
   getFilterOptions: async () => {
     const response = await apiClient.get(API_ENDPOINTS.TEACHER.QUESTIONS.FILTER_OPTIONS);
-    return getResponseData(response, {});
+    // Response structure: { success: true, data: { aptisTypes, questionTypes, skills, difficulties, statuses } }
+    const responseData = response.data?.data || response.data || {};
+    console.log('[getFilterOptions] Response:', responseData);
+    return responseData;
   },
 
   // Upload images for a question

@@ -172,7 +172,7 @@ export default function QuestionForm({
       return (
         <Box textAlign="center" py={4}>
           <Typography color="error">
-            ❌ Loại câu hỏi không được chọn
+            Loại câu hỏi không được chọn
           </Typography>
           <Typography variant="body2" color="text.secondary" mt={1}>
             Vui lòng quay lại và chọn loại câu hỏi
@@ -252,7 +252,7 @@ export default function QuestionForm({
         return (
           <Box textAlign="center" py={4}>
             <Typography color="error" gutterBottom>
-              ⚠️ Loại câu hỏi này chưa được hỗ trợ
+              Loại câu hỏi này chưa được hỗ trợ
             </Typography>
             <Typography variant="body2" color="text.secondary" mt={1} sx={{ wordBreak: 'break-all' }}>
               Question Code: {questionCode}

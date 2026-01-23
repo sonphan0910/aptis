@@ -12,7 +12,7 @@ const testCases = [
     name: "Test 1: Good A2 level response",
     transcription: "Sure. Here's a short self introduction. My name is Alex and I'm from Vietnam. I'm currently studying and working in the field of information technology with a strong focus on web development and software projects. In my free time, I enjoy learning new tech.",
     question: {
-      content: "Tell me about yourself: Name and where you're from, What you do (work or studies), Your hobbies and interests. 30 seconds to prepare, 1 minute to speak.",
+      content: "Tell me about yourself: Name and where you're from, What you do (work or studies), Your hobbies and interests. ",
       questionType: { code: 'SPEAKING_INTRO' }
     },
     expectedScore: { min: 3, max: 5 },

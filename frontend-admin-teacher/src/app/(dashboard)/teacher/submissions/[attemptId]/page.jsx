@@ -22,16 +22,11 @@ import {
 } from '@mui/material';
 import { 
   ArrowBack, 
-  Save, 
-  Grade, 
-  VolumeUp,
-  Description,
-  Person,
-  Assignment,
-  Star
+  Save
 } from '@mui/icons-material';
 import { submissionApi } from '@/services/submissionService';
 import QuestionDisplay from '@/components/QuestionDisplay';
+import DetailedAnswerRenderer from '@/components/DetailedAnswerRenderer';
 
 export default function SubmissionDetailPage() {
   const router = useRouter();
@@ -39,6 +34,7 @@ export default function SubmissionDetailPage() {
   const searchParams = useSearchParams();
   const attemptId = params.attemptId;
   const mode = searchParams.get('mode') || 'view';
+  const answerId = searchParams.get('answerId'); // Get the answer ID from query param
   
   const [submissionDetail, setSubmissionDetail] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -59,12 +55,22 @@ export default function SubmissionDetailPage() {
   }, [attemptId]);
 
   useEffect(() => {
-    if (submissionDetail?.answers?.[0]) {
-      const answer = submissionDetail.answers[0];
-      setScore(answer.final_score || answer.score || 0);
-      setFeedback(answer.manual_feedback || '');
+    if (submissionDetail?.answers) {
+      // Find the specific answer if answerId is provided, otherwise use first
+      let answer;
+      if (answerId) {
+        answer = submissionDetail.answers.find(a => a.id === parseInt(answerId));
+      }
+      if (!answer) {
+        answer = submissionDetail.answers[0];
+      }
+      
+      if (answer) {
+        setScore(answer.final_score || answer.score || 0);
+        setFeedback(answer.manual_feedback || '');
+      }
     }
-  }, [submissionDetail]);
+  }, [submissionDetail, answerId]);
 
   const loadSubmissionDetail = async () => {
     setLoading(true);
@@ -87,15 +93,25 @@ export default function SubmissionDetailPage() {
 
     setSaving(true);
     try {
-      const answerId = submissionDetail.answers[0].id;
-      const currentUser = 1; // TODO: Get from auth context
+      // Find the correct answer
+      let targetAnswer;
+      if (answerId) {
+        targetAnswer = submissionDetail.answers.find(a => a.id === parseInt(answerId));
+      }
+      if (!targetAnswer) {
+        targetAnswer = submissionDetail.answers[0];
+      }
       
-      await submissionApi.submitAnswerReview(answerId, {
+      if (!targetAnswer?.id) {
+        showNotification('Không thể xác định câu trả lời', 'error');
+        setSaving(false);
+        return;
+      }
+      
+      // Chỉ gửi final_score và manual_feedback thôi
+      await submissionApi.submitAnswerReview(targetAnswer.id, {
         final_score: score,
-        manual_feedback: feedback,
-        needs_review: false,
-        reviewed_by: currentUser,
-        reviewed_at: new Date().toISOString()
+        manual_feedback: feedback
       });
       
       showNotification('Đã lưu đánh giá thành công', 'success');
@@ -165,14 +181,40 @@ export default function SubmissionDetailPage() {
   }
 
   const { skill, student, exam, answers } = submissionDetail;
-  const answer = answers && answers.length > 0 ? answers[0] : null;
+  
+  // Find the specific answer if answerId is provided, otherwise use first
+  let answer;
+  if (answerId && answers) {
+    answer = answers.find(a => a.id === parseInt(answerId));
+  }
+  if (!answer && answers) {
+    answer = answers[0];
+  }
+  
+  // Derive skill from question type code (more reliable than submissionDetail.skill)
+  const getSkillFromQuestionCode = (code) => {
+    if (!code) return null;
+    if (code.startsWith('WRITING_')) return 'Writing';
+    if (code.startsWith('SPEAKING_')) return 'Speaking';
+    if (code.startsWith('LISTENING_')) return 'Listening';
+    if (code.startsWith('READING_')) return 'Reading';
+    return null;
+  };
+  
+  const derivedSkill = answer?.question?.questionType?.code 
+    ? getSkillFromQuestionCode(answer.question.questionType.code)
+    : skill;
+  
   const question = answer?.question || {};
   const maxScore = answer?.max_score || 100;
   const scorePercentage = maxScore ? (score / maxScore) * 100 : 0;
   
-  // Determine grading status based on answer data
-  const gradingStatus = answer?.grading_status || 
-    (answer?.final_score !== null && answer?.final_score !== undefined ? 'manually_graded' : 'ungraded');
+  // Determine grading status: check final_score first, then grading_status
+  const hasManualScore = answer?.final_score !== null && answer?.final_score !== undefined && answer?.final_score !== '';
+  const gradingStatus = hasManualScore ? 'manually_graded' : (answer?.grading_status || 'ungraded');
+  
+  // Check if we should show comparison (only in grade mode or if scores differ)
+  const shouldShowComparison = mode === 'grade' || (answer?.score !== answer?.final_score);
 
   return (
     <Box>
@@ -192,7 +234,7 @@ export default function SubmissionDetailPage() {
               {student?.full_name} - {exam?.title}
             </Typography>
             <Box display="flex" gap={1} mt={1}>
-              <Chip label={skill || 'Không xác định'} color="primary" size="small" />
+              <Chip label={derivedSkill || 'Không xác định'} color="primary" size="small" />
               {getStatusChip(gradingStatus)}
               {mode === 'view' && (
                 <Button
@@ -200,7 +242,6 @@ export default function SubmissionDetailPage() {
                   variant="outlined"
                   color="primary"
                   onClick={() => router.push(`/teacher/submissions/${attemptId}?mode=grade`)}
-                  startIcon={<Grade />}
                 >
                   Chuyển sang chấm
                 </Button>
@@ -210,35 +251,14 @@ export default function SubmissionDetailPage() {
         </Box>
       </Box>
 
-
-      
-      {mode === 'grade' && (
-        <Alert severity="warning" sx={{ mb: 3 }}>
-          <strong>Chế độ chấm:</strong> Bạn có thể chấm điểm và đưa ra phản hồi. 
-          Nhớ nhấn "Lưu đánh giá" sau khi hoàn thành.
-        </Alert>
-      )}
-
       <Grid container spacing={3}>
         {/* Left Column - Student Answer Display */}
         <Grid item xs={12} md={7}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom display="flex" alignItems="center">
-              <Avatar 
-                src={student?.avatar} 
-                sx={{ width: 32, height: 32, mr: 2 }}
-              >
-                {student?.full_name?.charAt(0)}
-              </Avatar>
-              {student?.full_name}
-            </Typography>
-            
+    
             {/* Question Content */}
             {question && (
               <Box mb={3}>
-                <Typography variant="subtitle1" fontWeight="bold" color="primary">
-                  Câu hỏi:
-                </Typography>
+
                 <QuestionDisplay question={question} answer={answer} />
               </Box>
             )}
@@ -246,209 +266,141 @@ export default function SubmissionDetailPage() {
             {/* Answer Content */}
             {answer && (
               <Box>
-                <Typography variant="subtitle1" fontWeight="bold" color="secondary">
-                  Câu trả lời của học sinh:
-                </Typography>
-                
-                {/* Answer Type Badge */}
-                <Box mb={2}>
-                  <Chip 
-                    label={`Loại: ${answer.answer_type === 'text' ? 'Văn bản' : 
-                           answer.answer_type === 'audio' ? 'Thu âm' : 
-                           answer.answer_type === 'option' ? 'Trắc nghiệm' : 
-                           answer.answer_type === 'json' ? 'Cấu trúc' : 'Khác'}`}
-                    size="small"
-                    color="primary"
-                    variant="outlined"
-                  />
-                </Box>
-                
-                {/* Text Answer */}
-                {answer.text_answer && (
-                  <Box sx={{ p: 2, bgcolor: 'background.default', borderRadius: 1, mt: 1 }}>
-                    <Typography variant="body2" fontWeight="bold" color="text.secondary" mb={1}>
-                      Văn bản:
-                    </Typography>
-                    <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-                      {answer.text_answer}
-                    </Typography>
-                  </Box>
-                )}
-
-                {/* Selected Option Answer */}
-                {answer.selected_option_id && (
-                  <Box sx={{ p: 2, bgcolor: 'background.default', borderRadius: 1, mt: 1 }}>
-                    <Typography variant="body2" fontWeight="bold" color="text.secondary" mb={1}>
-                      Lựa chọn đã chọn:
-                    </Typography>
-                    <Typography variant="body1">
-                      Option ID: {answer.selected_option_id}
-                    </Typography>
-                  </Box>
-                )}
-
-                {/* JSON Answer (for complex question types) */}
-                {answer.answer_json && (
-                  <Box sx={{ p: 2, bgcolor: 'background.default', borderRadius: 1, mt: 1 }}>
-                    <Typography variant="body2" fontWeight="bold" color="text.secondary" mb={1}>
-                      Dữ liệu câu trả lời:
-                    </Typography>
-                    <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>
-                      {answer.answer_json}
-                    </Typography>
-                  </Box>
-                )}
-
-                {/* Audio Answer */}
-                {answer.audio_url && (
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="body2" fontWeight="bold" mb={1}>
-                      Bài thu âm:
-                    </Typography>
-                    <audio controls style={{ width: '100%' }}>
-                      <source src={answer.audio_url} type="audio/mpeg" />
-                      Trình duyệt không hỗ trợ audio.
-                    </audio>
-                    
-                    {/* Transcribed Text if available */}
-                    {answer.transcribed_text && (
-                      <Box sx={{ p: 2, bgcolor: 'info.50', borderRadius: 1, mt: 1 }}>
-                        <Typography variant="body2" fontWeight="bold" color="info.main" mb={1}>
-                          Văn bản đã chuyển đổi:
-                        </Typography>
-                        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                          {answer.transcribed_text}
-                        </Typography>
-                      </Box>
-                    )}
-                  </Box>
-                )}
-
-                {/* AI Feedback */}
-                {answer.ai_feedback && (
-                  <Box mt={2}>
-                    <Typography variant="body2" fontWeight="bold" color="info.main">
-                      Phản hồi AI:
-                    </Typography>
-                    <Box sx={{ p: 2, bgcolor: 'info.50', borderRadius: 1, mt: 1 }}>
-                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                        {answer.ai_feedback}
-                      </Typography>
-                    </Box>
-                  </Box>
-                )}
-
-                {/* Existing Manual Feedback */}
-                {answer.manual_feedback && (
-                  <Box mt={2}>
-                    <Typography variant="body2" fontWeight="bold" color="warning.main">
-                      Nhận xét trước đó:
-                    </Typography>
-                    <Box sx={{ p: 2, bgcolor: 'warning.50', borderRadius: 1, mt: 1 }}>
-                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                        {answer.manual_feedback}
-                      </Typography>
-                    </Box>
-                  </Box>
-                )}
+                <DetailedAnswerRenderer question={question} answer={answer} />
               </Box>
             )}
-          </Paper>
+      
         </Grid>
 
         {/* Right Column - Grading Form */}
         <Grid item xs={12} md={5}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" gutterBottom>
-              📊 Form chấm điểm
+              Chấm điểm và đánh giá
             </Typography>
             
-            {/* Current Score Display */}
-            {answer && (
-              <Box mb={3} p={2} bgcolor="grey.50" borderRadius={1}>
-                <Typography variant="body2" color="text.secondary">Điểm hiện tại:</Typography>
-                <Box display="flex" alignItems="center" gap={1}>
-                  <Typography variant="h5" fontWeight="bold" color={getScoreColor(answer.score || 0, answer.max_score)}>
-                    {answer.score || 0}/{answer.max_score}
-                  </Typography>
+            {/* AI Score vs Manual Score Comparison - Only show in grade mode or if scores differ */}
+            {shouldShowComparison && answer && (
+              <Box mb={3}>
+                <Typography variant="subtitle2" mb={2} color="text.secondary">
+                  So sánh điểm AI và điểm thủ công:
+                </Typography>
+                
+                {/* AI Score */}
+                <Box display="flex" justifyContent="space-between" alignItems="center" p={2} bgcolor="info.50" borderRadius={1} mb={1}>
+                  <Box>
+                    <Typography variant="body2" fontWeight="bold" color="info.main">Điểm AI:</Typography>
+                    <Typography variant="h6" color="info.main">{answer.score || 0}/{answer.max_score}</Typography>
+                  </Box>
                   <LinearProgress 
                     variant="determinate" 
                     value={(answer.score || 0) / (answer.max_score || 1) * 100}
-                    sx={{ flex: 1, height: 8, borderRadius: 4 }}
-                    color={getScoreColor(answer.score || 0, answer.max_score)}
+                    sx={{ width: '40%', height: 8, borderRadius: 4 }}
+                    color="info"
                   />
-                  <Typography variant="body2" color="text.secondary">
+                  <Typography variant="body2" color="info.main" fontWeight="bold">
                     {Math.round((answer.score || 0) / (answer.max_score || 1) * 100)}%
+                  </Typography>
+                </Box>
+
+                {/* Manual/Final Score */}
+                <Box display="flex" justifyContent="space-between" alignItems="center" p={2} bgcolor="primary.50" borderRadius={1}>
+                  <Box>
+                    <Typography variant="body2" fontWeight="bold" color="primary.main">Điểm cuối:</Typography>
+                    <Typography variant="h6" color="primary.main">{score}/{maxScore}</Typography>
+                  </Box>
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={scorePercentage}
+                    sx={{ width: '40%', height: 8, borderRadius: 4 }}
+                    color="primary"
+                  />
+                  <Typography variant="body2" color="primary.main" fontWeight="bold">
+                    {Math.round(scorePercentage)}%
                   </Typography>
                 </Box>
               </Box>
             )}
 
-            {/* Score Input */}
+            {/* Final Score Input */}
             <Box mb={3}>
-              <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                Điểm số mới:
+              <Typography variant="subtitle1" fontWeight="bold" gutterBottom color="primary">
+                Điểm cuối cùng (Final Score):
               </Typography>
               <TextField
                 type="number"
-                label="Điểm"
+                label="Nhập điểm cuối cùng"
                 value={score}
-                onChange={(e) => setScore(Math.max(0, Math.min(maxScore, parseInt(e.target.value) || 0)))}
+                onChange={(e) => setScore(Math.max(0, Math.min(maxScore, parseFloat(e.target.value) || 0)))}
                 InputProps={{
                   endAdornment: <Typography color="text.secondary">/{maxScore}</Typography>
                 }}
                 fullWidth
                 disabled={mode === 'view'}
-                inputProps={{ min: 0, max: maxScore }}
+                inputProps={{ min: 0, max: maxScore, step: 0.1 }}
                 error={score > maxScore}
-                helperText={score > maxScore ? `Điểm không được vượt quá ${maxScore}` : ''}
+                helperText={
+                  score > maxScore ? 
+                    `Điểm không được vượt quá ${maxScore}` : 
+                    `Điểm AI gốc: ${answer?.score || 0}/${maxScore}`
+                }
+                variant="outlined"
+                sx={{ 
+                  '& .MuiOutlinedInput-root': {
+                    '&.Mui-focused fieldset': {
+                      borderColor: 'primary.main',
+                      borderWidth: 2
+                    }
+                  }
+                }}
               />
               
               {/* Score Rating Visual */}
-              <Box mt={1}>
+              <Box mt={1} display="flex" alignItems="center" gap={2}>
                 <Rating
                   value={score / maxScore * 5}
                   readOnly
-                  precision={0.5}
+                  precision={0.1}
                   size="small"
                 />
-                <Typography variant="caption" color="text.secondary" ml={1}>
-                  {getScoreLabel(score, maxScore)}
-                </Typography>
+                <Chip 
+                  label={getScoreLabel(score, maxScore)} 
+                  color={getScoreColor(score, maxScore)}
+                  size="small"
+                />
               </Box>
             </Box>
 
-            {/* Progress Bar */}
+            {/* Manual Feedback Input */}
             <Box mb={3}>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                Tiến độ điểm:
-              </Typography>
-              <LinearProgress 
-                variant="determinate" 
-                value={scorePercentage}
-                sx={{ height: 8, borderRadius: 4 }}
-                color={getScoreColor(score, maxScore)}
-              />
-              <Typography variant="caption" color="text.secondary">
-                {score}/{maxScore} điểm ({Math.round(scorePercentage)}%)
-              </Typography>
-            </Box>
-
-            {/* Feedback Input */}
-            <Box mb={3}>
-              <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                Nhận xét chi tiết:
+              <Typography variant="subtitle1" fontWeight="bold" gutterBottom color="secondary">
+                Nhận xét thủ công (Manual Feedback):
               </Typography>
               <TextField
                 multiline
-                rows={6}
-                label="Viết nhận xét cho học sinh..."
+                rows={8}
+                label="Viết nhận xét chi tiết cho học sinh..."
                 value={feedback}
                 onChange={(e) => setFeedback(e.target.value)}
                 fullWidth
                 disabled={mode === 'view'}
-                placeholder="Ví dụ: Bài làm tốt, cần cải thiện ngữ pháp ở phần..."
+                placeholder={`Ví dụ cho ${skill === 'writing' ? 'Writing' : 'Speaking'}:
+- Nội dung: ${skill === 'writing' ? 'Ý tưởng rõ ràng, bố cục tốt' : 'Phát âm rõ ràng, lưu loát'}
+- Ngôn ngữ: ${skill === 'writing' ? 'Ngữ pháp chính xác, từ vựng phong phú' : 'Sử dụng từ vựng phù hợp'}
+- Cần cải thiện: ${skill === 'writing' ? 'Liên kết câu, chính tả' : 'Ngữ điệu, tự tin hơn'}`}
+                variant="outlined"
+                sx={{ 
+                  '& .MuiOutlinedInput-root': {
+                    '&.Mui-focused fieldset': {
+                      borderColor: 'secondary.main',
+                      borderWidth: 2
+                    }
+                  }
+                }}
               />
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                Gợi ý: Hãy đưa ra nhận xét cụ thể và xây dựng để giúp học sinh cải thiện
+              </Typography>
             </Box>
 
             {/* Action Buttons */}
@@ -459,7 +411,7 @@ export default function SubmissionDetailPage() {
                   color="primary"
                   onClick={handleSubmitReview}
                   disabled={saving}
-                  startIcon={saving ? <CircularProgress size={16} /> : <Grade />}
+                  startIcon={saving ? <CircularProgress size={16} /> : <Save />}
                   fullWidth
                 >
                   {saving ? 'Đang lưu...' : 'Lưu đánh giá'}

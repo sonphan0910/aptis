@@ -301,6 +301,10 @@ exports.getSubmissions = async (req, res, next) => {
       attemptWhere.student_id = parseInt(student_id);
     }
 
+    // Handle skill type filtering
+    const defaultSkillTypes = ['WRITING', 'SPEAKING']; // Default: Writing & Speaking
+    const targetSkillTypes = skill_type ? [skill_type] : defaultSkillTypes;
+
     const { count, rows } = await AttemptAnswer.findAndCountAll({
       where,
       include: [
@@ -309,25 +313,25 @@ exports.getSubmissions = async (req, res, next) => {
           as: 'attempt',
           where: Object.keys(attemptWhere).length > 0 ? attemptWhere : undefined,
           attributes: ['id', 'student_id', 'exam_id', 'attempt_type', 'selected_skill_id', 'attempt_number', 'start_time', 'end_time', 'status', 'total_score'],
+          required: false, // Use LEFT OUTER JOIN to allow missing attempts
           include: [
             {
               model: User,
               as: 'student',
               attributes: ['id', 'full_name', 'email', 'avatar_url'],
+              required: false,
             },
             {
               model: Exam,
               as: 'exam',
               attributes: ['id', 'title'],
+              required: false,
             },
             {
               model: SkillType,
               as: 'selectedSkill',
               attributes: ['id', 'code', 'skill_type_name'],
-              required: true, // Luôn require skill để filter
-              where: skill_type ? { code: skill_type } : {
-                code: { [Op.in]: ['WRITING', 'SPEAKING'] } // Mặc định chỉ lấy Writing & Speaking
-              },
+              required: false,
             },
           ],
         },
@@ -335,11 +339,13 @@ exports.getSubmissions = async (req, res, next) => {
           model: Question,
           as: 'question',
           attributes: ['id', 'content', 'difficulty'],
+          required: false, // Allow missing questions too
           include: [
             {
               model: QuestionType,
               as: 'questionType',
               attributes: ['id', 'code', 'question_type_name'],
+              required: false,
             },
           ],
         },
@@ -356,7 +362,50 @@ exports.getSubmissions = async (req, res, next) => {
       subQuery: false,
     });
 
-    const transformedRows = rows.map(row => ({
+    // Filter rows by skill type after fetching (temporarily disabled for debugging)
+    let filteredRows = rows;
+    
+    // Debug: Show actual skill types in database
+    console.log('[DEBUG] Sample skill types found:');
+    rows.slice(0, 3).forEach((row, index) => {
+      console.log(`Row ${index + 1}:`, {
+        attempt: !!row.attempt,
+        selectedSkill: row.attempt?.selectedSkill,
+        answer_type: row.answer_type,
+        question_type: row.question?.questionType?.code
+      });
+    });
+    
+    // Apply skill type filtering based on question type (since selectedSkill is null)
+    if (skill_type) {
+      console.log('[DEBUG] Filtering by skill_type:', skill_type);
+      filteredRows = rows.filter(row => {
+        const questionCode = row.question?.questionType?.code;
+        if (!questionCode) return false;
+        
+        // Determine skill from question type code
+        if (skill_type === 'WRITING' && questionCode.startsWith('WRITING_')) return true;
+        if (skill_type === 'SPEAKING' && questionCode.startsWith('SPEAKING_')) return true;
+        return false;
+      });
+    } else {
+      // Default: show WRITING and SPEAKING based on question types
+      const matchingRows = rows.filter(row => {
+        const questionCode = row.question?.questionType?.code;
+        if (!questionCode) return false;
+        return questionCode.startsWith('WRITING_') || questionCode.startsWith('SPEAKING_');
+      });
+      
+      // If no matching rows, return all rows (so user can see what data exists)
+      if (matchingRows.length === 0) {
+        console.log('[DEBUG] No WRITING/SPEAKING rows found, showing all rows for debugging');
+        filteredRows = rows;
+      } else {
+        filteredRows = matchingRows;
+      }
+    }
+
+    const transformedRows = filteredRows.map(row => ({
       ...row.toJSON(),
       grading_status: getGradingStatus(row),
       can_regrade: canRegrade(row),
@@ -364,9 +413,36 @@ exports.getSubmissions = async (req, res, next) => {
       review_priority: getReviewPriority(row),
     }));
 
+    // Log for debugging
+    console.log('[getSubmissions] Query returned:', rows.length, 'rows, after filtering:', filteredRows.length);
+    
+    // Enhanced debugging - show more data structure
+    if (rows.length > 0) {
+      console.log('[DEBUG] First row full structure:', JSON.stringify({
+        id: rows[0].id,
+        answer_type: rows[0].answer_type,
+        attempt_exists: !!rows[0].attempt,
+        attempt_id: rows[0].attempt?.id,
+        selected_skill_id: rows[0].attempt?.selected_skill_id,
+        skill_code: rows[0].attempt?.selectedSkill?.code,
+        skill_name: rows[0].attempt?.selectedSkill?.skill_type_name,
+        student_name: rows[0].attempt?.student?.full_name,
+        exam_title: rows[0].attempt?.exam?.title,
+        question_type: rows[0].question?.questionType?.code
+      }, null, 2));
+    }
+    
+    if (filteredRows.length > 0) {
+      console.log('[DEBUG] First filtered row basic info:', {
+        id: filteredRows[0].id,
+        grading_status: filteredRows[0].grading_status || 'calculated later',
+        answer_type: filteredRows[0].answer_type
+      });
+    }
+
     res.json({
       success: true,
-      ...paginationResponse(transformedRows, parseInt(page), validLimit, count),
+      ...paginationResponse(transformedRows, parseInt(page), validLimit, filteredRows.length), // Use filtered count
     });
   } catch (error) {
     next(error);
@@ -434,27 +510,71 @@ exports.getSubmissionDetail = async (req, res, next) => {
         {
           model: Question,
           as: 'question',
-          attributes: ['id', 'content', 'difficulty', 'question_type_id'],
+          attributes: ['id', 'content', 'difficulty', 'question_type_id', 'media_url', 'additional_media', 'duration_seconds', 'parent_question_id'],
           include: [
             {
               model: QuestionType,
               as: 'questionType',
-              attributes: ['id', 'question_type_name'],
+              attributes: ['id', 'question_type_name', 'code'],
+              include: [
+                {
+                  model: SkillType,
+                  as: 'skillType', 
+                  attributes: ['id', 'skill_type_name', 'code']
+                }
+              ]
             },
+            {
+              model: require('../../models').QuestionItem,
+              as: 'items',
+              attributes: ['id', 'item_text', 'item_order', 'correct_option_id', 'answer_text', 'media_url'],
+              required: false
+            },
+            {
+              model: require('../../models').QuestionOption,
+              as: 'options', 
+              attributes: ['id', 'item_id', 'option_text', 'option_order', 'is_correct'],
+              required: false
+            }
           ],
         },
         {
           model: AnswerAiFeedback,
           as: 'aiFeedbacks',
         },
+        {
+          model: require('../../models').QuestionOption,
+          as: 'selectedOption',
+          attributes: ['id', 'option_text'],
+          required: false
+        }
       ],
       order: [['id', 'ASC']],
     });
 
-    // Determine skill type from answers
+    // Determine skill type from question type, not answer type
     let skill = 'writing';
     if (answers.length > 0) {
-      skill = answers[0].answer_type === 'audio' ? 'speaking' : 'writing';
+      const firstAnswer = answers[0];
+      if (firstAnswer.question && firstAnswer.question.questionType) {
+        const questionTypeCode = firstAnswer.question.questionType.code || '';
+        
+        if (questionTypeCode.startsWith('SPEAKING_')) {
+          skill = 'speaking';
+        } else if (questionTypeCode.startsWith('LISTENING_')) {
+          skill = 'listening';
+        } else if (questionTypeCode.startsWith('READING_')) {
+          skill = 'reading';
+        } else if (questionTypeCode.startsWith('WRITING_')) {
+          skill = 'writing';
+        } else {
+          // Fallback to answer type
+          skill = firstAnswer.answer_type === 'audio' ? 'speaking' : 'writing';
+        }
+      } else {
+        // Fallback to answer type  
+        skill = firstAnswer.answer_type === 'audio' ? 'speaking' : 'writing';
+      }
     }
 
     res.json({
@@ -481,7 +601,7 @@ exports.getSubmissionDetail = async (req, res, next) => {
 exports.submitAnswerReview = async (req, res, next) => {
   try {
     const { answerId } = req.params;
-    const { scores, feedback, final_score } = req.body;
+    const { final_score, manual_feedback } = req.body;
     const teacherId = req.user.userId;
 
     const answer = await AttemptAnswer.findByPk(answerId);
@@ -490,19 +610,50 @@ exports.submitAnswerReview = async (req, res, next) => {
       throw new NotFoundError('Answer not found');
     }
 
+    // Cập nhật chỉ final_score và manual_feedback
     await answer.update({
-      final_score: final_score !== undefined ? final_score : answer.score,
-      manual_feedback: feedback,
+      final_score: final_score !== undefined ? parseFloat(final_score) : answer.score,
+      manual_feedback: manual_feedback || '',
       reviewed_by: teacherId,
       reviewed_at: new Date(),
       needs_review: false,
-      // Store detailed scores as JSON
-      criteria_scores: scores ? JSON.stringify(scores) : answer.criteria_scores,
+    });
+
+    // Update attempt total score
+    const attempt = await ExamAttempt.findByPk(answer.attempt_id);
+    const allAnswers = await AttemptAnswer.findAll({
+      where: { attempt_id: answer.attempt_id },
+    });
+
+    // Tính tổng điểm từ final_score nếu có, không thì dùng score
+    const totalScore = allAnswers.reduce((sum, a) => {
+      const scoreToUse = a.final_score !== null && a.final_score !== undefined ? a.final_score : (a.score || 0);
+      return sum + parseFloat(scoreToUse);
+    }, 0);
+
+    await attempt.update({ total_score: Math.round(totalScore * 100) / 100 });
+
+    // Load updated answer with related data
+    const updatedAnswer = await AttemptAnswer.findByPk(answerId, {
+      include: [
+        {
+          model: Question,
+          as: 'question',
+          include: [
+            {
+              model: QuestionType,
+              as: 'questionType',
+              attributes: ['id', 'question_type_name', 'code']
+            }
+          ]
+        }
+      ]
     });
 
     res.json({
       success: true,
-      data: answer,
+      data: updatedAnswer,
+      message: 'Review submitted successfully'
     });
   } catch (error) {
     next(error);

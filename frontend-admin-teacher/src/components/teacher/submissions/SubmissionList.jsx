@@ -49,9 +49,13 @@ export default function SubmissionList({
   const { ungradedCount, aiGradedCount } = getSubmissionStats();
 
   const getStatusChip = (submission) => {
-    const { grading_status, needs_review, has_ai_feedback } = submission;
+    const { grading_status, needs_review, final_score } = submission;
     
-    switch (grading_status) {
+    // If final_score exists, it means manually graded
+    const hasManualScore = final_score !== null && final_score !== undefined && final_score !== '';
+    const actualStatus = hasManualScore ? 'manually_graded' : grading_status;
+    
+    switch (actualStatus) {
       case 'ungraded':
         return (
           <Chip 
@@ -74,7 +78,7 @@ export default function SubmissionList({
       case 'manually_graded':
         return (
           <Chip 
-            label="Đã chấm" 
+            label="Đã chấm thủ công" 
             color="success" 
             size="small"
             icon={<Person />}
@@ -96,19 +100,33 @@ export default function SubmissionList({
     }
   };
 
-  const getSkillTypeChip = (skillType) => {
+  const getSkillTypeFromQuestionCode = (questionCode) => {
+    if (!questionCode) return null;
+    if (questionCode.startsWith('WRITING_')) return 'WRITING';
+    if (questionCode.startsWith('SPEAKING_')) return 'SPEAKING';
+    if (questionCode.startsWith('LISTENING_')) return 'LISTENING';
+    if (questionCode.startsWith('READING_')) return 'READING';
+    return null;
+  };
+
+  const getSkillTypeChip = (skillType, questionCode) => {
+    // If selectedSkill is not available, derive from question code
+    const derivedSkill = !skillType && questionCode 
+      ? getSkillTypeFromQuestionCode(questionCode) 
+      : skillType;
+
     const skillConfig = {
-      'WRITING': { label: 'Writing', color: 'primary', icon: '✍️' },
-      'SPEAKING': { label: 'Speaking', color: 'secondary', icon: '🗣️' },
-      'LISTENING': { label: 'Listening', color: 'info', icon: '👂' },
-      'READING': { label: 'Reading', color: 'warning', icon: '📖' }
+      'WRITING': { label: 'Writing', color: 'primary', icon: '' },
+      'SPEAKING': { label: 'Speaking', color: 'secondary', icon: '' },
+      'LISTENING': { label: 'Listening', color: 'info', icon: '' },
+      'READING': { label: 'Reading', color: 'warning', icon: '' }
     };
     
-    const config = skillConfig[skillType] || { label: skillType, color: 'default', icon: '' };
+    const config = skillConfig[derivedSkill] || { label: derivedSkill || 'N/A', color: 'default', icon: '' };
     
     return (
       <Chip 
-        label={`${config.icon} ${config.label}`}
+        label={config.label}
         color={config.color}
         size="small"
         variant="outlined"
@@ -140,10 +158,16 @@ export default function SubmissionList({
 
   const getScoreDisplay = (submission) => {
     const { final_score, score, max_score, grading_status } = submission;
-    const displayScore = Number(final_score || score || 0);
+    
+    // Prioritize final_score if exists, otherwise use AI score
+    const hasManualScore = final_score !== null && final_score !== undefined && final_score !== '';
+    const displayScore = hasManualScore ? Number(final_score) : Number(score || 0);
     const maxScore = Number(max_score || 10);
     
-    if (grading_status === 'ungraded') {
+    // Check if ungraded (no final_score and no AI score)
+    const isUngraded = !hasManualScore && (score === null || score === undefined || score === '');
+    
+    if (isUngraded) {
       return (
         <Box textAlign="center">
           <Typography variant="body2" color="text.secondary">
@@ -176,40 +200,6 @@ export default function SubmissionList({
 
   return (
     <Paper>
-      {/* Header with actions */}
-      <Box p={2} display="flex" justifyContent="space-between" alignItems="center">
-        <Box>
-          <Typography variant="h6">
-            Danh sách bài làm ({submissions.length})
-          </Typography>
-          <Box display="flex" gap={1} mt={1}>
-            {ungradedCount > 0 && (
-              <Chip 
-                label={`${ungradedCount} cần chấm ngay`} 
-                color="error" 
-                size="small"
-                icon={<Warning />}
-              />
-            )}
-            {aiGradedCount > 0 && (
-              <Chip 
-                label={`${aiGradedCount} cần kiểm tra AI`} 
-                color="warning" 
-                size="small"
-                icon={<Psychology />}
-              />
-            )}
-          </Box>
-        </Box>
-        <Button
-          variant="outlined"
-          startIcon={<Refresh />}
-          onClick={onRefresh}
-          disabled={loading}
-        >
-          Làm mới
-        </Button>
-      </Box>
 
       {/* Table */}
       <TableContainer>
@@ -219,10 +209,9 @@ export default function SubmissionList({
               <TableCell>Học sinh</TableCell>
               <TableCell>Bài thi</TableCell>
               <TableCell>Kỹ năng</TableCell>
-              <TableCell>Câu hỏi</TableCell>
+              <TableCell>Loại câu hỏi</TableCell>
               <TableCell>Điểm số</TableCell>
               <TableCell>Trạng thái</TableCell>
-              <TableCell>Ưu tiên</TableCell>
               <TableCell>Thời gian</TableCell>
               <TableCell align="center">Thao tác</TableCell>
             </TableRow>
@@ -252,47 +241,30 @@ export default function SubmissionList({
                 <TableCell>
                   <Box>
                     <Typography variant="body2" fontWeight="medium">
-                      {submission.attempt?.student?.full_name}
+                      {submission.attempt?.student?.full_name || 'N/A'}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {submission.attempt?.student?.email}
+                      {submission.attempt?.student?.email || 'N/A'}
                     </Typography>
                   </Box>
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2">
-                    {submission.attempt?.exam?.title}
+                    {submission.attempt?.exam?.title || 'N/A'}
                   </Typography>
                 </TableCell>
                 <TableCell>
-                  {getSkillTypeChip(submission.attempt?.selectedSkill?.skill_type_name)}
+                  {getSkillTypeChip(
+                    submission.attempt?.selectedSkill?.skill_type_name || submission.attempt?.selectedSkill?.code,
+                    submission.question?.questionType?.code
+                  )}
                 </TableCell>
                 <TableCell>
                   <Box>
                     <Typography variant="body2" fontWeight="medium">
                       {submission.question?.questionType?.question_type_name || 'N/A'}
                     </Typography>
-                    <Box display="flex" alignItems="center" gap={1} mt={0.5}>
-                      <Chip 
-                        label={submission.question?.difficulty || 'N/A'}
-                        size="small"
-                        color={
-                          submission.question?.difficulty === 'easy' ? 'success' :
-                          submission.question?.difficulty === 'medium' ? 'warning' : 'error'
-                        }
-                        variant="outlined"
-                      />
-                      {submission.answer_type === 'audio' && (
-                        <Typography variant="caption" color="text.secondary">
-                          🎤 Âm thanh
-                        </Typography>
-                      )}
-                      {submission.answer_type === 'text' && (
-                        <Typography variant="caption" color="text.secondary">
-                          ✍️ Văn bản
-                        </Typography>
-                      )}
-                    </Box>
+                    
                   </Box>
                 </TableCell>
                 <TableCell>
@@ -301,12 +273,12 @@ export default function SubmissionList({
                 <TableCell>
                   {getStatusChip(submission)}
                 </TableCell>
-                <TableCell>
-                  {getPriorityIcon(submission)}
-                </TableCell>
+      
                 <TableCell>
                   <Typography variant="caption" color="text.secondary">
-                    {new Date(submission.answered_at).toLocaleDateString('vi-VN')}
+                    {submission.answered_at 
+                      ? new Date(submission.answered_at).toLocaleDateString('vi-VN')
+                      : 'Chưa trả lời'}
                   </Typography>
                 </TableCell>
                 <TableCell align="center">
