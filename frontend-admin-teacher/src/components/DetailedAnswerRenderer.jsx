@@ -14,11 +14,7 @@ import {
 } from '@mui/material';
 import { 
   CheckCircle,
-  Cancel,
-  VolumeUp,
-  TextFields,
-  FormatAlignJustify,
-  RadioButtonChecked
+  Cancel
 } from '@mui/icons-material';
 
 // Helper function to get full URL for backend resources
@@ -65,20 +61,7 @@ export default function DetailedAnswerRenderer({ question, answer }) {
   return (
     <Card variant="outlined" sx={{ mt: 2 }}>
       <CardContent>
-        <Typography variant="h6" gutterBottom display="flex" alignItems="center">
-          <FormatAlignJustify sx={{ mr: 1 }} />
-          Câu trả lời của học sinh
-        </Typography>
 
-        {/* Answer Type Badge */}
-        <Box mb={2}>
-          <Chip 
-            label={getAnswerTypeLabel(answerType)}
-            color={getAnswerTypeColor(answerType)}
-            size="small"
-            variant="outlined"
-          />
-        </Box>
 
         {/* Render different answer types */}
         {answerType === 'text' && answer.text_answer && (
@@ -157,10 +140,9 @@ function TextAnswerRenderer({ answer, question }) {
   
   return (
     <Box>
-      <Box display="flex" alignItems="center" gap={1} mb={1}>
-        <TextFields color="primary" />
+      <Box mb={1}>
         <Typography variant="subtitle2">Câu trả lời văn bản:</Typography>
-        <Chip label={`${wordCount} từ`} size="small" color="info" />
+        <Chip label={`${wordCount} từ`} size="small" color="info" sx={{ ml: 1 }} />
       </Box>
       
       <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1, border: '1px solid #ddd' }}>
@@ -178,8 +160,7 @@ function AudioAnswerRenderer({ answer, question }) {
   
   return (
     <Box>
-      <Box display="flex" alignItems="center" gap={1} mb={2}>
-        <VolumeUp color="secondary" />
+      <Box mb={2}>
         <Typography variant="subtitle2">Bài thu âm:</Typography>
       </Box>
       
@@ -215,8 +196,7 @@ function OptionAnswerRenderer({ answer, question }) {
   
   return (
     <Box>
-      <Box display="flex" alignItems="center" gap={1} mb={2}>
-        <RadioButtonChecked color="info" />
+      <Box mb={2}>
         <Typography variant="subtitle2">Lựa chọn đã chọn:</Typography>
       </Box>
       

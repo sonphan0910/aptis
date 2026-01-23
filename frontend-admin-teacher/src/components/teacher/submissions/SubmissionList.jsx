@@ -49,9 +49,13 @@ export default function SubmissionList({
   const { ungradedCount, aiGradedCount } = getSubmissionStats();
 
   const getStatusChip = (submission) => {
-    const { grading_status, needs_review, has_ai_feedback } = submission;
+    const { grading_status, needs_review, final_score } = submission;
     
-    switch (grading_status) {
+    // If final_score exists, it means manually graded
+    const hasManualScore = final_score !== null && final_score !== undefined && final_score !== '';
+    const actualStatus = hasManualScore ? 'manually_graded' : grading_status;
+    
+    switch (actualStatus) {
       case 'ungraded':
         return (
           <Chip 
@@ -74,7 +78,7 @@ export default function SubmissionList({
       case 'manually_graded':
         return (
           <Chip 
-            label="Đã chấm" 
+            label="Đã chấm thủ công" 
             color="success" 
             size="small"
             icon={<Person />}
@@ -154,10 +158,16 @@ export default function SubmissionList({
 
   const getScoreDisplay = (submission) => {
     const { final_score, score, max_score, grading_status } = submission;
-    const displayScore = Number(final_score || score || 0);
+    
+    // Prioritize final_score if exists, otherwise use AI score
+    const hasManualScore = final_score !== null && final_score !== undefined && final_score !== '';
+    const displayScore = hasManualScore ? Number(final_score) : Number(score || 0);
     const maxScore = Number(max_score || 10);
     
-    if (grading_status === 'ungraded') {
+    // Check if ungraded (no final_score and no AI score)
+    const isUngraded = !hasManualScore && (score === null || score === undefined || score === '');
+    
+    if (isUngraded) {
       return (
         <Box textAlign="center">
           <Typography variant="body2" color="text.secondary">
@@ -190,40 +200,6 @@ export default function SubmissionList({
 
   return (
     <Paper>
-      {/* Header with actions */}
-      <Box p={2} display="flex" justifyContent="space-between" alignItems="center">
-        <Box>
-          <Typography variant="h6">
-            Danh sách bài làm ({submissions.length})
-          </Typography>
-          <Box display="flex" gap={1} mt={1}>
-            {ungradedCount > 0 && (
-              <Chip 
-                label={`${ungradedCount} cần chấm ngay`} 
-                color="error" 
-                size="small"
-                icon={<Warning />}
-              />
-            )}
-            {aiGradedCount > 0 && (
-              <Chip 
-                label={`${aiGradedCount} cần kiểm tra AI`} 
-                color="warning" 
-                size="small"
-                icon={<Psychology />}
-              />
-            )}
-          </Box>
-        </Box>
-        <Button
-          variant="outlined"
-          startIcon={<Refresh />}
-          onClick={onRefresh}
-          disabled={loading}
-        >
-          Làm mới
-        </Button>
-      </Box>
 
       {/* Table */}
       <TableContainer>
@@ -236,7 +212,6 @@ export default function SubmissionList({
               <TableCell>Loại câu hỏi</TableCell>
               <TableCell>Điểm số</TableCell>
               <TableCell>Trạng thái</TableCell>
-              <TableCell>Ưu tiên</TableCell>
               <TableCell>Thời gian</TableCell>
               <TableCell align="center">Thao tác</TableCell>
             </TableRow>
@@ -298,12 +273,12 @@ export default function SubmissionList({
                 <TableCell>
                   {getStatusChip(submission)}
                 </TableCell>
-                <TableCell>
-                  {getPriorityIcon(submission)}
-                </TableCell>
+      
                 <TableCell>
                   <Typography variant="caption" color="text.secondary">
-                    {new Date(submission.answered_at).toLocaleDateString('vi-VN')}
+                    {submission.answered_at 
+                      ? new Date(submission.answered_at).toLocaleDateString('vi-VN')
+                      : 'Chưa trả lời'}
                   </Typography>
                 </TableCell>
                 <TableCell align="center">

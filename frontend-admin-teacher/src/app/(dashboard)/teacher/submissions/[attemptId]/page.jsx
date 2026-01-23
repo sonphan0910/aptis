@@ -22,13 +22,7 @@ import {
 } from '@mui/material';
 import { 
   ArrowBack, 
-  Save, 
-  Grade, 
-  VolumeUp,
-  Description,
-  Person,
-  Assignment,
-  Star
+  Save
 } from '@mui/icons-material';
 import { submissionApi } from '@/services/submissionService';
 import QuestionDisplay from '@/components/QuestionDisplay';
@@ -197,13 +191,30 @@ export default function SubmissionDetailPage() {
     answer = answers[0];
   }
   
+  // Derive skill from question type code (more reliable than submissionDetail.skill)
+  const getSkillFromQuestionCode = (code) => {
+    if (!code) return null;
+    if (code.startsWith('WRITING_')) return 'Writing';
+    if (code.startsWith('SPEAKING_')) return 'Speaking';
+    if (code.startsWith('LISTENING_')) return 'Listening';
+    if (code.startsWith('READING_')) return 'Reading';
+    return null;
+  };
+  
+  const derivedSkill = answer?.question?.questionType?.code 
+    ? getSkillFromQuestionCode(answer.question.questionType.code)
+    : skill;
+  
   const question = answer?.question || {};
   const maxScore = answer?.max_score || 100;
   const scorePercentage = maxScore ? (score / maxScore) * 100 : 0;
   
-  // Determine grading status based on answer data
-  const gradingStatus = answer?.grading_status || 
-    (answer?.final_score !== null && answer?.final_score !== undefined ? 'manually_graded' : 'ungraded');
+  // Determine grading status: check final_score first, then grading_status
+  const hasManualScore = answer?.final_score !== null && answer?.final_score !== undefined && answer?.final_score !== '';
+  const gradingStatus = hasManualScore ? 'manually_graded' : (answer?.grading_status || 'ungraded');
+  
+  // Check if we should show comparison (only in grade mode or if scores differ)
+  const shouldShowComparison = mode === 'grade' || (answer?.score !== answer?.final_score);
 
   return (
     <Box>
@@ -223,7 +234,7 @@ export default function SubmissionDetailPage() {
               {student?.full_name} - {exam?.title}
             </Typography>
             <Box display="flex" gap={1} mt={1}>
-              <Chip label={skill || 'Không xác định'} color="primary" size="small" />
+              <Chip label={derivedSkill || 'Không xác định'} color="primary" size="small" />
               {getStatusChip(gradingStatus)}
               {mode === 'view' && (
                 <Button
@@ -231,7 +242,6 @@ export default function SubmissionDetailPage() {
                   variant="outlined"
                   color="primary"
                   onClick={() => router.push(`/teacher/submissions/${attemptId}?mode=grade`)}
-                  startIcon={<Grade />}
                 >
                   Chuyển sang chấm
                 </Button>
@@ -241,41 +251,14 @@ export default function SubmissionDetailPage() {
         </Box>
       </Box>
 
-
-      
-      {mode === 'grade' && (
-        <Alert severity="warning" sx={{ mb: 3 }}>
-          <strong>Chế độ chấm:</strong> Bạn có thể chấm điểm và đưa ra phản hồi. 
-          Nhớ nhấn "Lưu đánh giá" sau khi hoàn thành.
-        </Alert>
-      )}
-
       <Grid container spacing={3}>
         {/* Left Column - Student Answer Display */}
         <Grid item xs={12} md={7}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom display="flex" alignItems="center">
-              <Avatar 
-                src={student?.avatar} 
-                sx={{ width: 32, height: 32, mr: 2 }}
-              >
-                {student?.full_name?.charAt(0)}
-              </Avatar>
-              {student?.full_name}
-              <Chip 
-                label={`${skill?.toUpperCase()} - ${question?.questionType?.question_type_name || 'Unknown'}`} 
-                size="small" 
-                color="primary" 
-                sx={{ ml: 2 }}
-              />
-            </Typography>
-            
+    
             {/* Question Content */}
             {question && (
               <Box mb={3}>
-                <Typography variant="subtitle1" fontWeight="bold" color="primary" mb={2}>
-                  Câu hỏi chi tiết:
-                </Typography>
+
                 <QuestionDisplay question={question} answer={answer} />
               </Box>
             )}
@@ -283,13 +266,10 @@ export default function SubmissionDetailPage() {
             {/* Answer Content */}
             {answer && (
               <Box>
-                <Typography variant="subtitle1" fontWeight="bold" color="secondary" mb={2}>
-                  Câu trả lời học sinh:
-                </Typography>
                 <DetailedAnswerRenderer question={question} answer={answer} />
               </Box>
             )}
-          </Paper>
+      
         </Grid>
 
         {/* Right Column - Grading Form */}
@@ -299,8 +279,8 @@ export default function SubmissionDetailPage() {
               Chấm điểm và đánh giá
             </Typography>
             
-            {/* AI Score vs Manual Score Comparison */}
-            {answer && (
+            {/* AI Score vs Manual Score Comparison - Only show in grade mode or if scores differ */}
+            {shouldShowComparison && answer && (
               <Box mb={3}>
                 <Typography variant="subtitle2" mb={2} color="text.secondary">
                   So sánh điểm AI và điểm thủ công:
@@ -431,7 +411,7 @@ export default function SubmissionDetailPage() {
                   color="primary"
                   onClick={handleSubmitReview}
                   disabled={saving}
-                  startIcon={saving ? <CircularProgress size={16} /> : <Grade />}
+                  startIcon={saving ? <CircularProgress size={16} /> : <Save />}
                   fullWidth
                 >
                   {saving ? 'Đang lưu...' : 'Lưu đánh giá'}

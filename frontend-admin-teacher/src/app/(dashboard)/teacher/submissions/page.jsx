@@ -151,8 +151,7 @@ export default function SubmissionsPage() {
   };
 
   return (
-    <Container maxWidth="xl">
-      <Box py={3}>
+      <Box sx={{ p: 0 }}>
         {/* Header */}
         <Box mb={4}>
           <Typography variant="h4" gutterBottom fontWeight="bold">
@@ -208,6 +207,5 @@ export default function SubmissionsPage() {
           </Alert>
         </Snackbar>
       </Box>
-    </Container>
   );
 }
