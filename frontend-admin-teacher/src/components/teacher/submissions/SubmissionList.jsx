@@ -63,6 +63,7 @@ export default function SubmissionList({
             color="error" 
             size="small" 
             variant={submission.needs_review ? 'filled' : 'outlined'}
+            sx={{ '& .MuiChip-label': { color: '#fff' } }}
           />
         );
       case 'ai_graded':
@@ -73,6 +74,7 @@ export default function SubmissionList({
             size="small"
             icon={<Psychology />}
             variant="filled"
+            sx={{ '& .MuiChip-label': { color: '#fff' } }}
           />
         );
       case 'manually_graded':
@@ -81,8 +83,8 @@ export default function SubmissionList({
             label="Đã chấm thủ công" 
             color="success" 
             size="small"
-            icon={<Person />}
             variant="filled"
+            sx={{ '& .MuiChip-label': { color: '#fff' } }}
           />
         );
       case 'needs_review':
@@ -93,10 +95,11 @@ export default function SubmissionList({
             size="small"
             icon={<Warning />}
             variant="filled"
+            sx={{ '& .MuiChip-label': { color: '#fff' } }}
           />
         );
       default:
-        return <Chip label="Không rõ" color="default" size="small" />;
+        return <Chip label="Không rõ" color="default" size="small" sx={{ '& .MuiChip-label': { color: '#fff' } }} />;
     }
   };
 
@@ -158,25 +161,56 @@ export default function SubmissionList({
 
   const getScoreDisplay = (submission) => {
     const { final_score, score, max_score, grading_status } = submission;
-    
-    // Prioritize final_score if exists, otherwise use AI score
-    const hasManualScore = final_score !== null && final_score !== undefined && final_score !== '';
-    const displayScore = hasManualScore ? Number(final_score) : Number(score || 0);
+    const displayScore = Number(score || 0);
     const maxScore = Number(max_score || 10);
     
-    // Check if ungraded (no final_score and no AI score)
-    const isUngraded = !hasManualScore && (score === null || score === undefined || score === '');
-    
-    if (isUngraded) {
+    if (displayScore === 0 && (score === null || score === undefined || score === '')) {
       return (
         <Box textAlign="center">
           <Typography variant="body2" color="text.secondary">
-            Chưa có điểm
+            -
           </Typography>
         </Box>
       );
     }
     
+    const percentage = (displayScore / maxScore) * 100;
+    const scoreColor = percentage >= 80 ? 'success' : percentage >= 60 ? 'warning' : 'error';
+    
+    return (
+      <Box textAlign="center">
+        <Typography variant="body2" fontWeight="bold" color={`${scoreColor}.main`}>
+          {displayScore.toFixed(1)}/{maxScore}
+        </Typography>
+        <LinearProgress 
+          variant="determinate" 
+          value={percentage}
+          color={scoreColor}
+          sx={{ width: 60, height: 4, mt: 0.5, mx: 'auto' }}
+        />
+        <Typography variant="caption" color="text.secondary">
+          {percentage.toFixed(0)}%
+        </Typography>
+      </Box>
+    );
+  };
+
+  const getTeacherScoreDisplay = (submission) => {
+    const { final_score, max_score } = submission;
+    
+    // If no final_score, display "-"
+    if (final_score === null || final_score === undefined || final_score === '') {
+      return (
+        <Box textAlign="center">
+          <Typography variant="body2" color="text.secondary">
+            -
+          </Typography>
+        </Box>
+      );
+    }
+    
+    const displayScore = Number(final_score);
+    const maxScore = Number(max_score || 10);
     const percentage = (displayScore / maxScore) * 100;
     const scoreColor = percentage >= 80 ? 'success' : percentage >= 60 ? 'warning' : 'error';
     
@@ -210,7 +244,8 @@ export default function SubmissionList({
               <TableCell>Bài thi</TableCell>
               <TableCell>Kỹ năng</TableCell>
               <TableCell>Loại câu hỏi</TableCell>
-              <TableCell>Điểm số</TableCell>
+              <TableCell align="center">Điểm AI</TableCell>
+              <TableCell align="center">Điểm Giáo viên</TableCell>
               <TableCell>Trạng thái</TableCell>
               <TableCell>Thời gian</TableCell>
               <TableCell align="center">Thao tác</TableCell>
@@ -264,11 +299,13 @@ export default function SubmissionList({
                     <Typography variant="body2" fontWeight="medium">
                       {submission.question?.questionType?.question_type_name || 'N/A'}
                     </Typography>
-                    
                   </Box>
                 </TableCell>
                 <TableCell>
                   {getScoreDisplay(submission)}
+                </TableCell>
+                <TableCell>
+                  {getTeacherScoreDisplay(submission)}
                 </TableCell>
                 <TableCell>
                   {getStatusChip(submission)}
