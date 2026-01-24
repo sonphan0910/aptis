@@ -111,4 +111,10 @@ export const examApi = {
     const response = await apiClient.get(API_ENDPOINTS.TEACHER.QUESTIONS.LIST, { params });
     return response.data;
   },
+
+  // Get a single question by ID
+  getQuestionById: async (questionId) => {
+    const response = await apiClient.get(API_ENDPOINTS.TEACHER.QUESTIONS.BY_ID(questionId));
+    return response.data;
+  },
 };

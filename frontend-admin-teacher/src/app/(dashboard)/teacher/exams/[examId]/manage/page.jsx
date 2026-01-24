@@ -55,6 +55,7 @@ import { examApi } from '@/services/examService';
 import { LazyQuestionDisplay } from '@/components/teacher/questions/LazyQuestionDisplay';
 import AddQuestionDialog from '@/components/teacher/exams/AddQuestionDialog';
 import QuestionRenderer from '@/components/teacher/exams/QuestionRenderer';
+import SectionQuestionItem from '@/components/teacher/exams/SectionQuestionItem';
 
 export default function ExamManagePage() {
   const router = useRouter();
@@ -75,6 +76,8 @@ export default function ExamManagePage() {
   const [expandedSectionId, setExpandedSectionId] = useState(null);
   const [selectedSection, setSelectedSection] = useState(null);
   const [removingQuestionId, setRemovingQuestionId] = useState(null);
+  const [questionDetails, setQuestionDetails] = useState({}); // Store full question data by question_id
+  const [loadingQuestionDetails, setLoadingQuestionDetails] = useState(false);
   const [sectionForm, setSectionForm] = useState({
     skill_type_id: '',
     section_order: 1,
@@ -276,6 +279,63 @@ export default function ExamManagePage() {
     }
   };
 
+  // Fetch detailed question data for display
+  const fetchQuestionDetails = async (questionIds) => {
+    if (!questionIds || questionIds.length === 0) return;
+    
+    setLoadingQuestionDetails(true);
+    try {
+      // Only fetch questions we don't already have
+      const missingIds = questionIds.filter(id => !questionDetails[id]);
+      
+      if (missingIds.length > 0) {
+        // Fetch questions one by one (could be optimized to batch later)
+        const promises = missingIds.map(async (questionId) => {
+          try {
+            const response = await examApi.getQuestionById(questionId);
+            if (response.success && response.data) {
+              return { id: questionId, data: response.data };
+            }
+            return null;
+          } catch (error) {
+            console.error(`Failed to fetch question ${questionId}:`, error);
+            return null;
+          }
+        });
+
+        const results = await Promise.all(promises);
+        const newQuestionDetails = { ...questionDetails };
+        
+        results.forEach(result => {
+          if (result) {
+            newQuestionDetails[result.id] = result.data;
+          }
+        });
+        
+        setQuestionDetails(newQuestionDetails);
+      }
+    } catch (error) {
+      console.error('Error fetching question details:', error);
+    } finally {
+      setLoadingQuestionDetails(false);
+    }
+  };
+
+  // Handle section expansion - fetch question details when expanding
+  const handleSectionExpand = async (sectionId) => {
+    const newExpandedId = expandedSectionId === sectionId ? null : sectionId;
+    setExpandedSectionId(newExpandedId);
+    
+    if (newExpandedId) {
+      // Find the section and get question IDs
+      const section = currentExam?.sections?.find(s => s.id === sectionId);
+      if (section && section.questions && section.questions.length > 0) {
+        const questionIds = section.questions.map(q => q.question_id);
+        await fetchQuestionDetails(questionIds);
+      }
+    }
+  };
+
   const handleOpenSectionDialog = () => {
     // Calculate next section order
     const nextOrder = (currentExam?.sections?.length || 0) + 1;
@@ -423,9 +483,7 @@ export default function ExamManagePage() {
                       <Box display="flex" gap={1} alignItems="center">
                         <IconButton
                           size="small"
-                          onClick={() => setExpandedSectionId(
-                            expandedSectionId === section.id ? null : section.id
-                          )}
+                          onClick={() => handleSectionExpand(section.id)}
                         >
                           {expandedSectionId === section.id ? (
                             <ExpandLessIcon />
@@ -454,50 +512,26 @@ export default function ExamManagePage() {
 
                   {/* Questions List - Expanded */}
                   {expandedSectionId === section.id && section.questions && section.questions.length > 0 && (
-                    <Box sx={{ pl: 4, pr: 2, py: 1, bgcolor: 'background.default' }}>
-                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-                        Danh sách câu hỏi:
+                    <Box sx={{ pl: 2, pr: 2, py: 1, bgcolor: 'background.default' }}>
+                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2 }}>
+                        Danh sách câu hỏi ({section.questions.length}):
                       </Typography>
                       <List disablePadding>
                         {section.questions.map((question, qIndex) => (
-                          <ListItem 
+                          <SectionQuestionItem
                             key={question.id || qIndex}
-                            dense
-                            sx={{ 
-                              bgcolor: 'background.paper',
-                              mb: 0.5,
-                              borderRadius: 1,
-                              border: '1px solid',
-                              borderColor: 'divider'
-                            }}
-                          >
-                            <ListItemIcon sx={{ minWidth: 40 }}>
-                              <QuestionIcon fontSize="small" color="action" />
-                            </ListItemIcon>
-                            <ListItemText
-                              primary={
-                                <Box>
-                                  <Typography variant="body2" fontWeight={500}>
-                                    Câu {question.question_order} - ID: {question.question_id}
-                                  </Typography>
-                                  <Typography variant="caption" color="text.secondary">
-                                    Điểm tối đa: {question.max_score}
-                                  </Typography>
-                                </Box>
-                              }
-                              secondary={null}
-                            />
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => handleRemoveQuestionFromSection(section.id, question.id)}
-                              disabled={removingQuestionId === question.id}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </ListItem>
+                            question={question}
+                            questionData={questionDetails[question.question_id]}
+                            onRemove={(questionId) => handleRemoveQuestionFromSection(section.id, questionId)}
+                            removing={removingQuestionId === question.id}
+                          />
                         ))}
                       </List>
+                      {loadingQuestionDetails && (
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                          Đang tải chi tiết câu hỏi...
+                        </Typography>
+                      )}
                     </Box>
                   )}
 

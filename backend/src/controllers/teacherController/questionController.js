@@ -749,17 +749,70 @@ exports.deleteQuestion = async (req, res, next) => {
       throw new BadRequestError('Cannot delete question that is used in exams');
     }
 
-    if (question.media_url) {
-      await StorageService.deleteFile(question.media_url);
+    // Check if this question is a child question (has a parent)
+    if (question.parent_question_id) {
+      // This is a child question, just delete it directly
+      if (question.media_url) {
+        await StorageService.deleteFile(question.media_url);
+      }
+
+      // Xóa tất cả QuestionItem và QuestionOption liên quan (cascade)
+      await Promise.all([
+        require('../../models').QuestionItem.destroy({ where: { question_id: questionId } }),
+        require('../../models').QuestionOption.destroy({ where: { question_id: questionId } })
+      ]);
+
+      await question.destroy();
+    } else {
+      // This is a parent question, cascade delete all child questions
+      const childQuestions = await Question.findAll({
+        where: { parent_question_id: questionId }
+      });
+
+      console.log(`[deleteQuestion] Deleting parent question ${questionId} with ${childQuestions.length} child questions`);
+
+      // Delete all child questions
+      for (const childQuestion of childQuestions) {
+        // Check if child is used in exams
+        const childUsage = await ExamSectionQuestion.count({
+          where: { question_id: childQuestion.id },
+        });
+
+        if (childUsage > 0) {
+          throw new BadRequestError(`Cannot delete question because child question (ID: ${childQuestion.id}) is used in exams`);
+        }
+
+        // Delete child question media
+        if (childQuestion.media_url) {
+          await StorageService.deleteFile(childQuestion.media_url);
+        }
+
+        // Delete child question items and options
+        await Promise.all([
+          require('../../models').QuestionItem.destroy({ where: { question_id: childQuestion.id } }),
+          require('../../models').QuestionOption.destroy({ where: { question_id: childQuestion.id } })
+        ]);
+
+        // Delete child question
+        await childQuestion.destroy();
+        console.log(`[deleteQuestion] Deleted child question ${childQuestion.id}`);
+      }
+
+      // Delete parent question media
+      if (question.media_url) {
+        await StorageService.deleteFile(question.media_url);
+      }
+
+      // Delete parent question items and options
+      await Promise.all([
+        require('../../models').QuestionItem.destroy({ where: { question_id: questionId } }),
+        require('../../models').QuestionOption.destroy({ where: { question_id: questionId } })
+      ]);
+
+      // Delete parent question
+      await question.destroy();
+      console.log(`[deleteQuestion] Deleted parent question ${questionId}`);
     }
-
-    // Xóa tất cả QuestionItem và QuestionOption liên quan (cascade)
-    await Promise.all([
-      require('../../models').QuestionItem.destroy({ where: { question_id: questionId } }),
-      require('../../models').QuestionOption.destroy({ where: { question_id: questionId } })
-    ]);
-
-    await question.destroy();
 
     res.json({
       success: true,

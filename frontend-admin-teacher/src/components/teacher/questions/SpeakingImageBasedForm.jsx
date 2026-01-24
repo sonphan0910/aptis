@@ -33,7 +33,6 @@ export default function SpeakingImageBasedForm({ questionType, initialData, onSu
   const [mainQuestion, setMainQuestion] = useState({
     content: initialData?.content || '',
     difficulty: initialData?.difficulty || 'medium',
-    duration_seconds: initialData?.duration_seconds || 150,
     additional_media: initialData?.additional_media || [],
     imageFiles: [],
     imagePreviews: []
@@ -42,12 +41,10 @@ export default function SpeakingImageBasedForm({ questionType, initialData, onSu
   // Child questions data
   const [childQuestions, setChildQuestions] = useState([
     {
-      content: '',
-      duration_seconds: 90
+      content: ''
     },
     {
-      content: '',
-      duration_seconds: 90
+      content: ''
     }
   ]);
 
@@ -123,7 +120,6 @@ export default function SpeakingImageBasedForm({ questionType, initialData, onSu
       mainQuestion: {
         content: mainQuestion.content,
         difficulty: mainQuestion.difficulty,
-        duration_seconds: mainQuestion.duration_seconds,
         additional_media: null, // Sẽ được update sau khi upload ảnh
       },
       childQuestions: childQuestions,
@@ -266,29 +262,18 @@ export default function SpeakingImageBasedForm({ questionType, initialData, onSu
           }
         />
 
-        <Box display="flex" gap={2}>
-          <FormControl sx={{ minWidth: 200 }}>
-            <InputLabel>Độ khó</InputLabel>
-            <Select
-              value={mainQuestion.difficulty}
-              label="Độ khó"
-              onChange={(e) => handleMainQuestionChange('difficulty', e.target.value)}
-            >
-              <MenuItem value="easy">Dễ</MenuItem>
-              <MenuItem value="medium">Trung bình</MenuItem>
-              <MenuItem value="hard">Khó</MenuItem>
-            </Select>
-          </FormControl>
-
-          <TextField
-            label="Thời gian (giây)"
-            type="number"
-            value={mainQuestion.duration_seconds}
-            onChange={(e) => handleMainQuestionChange('duration_seconds', parseInt(e.target.value))}
-            inputProps={{ min: 30, max: 300 }}
-            sx={{ width: 200 }}
-          />
-        </Box>
+        <FormControl sx={{ minWidth: 200 }}>
+          <InputLabel>Độ khó</InputLabel>
+          <Select
+            value={mainQuestion.difficulty}
+            label="Độ khó"
+            onChange={(e) => handleMainQuestionChange('difficulty', e.target.value)}
+          >
+            <MenuItem value="easy">Dễ</MenuItem>
+            <MenuItem value="medium">Trung bình</MenuItem>
+            <MenuItem value="hard">Khó</MenuItem>
+          </Select>
+        </FormControl>
       </Paper>
 
       {/* Child Questions */}
@@ -316,15 +301,6 @@ export default function SpeakingImageBasedForm({ questionType, initialData, onSu
                   ? "Ví dụ: What would you like to do there?"
                   : "Ví dụ: Looking back at the park/images:\n\nNow tell me:\n- What activities could families do there?\n- How often would you visit this place?"
               }
-            />
-
-            <TextField
-              label="Thời gian (giây)"
-              type="number"
-              value={child.duration_seconds}
-              onChange={(e) => handleChildQuestionChange(index, 'duration_seconds', parseInt(e.target.value))}
-              inputProps={{ min: 30, max: 120 }}
-              sx={{ width: 200 }}
             />
           </CardContent>
         </Card>

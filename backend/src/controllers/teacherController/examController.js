@@ -707,6 +707,7 @@ exports.getExamById = async (req, res, next) => {
             {
               model: ExamSectionQuestion,
               as: 'questions',
+              order: [['question_order', 'ASC']],
               include: [
                 {
                   model: Question,
