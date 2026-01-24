@@ -210,10 +210,7 @@ export default function DashboardLayout({ children }) {
           <Person sx={{ mr: 2 }} />
           Hồ sơ cá nhân
         </MenuItem>
-        <MenuItem onClick={handleSettings}>
-          <Settings sx={{ mr: 2 }} />
-          Cài đặt
-        </MenuItem>
+
         <MenuItem onClick={handleLogout}>
           <Logout sx={{ mr: 2 }} />
           Đăng xuất

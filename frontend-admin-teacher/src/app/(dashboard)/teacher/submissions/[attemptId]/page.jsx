@@ -169,7 +169,7 @@ export default function SubmissionDetailPage() {
     };
     
     const config = statusConfig[status] || { label: 'Không xác định', color: 'default' };
-    return <Chip label={config.label} color={config.color} size="small" />;
+    return <Chip label={config.label} color={config.color} size="small" sx={{ '& .MuiChip-label': { color: '#fff'} }} />;
   };
 
   if (loading || !submissionDetail) {
@@ -213,8 +213,10 @@ export default function SubmissionDetailPage() {
   const hasManualScore = answer?.final_score !== null && answer?.final_score !== undefined && answer?.final_score !== '';
   const gradingStatus = hasManualScore ? 'manually_graded' : (answer?.grading_status || 'ungraded');
   
-  // Check if we should show comparison (only in grade mode or if scores differ)
-  const shouldShowComparison = mode === 'grade' || (answer?.score !== answer?.final_score);
+  // Check if we should show comparison:
+  // - In grade mode: always show for editing
+  // - In view mode: only show if no manual score yet (ungraded or ai_graded)
+  const shouldShowComparison = mode === 'grade' || (mode === 'view' && !hasManualScore);
 
   return (
     <Box>
@@ -282,9 +284,7 @@ export default function SubmissionDetailPage() {
             {/* AI Score vs Manual Score Comparison - Only show in grade mode or if scores differ */}
             {shouldShowComparison && answer && (
               <Box mb={3}>
-                <Typography variant="subtitle2" mb={2} color="text.secondary">
-                  So sánh điểm AI và điểm thủ công:
-                </Typography>
+
                 
                 {/* AI Score */}
                 <Box display="flex" justifyContent="space-between" alignItems="center" p={2} bgcolor="info.50" borderRadius={1} mb={1}>
@@ -324,9 +324,7 @@ export default function SubmissionDetailPage() {
 
             {/* Final Score Input */}
             <Box mb={3}>
-              <Typography variant="subtitle1" fontWeight="bold" gutterBottom color="primary">
-                Điểm cuối cùng (Final Score):
-              </Typography>
+             
               <TextField
                 type="number"
                 label="Nhập điểm cuối cùng"
@@ -355,27 +353,12 @@ export default function SubmissionDetailPage() {
                 }}
               />
               
-              {/* Score Rating Visual */}
-              <Box mt={1} display="flex" alignItems="center" gap={2}>
-                <Rating
-                  value={score / maxScore * 5}
-                  readOnly
-                  precision={0.1}
-                  size="small"
-                />
-                <Chip 
-                  label={getScoreLabel(score, maxScore)} 
-                  color={getScoreColor(score, maxScore)}
-                  size="small"
-                />
-              </Box>
+
             </Box>
 
             {/* Manual Feedback Input */}
             <Box mb={3}>
-              <Typography variant="subtitle1" fontWeight="bold" gutterBottom color="secondary">
-                Nhận xét thủ công (Manual Feedback):
-              </Typography>
+
               <TextField
                 multiline
                 rows={8}
