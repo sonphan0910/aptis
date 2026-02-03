@@ -1,5 +1,5 @@
 // API configuration
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
 
 console.log(`[API Config] API_BASE_URL = ${API_BASE_URL}`);
 
@@ -159,7 +159,7 @@ export const API_ENDPOINTS = {
   PUBLIC: {
     APTIS_TYPES: '/public/aptis-types',
     SKILL_TYPES: '/public/skill-types',
-    QUESTION_TYPES: '/public/question-types', 
+    QUESTION_TYPES: '/public/question-types',
     PUBLISHED_EXAMS: '/public/exams',
   },
 };
