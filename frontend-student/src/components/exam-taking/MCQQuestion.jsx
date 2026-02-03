@@ -29,7 +29,7 @@ export default function MCQQuestion({ question, onAnswerChange }) {
   const handleChange = (event) => {
     const value = event.target.value;
     setSelectedOption(value);
-    
+
     onAnswerChange({
       answer_type: 'option',
       selected_option_id: parseInt(value)
@@ -53,8 +53,8 @@ export default function MCQQuestion({ question, onAnswerChange }) {
               control={<Radio />}
               label={
                 <Typography variant="body1" sx={{ py: 1 }}>
-                  {isTrueFalse ? 
-                    option.option_text : 
+                  {isTrueFalse ?
+                    option.option_text :
                     `${String.fromCharCode(65 + index)}. ${option.option_text}`
                   }
                 </Typography>

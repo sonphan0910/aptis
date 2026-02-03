@@ -103,7 +103,7 @@ async function createFullExam(aptisType, teacher, skills) {
   await createListeningPartSection(exam.id, skills.listeningSkill, sectionOrder++, 1, 'LISTENING_MCQ', 'Part 1: Multiple Choice', 10, 13, 2.0);
   await createListeningPartSection(exam.id, skills.listeningSkill, sectionOrder++, 2, 'LISTENING_MATCHING', 'Part 2: Speaker Matching', 10, 1, 8.0);
   await createListeningPartSection(exam.id, skills.listeningSkill, sectionOrder++, 3, 'LISTENING_STATEMENT_MATCHING', 'Part 3: Statement Matching', 10, 1, 8.0);
-  await createListeningPartSection(exam.id, skills.listeningSkill, sectionOrder++, 4, 'LISTENING_MCQ', 'Part 4: Extended MCQ', 10, 2, 4.0);
+  await createListeningPartSection(exam.id, skills.listeningSkill, sectionOrder++, 4, 'LISTENING_MCQ_MULTI', 'Part 4: Extended MCQ', 10, 2, 4.0);
 
   // Section 10-13: Viết (4 task, tổng 50 điểm)
   // APTIS Writing: 4 tasks × 12.5 điểm = 50 điểm tổng
@@ -184,7 +184,7 @@ async function createListeningPartSection(examId, skillType, sectionOrder, partN
 
   let questionOrder = 1;
   const questionType = await QuestionType.findOne({ where: { code: questionTypeCode } });
-  
+
   let questions;
   if (partNumber === 4) {
     // Part 4 cần offset để lấy 2 câu MCQ cuối
@@ -225,16 +225,16 @@ async function createSpeakingPartSection(examId, skillType, sectionOrder, partNu
 
   let questionOrder = 1;
   const questionType = await QuestionType.findOne({ where: { code: questionTypeCode } });
-  
+
   let questions;
   // Get all questions of this type first
   const allQuestions = await Question.findAll({
     where: { question_type_id: questionType.id },
   });
-  
+
   // Take only the required number of questions (0-3 for sections 1-3, or just 1 for section 4)
   questions = allQuestions.slice(0, questionLimit);
-  
+
   // If not enough questions, log a warning
   if (questions.length < questionLimit) {
     console.warn(`[Seed] Warning: Expected ${questionLimit} questions for ${questionTypeCode}, but only found ${questions.length}`);

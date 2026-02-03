@@ -14,25 +14,25 @@ class SpeakingScoringPromptBuilder {
    */
   static buildSpeakingPrompt(answerText, question, criteria, maxScore) {
     const questionTypeCode = question.questionType?.code || '';
-    
+
     // Detect which speaking part based on question type code
     // Part 1: Personal Introduction (A0-B1+, 0-5 scale)
     if (questionTypeCode.includes('SPEAKING_INTRO') || questionTypeCode.includes('SPEAKING_PERSONAL') || questionTypeCode.includes('PART1')) {
       return this.buildPart1Prompt(answerText, question, criteria, maxScore);
-    } 
+    }
     // Part 2: Describe & Opinion (Below A2-B2+, 0-5 scale)
     else if (questionTypeCode.includes('SPEAKING_DESCRIPTION') || questionTypeCode.includes('SPEAKING_DESCRIBE') || questionTypeCode.includes('PART2')) {
       return this.buildPart2Prompt(answerText, question, criteria, maxScore);
-    } 
+    }
     // Part 3: Compare & Reasons (Below A2-B2+, 0-5 scale)
     else if (questionTypeCode.includes('SPEAKING_COMPARISON') || questionTypeCode.includes('SPEAKING_COMPARE') || questionTypeCode.includes('PART3')) {
       return this.buildPart3Prompt(answerText, question, criteria, maxScore);
-    } 
+    }
     // Part 4: Abstract Discussion (A1/A2-C2, 0-6 scale)
     else if (questionTypeCode.includes('SPEAKING_DISCUSSION') || questionTypeCode.includes('SPEAKING_DISCUSS') || questionTypeCode.includes('PART4')) {
       return this.buildPart4Prompt(answerText, question, criteria, maxScore);
     }
-    
+
     // Fallback: generic speaking prompt
     return this.buildGenericSpeakingPrompt(answerText, question, criteria, maxScore);
   }
@@ -105,7 +105,7 @@ Return assessment in JSON format:
   static buildPart2Prompt(answerText, question, criteria, maxScore) {
     // Extract visual context if available
     let visualContext = this.extractVisualContext(question);
-    
+
     return `You are an official APTIS Speaking assessor scoring Part 2 - Describe, Express Opinion and Provide Reasons.
 
 OFFICIAL APTIS RUBRIC FOR PART 2:
@@ -179,7 +179,7 @@ Return assessment in JSON format:
    */
   static buildPart3Prompt(answerText, question, criteria, maxScore) {
     let visualContext = this.extractVisualContext(question);
-    
+
     return `You are an official APTIS Speaking assessor scoring Part 3 - Compare and Provide Reasons.
 
 OFFICIAL APTIS RUBRIC FOR PART 3:
@@ -254,7 +254,7 @@ Return assessment in JSON format:
    */
   static buildPart4Prompt(answerText, question, criteria, maxScore) {
     let visualContext = this.extractVisualContext(question);
-    
+
     return `You are an official APTIS Speaking assessor scoring Part 4 - Discuss Personal Experience and Opinion on Abstract Topic.
 
 OFFICIAL APTIS RUBRIC FOR PART 4:
@@ -340,7 +340,7 @@ Return assessment in JSON format:
   static buildGenericSpeakingPrompt(answerText, question, criteria, maxScore) {
     const criteriaList = criteria.map(c => `- ${c.criteria_name}: ${c.description || c.rubric_prompt}`).join('\n');
     let visualContext = this.extractVisualContext(question);
-    
+
     return `You are an APTIS Speaking assessor. Score this speaking response comprehensively.
 
 SCORING CRITERIA:
@@ -383,13 +383,13 @@ Return assessment in JSON format:
    */
   static extractVisualContext(question) {
     let visualContext = '';
-    
+
     if (question.additional_media) {
       try {
-        const media = typeof question.additional_media === 'string' 
-          ? JSON.parse(question.additional_media) 
+        const media = typeof question.additional_media === 'string'
+          ? JSON.parse(question.additional_media)
           : question.additional_media;
-        
+
         const images = media.filter(m => m.type === 'image');
         if (images.length > 0) {
           visualContext = `\n\nVISUAL CONTEXT (Images provided to student):`;
@@ -397,7 +397,7 @@ Return assessment in JSON format:
             const source = img.source === 'parent_question' ? ' [From main question]' : '';
             visualContext += `\n${idx + 1}. ${img.description}${source}`;
           });
-          
+
           if (images.length === 1) {
             visualContext += `\n\nASSESSMENT NOTE: Student should describe/discuss this image as part of their response.`;
           } else if (images.length === 2) {
@@ -408,7 +408,7 @@ Return assessment in JSON format:
         console.error('[SpeakingScoringPromptBuilder] Error parsing additional_media:', e);
       }
     }
-    
+
     return visualContext;
   }
 }

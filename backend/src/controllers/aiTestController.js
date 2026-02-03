@@ -8,7 +8,7 @@ exports.getAiStatus = async (req, res, next) => {
       timestamp: new Date().toISOString(),
       services: {
         database: 'checking',
-        gemini_api: 'checking',
+        openai_api: 'checking',
         ai_criteria: 'checking',
       },
       details: {},
@@ -25,16 +25,16 @@ exports.getAiStatus = async (req, res, next) => {
 
     try {
       const testResult = await AiScoringService.scoreWriting(
-        548, 
+        548,
         'This is a test sentence to check if AI API is working properly.'
       );
-      status.services.gemini_api = testResult ? 'online' : 'error';
+      status.services.openai_api = testResult ? 'online' : 'error';
       status.details.test_result = testResult;
     } catch (e) {
-      status.services.gemini_api = 'offline';
+      status.services.openai_api = 'offline';
       status.details.api_error = e.message;
       if (e.message.includes('API key')) {
-        status.details.recommendation = 'Update GEMINI_API_KEY in .env file';
+        status.details.recommendation = 'Update OPENAI_API_KEY in .env file';
       }
     }
 
@@ -72,7 +72,7 @@ exports.testAiScoring = async (req, res, next) => {
 
     try {
       const feedback = await AiScoringService.scoreWriting(
-        999, 
+        999,
         text_answer
       );
 
@@ -84,9 +84,9 @@ exports.testAiScoring = async (req, res, next) => {
 
       if (error.message.includes('API key')) {
         result.troubleshooting = [
-          'GEMINI_API_KEY in .env is invalid or expired',
-          'Get a new API key from https://aistudio.google.com/app/apikey',
-          'Update .env file: GEMINI_API_KEY=your_new_key',
+          'OPENAI_API_KEY in .env is invalid or expired',
+          'Get a new API key from https://platform.openai.com/api-keys',
+          'Update .env file: OPENAI_API_KEY=your_new_key',
           'Restart the server',
         ];
       }
@@ -199,7 +199,7 @@ exports.getAiCriteria = async (req, res, next) => {
 };
 exports.requeuPendingAnswers = async (req, res, next) => {
   try {
-    const { limit = 100 } = req.query; 
+    const { limit = 100 } = req.query;
     const AiScoringService = require('../services/AiScoringService');
     const { Question, QuestionType } = require('../models');
 

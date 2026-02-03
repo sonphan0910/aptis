@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -14,14 +14,16 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
+  Chip
 } from '@mui/material';
-import { 
-  CheckCircle, 
-  Cancel, 
-  PlayArrow, 
-  Pause, 
-  VolumeUp 
+import {
+  CheckCircle,
+  Cancel,
+  PlayArrow,
+  Pause,
+  VolumeUp
 } from '@mui/icons-material';
+import { getAssetUrl } from '@/services/api';
 
 export default function ListeningMultiMCQQuestionResult({ answer, question, showCorrectAnswer = true }) {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -30,70 +32,127 @@ export default function ListeningMultiMCQQuestionResult({ answer, question, show
   const audioRef = useRef(null);
 
   // Parse user answers from answer_json
-  // For Multi MCQ, answer_json structure is: { [itemId]: optionId }
-  const userAnswers = answer.answer_json ? JSON.parse(answer.answer_json) : {};
-  const items = question.items || [];
-  const options = question.options || [];
-  
-  // Fix audio URL path
-  const audioUrl = question.media_url || question.audio_url;
-  const fullAudioUrl = audioUrl?.startsWith('http') 
-    ? audioUrl 
-    : `http://localhost:3001${audioUrl}`;
-  
-  console.log('[ListeningMultiMCQResult] Audio URL:', audioUrl, '-> Full URL:', fullAudioUrl);
+  const userAnswers = useMemo(() => {
+    try {
+      if (!answer.answer_json) return {};
+      const parsed = typeof answer.answer_json === 'string' ? JSON.parse(answer.answer_json) : answer.answer_json;
+      if (Array.isArray(parsed)) {
+        return parsed.reduce((acc, val, idx) => {
+          acc[idx] = val;
+          return acc;
+        }, {});
+      }
+      return parsed || {};
+    } catch (e) {
+      console.error('Error parsing answer_json', e);
+      return {};
+    }
+  }, [answer.answer_json]);
 
-  // Create option map for quick lookup
-  const optionMap = {};
-  options.forEach(option => {
-    optionMap[option.id] = option.option_text;
-  });
+  // Parse structured data from question content
+  const structuredData = useMemo(() => {
+    try {
+      const parsed = typeof question.content === 'string' ? JSON.parse(question.content) : question.content;
+      if (parsed && typeof parsed === 'object' && (parsed.questions || parsed.items)) {
+        const questionsSource = parsed.questions || parsed.items;
+        return {
+          instructions: parsed.instructions || parsed.instruction || parsed.title || "Listen to the audio and answer all questions.",
+          transcript: parsed.transcript || [],
+          audioUrl: parsed.audioUrl || question.media_url || question.audio_url,
+          questions: questionsSource.map((q, idx) => {
+            // Determine correct index from JSON
+            let correctIdx = -1;
+            if (q.correctAnswer !== undefined && q.correctAnswer !== null) {
+              if (typeof q.correctAnswer === 'string' && /^[A-E]$/i.test(q.correctAnswer)) {
+                correctIdx = q.correctAnswer.toUpperCase().charCodeAt(0) - 65;
+              } else {
+                correctIdx = parseInt(q.correctAnswer);
+              }
+            }
 
-  // Group options by item (each item typically has 3 options)
-  const getOptionsForItem = (itemIndex) => {
-    const optionsPerItem = Math.floor(options.length / items.length);
-    const startIdx = itemIndex * optionsPerItem;
-    return options.slice(startIdx, startIdx + optionsPerItem);
-  };
+            return {
+              text: q.question || q.text || `Question ${idx + 1}`,
+              correctIdx: correctIdx,
+              options: (q.options || []).map((opt, optIdx) => ({
+                text: opt.option_text || opt.text || opt,
+                // Primary source: explicit flag. Fallback: index match.
+                // WE REMOVED +1 logic to prevent double correct answers.
+                isCorrect: !!(opt.is_correct || opt.correct || (correctIdx === optIdx))
+              }))
+            };
+          })
+        };
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }, [question.content, question.media_url, question.audio_url]);
 
-  // Find correct answer for an item
-  const getCorrectOptionForItem = (itemIndex) => {
-    const itemOptions = getOptionsForItem(itemIndex);
-    return itemOptions.find(opt => opt.is_correct);
-  };
+  // Unified items and options for rendering - Merge DB and JSON
+  const itemsToRender = useMemo(() => {
+    const dbItems = [...(question.items || [])].sort((a, b) => (a.item_order || 0) - (b.item_order || 0));
+    const allDbOptions = question.options || [];
+
+    if (dbItems.length > 0) {
+      return dbItems.map((item, idx) => {
+        let subOptions = allDbOptions.filter(opt => String(opt.item_id) === String(item.id));
+        if (subOptions.length === 0 && allDbOptions.length > 0) {
+          const optionsPerItem = Math.floor(allDbOptions.length / dbItems.length);
+          const startIdx = idx * optionsPerItem;
+          subOptions = allDbOptions.slice(startIdx, startIdx + optionsPerItem);
+        }
+
+        const jsonQ = structuredData?.questions?.[idx];
+
+        return {
+          id: item.id,
+          text: item.item_text || jsonQ?.text || `Question ${idx + 1}`,
+          options: subOptions.map((opt, optIdx) => {
+            // A choice is correct if DB says so OR if JSON metadata for this specific index says so
+            const isJsonCorrect = jsonQ?.options?.[optIdx]?.isCorrect;
+            return {
+              id: opt.id,
+              text: opt.option_text || jsonQ?.options?.[optIdx]?.text || `Option ${optIdx + 1}`,
+              isCorrect: !!(opt.is_correct || isJsonCorrect)
+            };
+          }),
+          index: idx
+        };
+      });
+    }
+
+    // Fallback if no DB items/options exist (fully dynamic JSON question)
+    if (structuredData) {
+      return structuredData.questions.map((q, idx) => ({
+        id: `json-q-${idx}`,
+        text: q.text,
+        options: q.options.map((opt, optIdx) => ({
+          id: `json-opt-${idx}-${optIdx}`,
+          text: opt.text,
+          isCorrect: opt.isCorrect,
+          index: optIdx
+        })),
+        index: idx
+      }));
+    }
+
+    return [];
+  }, [question.items, question.options, structuredData]);
+
+  // Audio configuration
+  const audioUrl = structuredData?.audioUrl || question.media_url || question.audio_url;
+  const fullAudioUrl = getAssetUrl(audioUrl);
 
   const handlePlayPause = () => {
     if (!audioRef.current) return;
-    
-    if (isPlaying) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play();
-    }
+    isPlaying ? audioRef.current.pause() : audioRef.current.play();
     setIsPlaying(!isPlaying);
   };
 
-  const handleTimeUpdate = () => {
-    if (audioRef.current) {
-      setCurrentTime(audioRef.current.currentTime);
-    }
-  };
-
-  const handleLoadedMetadata = () => {
-    if (audioRef.current) {
-      setDuration(audioRef.current.duration);
-      console.log('[ListeningMultiMCQResult] Audio loaded successfully, duration:', audioRef.current.duration);
-    }
-  };
-
-  const handleError = (e) => {
-    console.error('[ListeningMultiMCQResult] Audio load error:', e, 'URL:', fullAudioUrl);
-  };
-
-  const handleEnded = () => {
-    setIsPlaying(false);
-    setCurrentTime(0);
-  };
+  const handleTimeUpdate = () => { if (audioRef.current) setCurrentTime(audioRef.current.currentTime); };
+  const handleLoadedMetadata = () => { if (audioRef.current) setDuration(audioRef.current.duration); };
+  const handleEnded = () => { setIsPlaying(false); setCurrentTime(0); };
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -101,50 +160,26 @@ export default function ListeningMultiMCQQuestionResult({ answer, question, show
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
-
-  // Sort items by item_order
-  const sortedItems = [...items].sort((a, b) => (a.item_order || 0) - (b.item_order || 0));
-
   return (
     <Box>
-      {/* Audio player */}
+      {/* Audio card */}
       {fullAudioUrl && (
         <Card sx={{ mb: 3 }}>
           <CardContent>
-            <Typography variant="h6" gutterBottom>
+            <Typography variant="h6" gutterBottom color="primary">
               <VolumeUp sx={{ mr: 1, verticalAlign: 'middle' }} />
               Listen to the audio
             </Typography>
-            
-            <audio
-              ref={audioRef}
-              src={fullAudioUrl}
-              onTimeUpdate={handleTimeUpdate}
-              onLoadedMetadata={handleLoadedMetadata}
-              onError={handleError}
-              onEnded={handleEnded}
-              style={{ display: 'none' }}
-            />
-            
+            <audio ref={audioRef} src={fullAudioUrl} onTimeUpdate={handleTimeUpdate} onLoadedMetadata={handleLoadedMetadata} onEnded={handleEnded} style={{ display: 'none' }} />
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <IconButton
-                onClick={handlePlayPause}
-                color="primary"
-                size="large"
-              >
+              <IconButton onClick={handlePlayPause} color="primary" size="large" sx={{ bgcolor: 'primary.50', '&:hover': { bgcolor: 'primary.100' } }}>
                 {isPlaying ? <Pause /> : <PlayArrow />}
               </IconButton>
-              
               <Box sx={{ flexGrow: 1 }}>
-                <LinearProgress 
-                  variant="determinate" 
-                  value={progress}
-                  sx={{ height: 6, borderRadius: 3 }}
-                />
+                <LinearProgress variant="determinate" value={duration > 0 ? (currentTime / duration) * 100 : 0} sx={{ height: 8, borderRadius: 4, bgcolor: 'grey.200' }} />
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                  <Typography variant="caption">{formatTime(currentTime)}</Typography>
-                  <Typography variant="caption">{formatTime(duration)}</Typography>
+                  <Typography variant="caption" sx={{ fontWeight: 500 }}>{formatTime(currentTime)}</Typography>
+                  <Typography variant="caption" sx={{ fontWeight: 500 }}>{formatTime(duration)}</Typography>
                 </Box>
               </Box>
             </Box>
@@ -152,140 +187,90 @@ export default function ListeningMultiMCQQuestionResult({ answer, question, show
         </Card>
       )}
 
-      {/* Main instruction */}
-      <Paper sx={{ p: 3, mb: 2, bgcolor: 'grey.50' }}>
-        <Typography variant="body1" sx={{ mb: 2, fontWeight: 500 }}>
-          {question.content}
+      {/* Instructions */}
+      <Paper sx={{ p: 3, mb: 2, bgcolor: 'info.50', borderLeft: '4px solid', borderColor: 'info.main' }}>
+        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+          {structuredData?.instructions || "Listen to the audio and answer the questions."}
         </Typography>
       </Paper>
 
-      {/* Sub-questions results */}
-      {sortedItems.map((item, itemIndex) => {
-        const userAnswerOptionId = userAnswers[item.id];
-        const userAnswerOption = options.find(opt => opt.id === userAnswerOptionId);
-        const correctOption = getCorrectOptionForItem(itemIndex);
-        const isCorrect = userAnswerOptionId === correctOption?.id;
-        const itemOptions = getOptionsForItem(itemIndex);
+      {/* Questions mapping */}
+      {itemsToRender.map((item, itemIdx) => {
+        const userAnswerVal = userAnswers[item.id] !== undefined ? userAnswers[item.id] : (userAnswers[itemIdx] !== undefined ? userAnswers[itemIdx] : userAnswers[String(itemIdx)]);
+
+        const selectedOption = item.options.find(opt =>
+          (userAnswerVal !== undefined && userAnswerVal !== null && opt.id && String(opt.id) === String(userAnswerVal)) ||
+          (typeof userAnswerVal === 'object' && userAnswerVal !== null && String(opt.id) === String(userAnswerVal?.id)) ||
+          (typeof userAnswerVal === 'number' && item.options.indexOf(opt) === userAnswerVal) ||
+          (typeof userAnswerVal === 'string' && userAnswerVal !== '' && !isNaN(parseInt(userAnswerVal)) && item.options.indexOf(opt) === parseInt(userAnswerVal))
+        );
+
+        const isCorrectResult = selectedOption ? !!selectedOption.isCorrect : false;
 
         return (
-          <Box key={`multi-mcq-item-${item.id}`} sx={{ mb: 3 }}>
+          <Box key={item.id} sx={{ mb: 3 }}>
             <Paper sx={{
               p: 3,
-              bgcolor: isCorrect ? 'success.50' : (userAnswerOption ? 'error.50' : 'grey.50'),
-              border: '1px solid',
-              borderColor: isCorrect ? 'success.main' : (userAnswerOption ? 'error.main' : 'grey.300')
+              borderRadius: 2,
+              bgcolor: isCorrectResult ? 'success.50' : (selectedOption ? 'error.50' : 'grey.50'),
+              border: '2px solid',
+              borderColor: isCorrectResult ? 'success.light' : (selectedOption ? 'error.light' : 'grey.200'),
             }}>
-              {/* Question header */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                <Typography variant="h6" sx={{ flex: 1 }}>
-                  Question {itemIndex + 1}: {item.item_text}
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2, mb: 2 }}>
+                <Typography variant="h6" sx={{ flex: 1, fontSize: '1.1rem', fontWeight: 700 }}>
+                  Question {itemIdx + 1}: {item.text}
                 </Typography>
-                
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  {isCorrect ? (
-                    <CheckCircle color="success" sx={{ fontSize: '2rem' }} />
-                  ) : (
-                    <Cancel color="error" sx={{ fontSize: '2rem' }} />
-                  )}
+                <Box>
+                  {selectedOption ? (isCorrectResult ? <CheckCircle color="success" sx={{ fontSize: '2rem' }} /> : <Cancel color="error" sx={{ fontSize: '2rem' }} />)
+                    : <Typography variant="caption" color="text.disabled">Not answered</Typography>}
                 </Box>
               </Box>
 
-              {/* Options list */}
-              <List dense sx={{ bgcolor: 'background.paper', borderRadius: 1 }}>
-                {itemOptions.map((option, optIndex) => {
-                  const isUserSelected = userAnswerOptionId === option.id;
-                  const isCorrectOption = option.is_correct;
-                  
+              <List sx={{ p: 0 }}>
+                {item.options.map((option, optIdx) => {
+                  const isUserChosen = selectedOption && String(selectedOption.id) === String(option.id);
+                  const isRight = !!option.isCorrect;
+                  const itemBgColor = isUserChosen ? (isRight ? 'success.100' : 'error.100') : (isRight && showCorrectAnswer ? 'success.50' : 'transparent');
+                  const itemBorderColor = isUserChosen ? (isRight ? 'success.main' : 'error.main') : (isRight && showCorrectAnswer ? 'success.light' : 'divider');
+
                   return (
-                    <ListItem key={option.id} sx={{
-                      bgcolor: isUserSelected 
-                        ? (isCorrectOption ? 'success.lighter' : 'error.lighter')
-                        : (isCorrectOption && showCorrectAnswer ? 'success.lighter' : 'transparent'),
-                      border: '1px solid',
-                      borderColor: isUserSelected
-                        ? (isCorrectOption ? 'success.main' : 'error.main') 
-                        : (isCorrectOption && showCorrectAnswer ? 'success.main' : 'divider'),
-                      borderRadius: 1,
-                      mb: 1
-                    }}>
-                      <ListItemIcon sx={{ minWidth: 40 }}>
-                        {isUserSelected ? (
-                          isCorrectOption ? (
-                            <CheckCircle color="success" />
-                          ) : (
-                            <Cancel color="error" />
-                          )
-                        ) : (
-                          isCorrectOption && showCorrectAnswer ? (
-                            <CheckCircle color="success" />
-                          ) : null
-                        )}
+                    <ListItem key={option.id} sx={{ bgcolor: itemBgColor, border: '1px solid', borderColor: itemBorderColor, borderRadius: 1.5, mb: 1, px: 2, py: 1.5 }}>
+                      <ListItemIcon sx={{ minWidth: 36 }}>
+                        {isUserChosen ? (isRight ? <CheckCircle color="success" /> : <Cancel color="error" />) : (isRight && showCorrectAnswer ? <CheckCircle color="success" sx={{ opacity: 0.5 }} /> : null)}
                       </ListItemIcon>
-                      
                       <ListItemText
-                        primary={
-                          <Typography 
-                            variant="body1" 
-                            sx={{ 
-                              fontWeight: isUserSelected || (isCorrectOption && showCorrectAnswer) ? 600 : 400 
-                            }}
-                          >
-                            <strong>{String.fromCharCode(65 + optIndex)}.</strong> {option.option_text}
-                          </Typography>
-                        }
-                        secondary={
-                          isUserSelected ? (
-                            <Typography variant="caption" color={isCorrectOption ? 'success.main' : 'error.main'}>
-                              Your answer {isCorrectOption ? '(Correct)' : '(Incorrect)'}
-                            </Typography>
-                          ) : (
-                            isCorrectOption && showCorrectAnswer ? (
-                              <Typography variant="caption" color="success.main">
-                                Correct answer
-                              </Typography>
-                            ) : null
-                          )
-                        }
+                        primary={<Typography variant="body1" sx={{ fontWeight: isUserChosen || (isRight && showCorrectAnswer) ? 700 : 400 }}><span style={{ marginRight: '8px', opacity: 0.7 }}>{String.fromCharCode(65 + optIdx)}.</span>{option.text}</Typography>}
+                        secondary={isUserChosen ? <Typography variant="caption" color={isRight ? 'success.main' : 'error.main'} sx={{ fontWeight: 600 }}>Your answer {isRight ? '(Correct)' : '(Incorrect)'}</Typography>
+                          : (isRight && showCorrectAnswer ? <Typography variant="caption" color="success.main" sx={{ fontWeight: 600 }}>Correct answer</Typography> : null)}
                       />
                     </ListItem>
                   );
                 })}
               </List>
 
-              {/* Result summary */}
-              <Divider sx={{ my: 2 }} />
+              <Divider sx={{ my: 2, borderStyle: 'dashed' }} />
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Typography variant="body2" color="text.secondary">
-                  <strong>Your answer:</strong> {
-                    userAnswerOption 
-                      ? `${String.fromCharCode(65 + itemOptions.findIndex(opt => opt.id === userAnswerOptionId))}. ${userAnswerOption.option_text}`
-                      : 'Not answered'
-                  }
+                  <strong>Answered:</strong> {selectedOption ? `${String.fromCharCode(65 + item.options.indexOf(selectedOption))}. ${selectedOption.text}` : 'Not answered'}
                 </Typography>
-                
-                <Typography 
-                  variant="body2" 
-                  color={isCorrect ? 'success.main' : 'error.main'}
-                  sx={{ fontWeight: 600 }}
-                >
-                  Result: {isCorrect ? 'Correct' : 'Incorrect'}
-                </Typography>
+                <Chip label={isCorrectResult ? 'CORRECT' : 'INCORRECT'} size="small" color={isCorrectResult ? 'success' : 'error'} sx={{ fontWeight: 700, borderRadius: 1 }} />
               </Box>
             </Paper>
           </Box>
         );
       })}
 
-      {/* Overall progress */}
-      <Divider sx={{ my: 2 }} />
-      <Typography variant="body2" color="text.secondary">
-        Completed {sortedItems.filter(item => {
-          const userAnswerOptionId = userAnswers[item.id];
-          const itemIndex = sortedItems.findIndex(i => i.id === item.id);
-          const correctOption = getCorrectOptionForItem(itemIndex);
-          return userAnswerOptionId === correctOption?.id;
-        }).length}/{sortedItems.length} sub-questions correctly
-      </Typography>
+      <Divider sx={{ my: 3 }} />
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, bgcolor: 'grey.50', borderRadius: 2 }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Section Summary:</Typography>
+        <Typography variant="h6" color="primary.main" sx={{ fontWeight: 800 }}>
+          {itemsToRender.filter((item, idx) => {
+            const val = userAnswers[item.id] || userAnswers[idx] || userAnswers[String(idx)];
+            const sel = item.options.find(opt => (opt.id && String(opt.id) === String(val)) || (typeof val === 'number' && item.options.indexOf(opt) === val));
+            return sel && sel.isCorrect;
+          }).length} / {itemsToRender.length} Correct
+        </Typography>
+      </Box>
     </Box>
   );
 }

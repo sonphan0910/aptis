@@ -19,13 +19,16 @@ export default function SkillScoreCard({ skill }) {
   const maxScore = Number(skill.maxScore ?? skill.max_score ?? 1); // Fallback to 1 to avoid division by zero
   const score = Number(skill.score ?? 0);
   const percentage = maxScore > 0 ? (score / maxScore) * 100 : 0;
-  
+
+  // Calculate normalized score on 50-point scale
+  const normalizedScore = maxScore > 0 ? (score / maxScore) * 50 : 0;
+
   const getPerformanceColor = () => {
-    if (percentage >= 80) return 'success';
-    if (percentage >= 60) return 'warning';
-    return 'error';
+    if (percentage >= 80) return '#4caf50'; // Success Green
+    if (percentage >= 60) return '#ff9800'; // Warning Orange
+    return '#f44336'; // Error Red
   };
-  
+
   const getPerformanceLabel = () => {
     if (percentage >= 90) return 'Xuất sắc';
     if (percentage >= 80) return 'Giỏi';
@@ -33,59 +36,67 @@ export default function SkillScoreCard({ skill }) {
     if (percentage >= 60) return 'Trung bình';
     return 'Cần cải thiện';
   };
-  
-  const getTrendIcon = () => {
-    if (!skill.improvement) return <TrendingFlat color="action" />;
-    if (skill.improvement > 0) return <TrendingUp color="success" />;
-    if (skill.improvement < 0) return <TrendingDown color="error" />;
-    return <TrendingFlat color="action" />;
-  };
-  
-  const getTrendColor = () => {
-    if (!skill.improvement) return 'default';
-    if (skill.improvement > 0) return 'success';
-    if (skill.improvement < 0) return 'error';
-    return 'default';
-  };
+
+  const performanceColor = getPerformanceColor();
 
   return (
-    <Card>
-      <CardContent>
+    <Card sx={{
+      borderRadius: 3,
+      boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+      overflow: 'hidden',
+      border: '1px solid #eee'
+    }}>
+      <CardContent sx={{ p: 3 }}>
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-          <Typography variant="h6" component="h3">
+          <Typography variant="h6" component="h3" sx={{ fontWeight: 700, color: '#002E5C' }}>
             {skill.skillName || skill.skill_type || 'Unknown'}
           </Typography>
           <Chip
             label={getPerformanceLabel()}
-            color={getPerformanceColor()}
+            sx={{
+              bgcolor: `${performanceColor}15`,
+              color: performanceColor,
+              borderColor: `${performanceColor}30`,
+              fontWeight: 700,
+              fontSize: '0.75rem'
+            }}
             size="small"
             variant="outlined"
           />
         </Box>
-        
-        <Box display="flex" alignItems="baseline" mb={2}>
-          <Typography variant="h4" component="div" fontWeight="bold">
-            {score}
+
+        <Box display="flex" alignItems="baseline" mb={1}>
+          <Typography variant="h3" component="div" sx={{ fontWeight: 800, color: '#002E5C' }}>
+            {Math.round(normalizedScore)}
           </Typography>
-          <Typography variant="body1" color="textSecondary" sx={{ ml: 1 }}>
-            / {maxScore}
+          <Typography variant="h6" color="textSecondary" sx={{ ml: 1, fontWeight: 500 }}>
+            / 50
           </Typography>
-          <Typography variant="h6" color="primary" sx={{ ml: 'auto' }}>
-            {percentage.toFixed(1)}%
-          </Typography>
+          <Box sx={{ ml: 'auto', textAlign: 'right' }}>
+            <Typography variant="h5" sx={{ fontWeight: 800, color: performanceColor }}>
+              {percentage.toFixed(0)}%
+            </Typography>
+          </Box>
         </Box>
-        
-        <LinearProgress
-          variant="determinate"
-          value={percentage}
-          color={getPerformanceColor()}
-          sx={{
-            height: 8,
-            borderRadius: 4,
-            mb: 2
-          }}
-        />
-        
+
+        <Box sx={{ width: '100%', mb: 3 }}>
+          <LinearProgress
+            variant="determinate"
+            value={percentage}
+            sx={{
+              height: 10,
+              borderRadius: 5,
+              backgroundColor: '#f0f0f0',
+              '& .MuiLinearProgress-bar': {
+                backgroundColor: performanceColor,
+                borderRadius: 5,
+                backgroundImage: `linear-gradient(90deg, ${performanceColor} 0%, ${performanceColor}aa 100%)`
+              }
+            }}
+          />
+        </Box>
+
+
         {/* Performance details */}
         <Box>
           {skill.breakdown && (
@@ -105,7 +116,7 @@ export default function SkillScoreCard({ skill }) {
               ))}
             </Box>
           )}
-          
+
           {/* Improvement indicator */}
           {skill.improvement !== undefined && (
             <Box display="flex" alignItems="center" justifyContent="space-between">
@@ -124,7 +135,7 @@ export default function SkillScoreCard({ skill }) {
               </Box>
             </Box>
           )}
-          
+
           {/* Feedback summary */}
           {skill.feedback_summary && (
             <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>

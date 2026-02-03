@@ -114,7 +114,7 @@ exports.getResults = async (req, res, next) => {
         {
           model: Question,
           as: 'question',
-          attributes: ['id', 'content', 'media_url'],
+          attributes: ['id', 'content', 'media_url', 'additional_media', 'parent_question_id'],
           include: [
             {
               model: QuestionType,
@@ -127,6 +127,11 @@ exports.getResults = async (req, res, next) => {
                   attributes: ['id', 'code', 'skill_type_name'],
                 },
               ],
+            },
+            {
+              model: Question,
+              as: 'parentQuestion',
+              attributes: ['id', 'content', 'media_url', 'additional_media']
             },
             // Include question items for gap filling, ordering, matching
             {
@@ -159,38 +164,35 @@ exports.getResults = async (req, res, next) => {
     let answeredQuestionsCount = 0;
 
     for (const answer of answers) {
-      const questionType = answer.question?.questionType?.code;
-      
-      // For matching questions, count individual items, not the question itself
-      if (questionType === 'READING_MATCHING' || questionType === 'LISTENING_MATCHING') {
-        // Get the number of items for this matching question
-        const matchingItems = await QuestionItem.count({
-          where: { question_id: answer.question_id }
-        });
-        
-        totalQuestionsCount += matchingItems;
-        
-        // Check if answer exists (for matching, check if answer_json is not empty)
+      const questionCode = (answer.question?.questionType?.code || '').toUpperCase();
+
+      // Get the number of items for this question
+      const itemsCount = await QuestionItem.count({
+        where: { question_id: answer.question_id }
+      });
+
+      if (itemsCount > 1 || questionCode.includes('MULTI') || questionCode.includes('MATCHING') || questionCode.includes('GAP_FILL')) {
+        const effectiveCount = itemsCount > 0 ? itemsCount : 1;
+        totalQuestionsCount += effectiveCount;
+
         if (answer.answer_json) {
           try {
-            const answerData = typeof answer.answer_json === 'string' 
-              ? JSON.parse(answer.answer_json) 
+            const answerData = typeof answer.answer_json === 'string'
+              ? JSON.parse(answer.answer_json)
               : answer.answer_json;
-            
-            // Handle both old format {matches: {}} and new format {itemId: optionId}
+
             const matches = answerData.matches || answerData || {};
-            const answeredItems = Object.keys(matches).filter(key => matches[key]).length;
-            answeredQuestionsCount += answeredItems;
+            // Count keys that have a truthy value (selected option ID or text)
+            const answeredCount = Object.keys(matches).filter(key => matches[key] !== null && matches[key] !== undefined && matches[key] !== '').length;
+            answeredQuestionsCount += Math.min(answeredCount, effectiveCount);
           } catch (e) {
-            // If parsing fails, assume no answers
-            console.warn('Failed to parse matching answer JSON:', e);
+            console.warn('Failed to parse multi-part answer JSON:', e);
           }
         }
       } else {
-        // For regular questions, count normally
+        // Regular single-part question
         totalQuestionsCount += 1;
-        
-        if (answer.selected_option_id || answer.text_answer || answer.audio_url) {
+        if (answer.selected_option_id || (answer.text_answer && answer.text_answer.trim()) || answer.audio_url) {
           answeredQuestionsCount += 1;
         }
       }

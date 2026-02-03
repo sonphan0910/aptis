@@ -12,7 +12,7 @@ const STORAGE_CONFIG = {
   // Giới hạn file upload
   limits: {
     fileSize: 500 * 1024 * 1024, // Dung lượng tối đa 500MB (increased from 50MB)
-    files: 1,                   // Tối đa 1 file mỗi lần upload
+    files: 10,                   // Tối đa 10 file mỗi lần upload (increased from 1)
   },
 
   // Các loại file được phép upload
@@ -46,25 +46,25 @@ const ensureUploadDirs = () => {
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     let uploadDir = STORAGE_CONFIG.basePath;
-    
+
     // Dynamic subfolder based on route or field
-    if (req.route && (req.route.path.includes('/questions/upload-image') || 
-                      req.route.path.includes('/questions/:questionId/upload-images'))) {
+    if (req.route && (req.route.path.includes('/questions/upload-image') ||
+      req.route.path.includes('/questions/:questionId/upload-images'))) {
       uploadDir = path.join(STORAGE_CONFIG.basePath, 'questions');
     } else if (file.fieldname === 'avatar') {
       uploadDir = path.join(STORAGE_CONFIG.basePath, 'avatars');
-    } else if (file.fieldname === 'audio') {
+    } else if (file.fieldname === 'audio' || file.fieldname === 'mainAudio' || file.fieldname === 'speakerAudios') {
       uploadDir = path.join(STORAGE_CONFIG.basePath, 'audio');
     } else if (file.fieldname === 'images') {
       // For question images
       uploadDir = path.join(STORAGE_CONFIG.basePath, 'questions');
     }
-    
+
     // Ensure directory exists
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
-    
+
     cb(null, uploadDir);
   },
   filename: (req, file, cb) => {

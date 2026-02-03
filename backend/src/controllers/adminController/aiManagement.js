@@ -107,8 +107,8 @@ class AiManagementController {
   static async getModelConfig(req, res) {
     try {
       const config = {
-        geminiModel: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
-        whisperModel: process.env.WHISPER_MODEL || 'tiny',
+        openaiModel: process.env.OPENAI_MODEL || 'gpt-4-turbo',
+        azureSpeechRegion: process.env.AZURE_SPEECH_REGION || 'southeastasia',
         maxRetries: 3,
         timeout: 30000,
         scoringCriteria: {

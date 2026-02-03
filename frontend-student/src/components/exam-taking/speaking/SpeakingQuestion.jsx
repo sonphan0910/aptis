@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { 
-  Box, 
-  Typography, 
-  Paper, 
-  Button, 
-  CircularProgress, 
+import {
+  Box,
+  Typography,
+  Paper,
+  Button,
+  CircularProgress,
   LinearProgress,
   Dialog,
   DialogTitle,
@@ -21,10 +21,10 @@ import { attemptService } from '@/services/attemptService';
  * Enhanced Speaking Question Component for multi-section structure
  * Handles individual question recording with section context
  */
-export default function SpeakingQuestion({ 
-  question, 
-  onAnswerChange, 
-  onMoveToNextQuestion, 
+export default function SpeakingQuestion({
+  question,
+  onAnswerChange,
+  onMoveToNextQuestion,
   attemptId,
   onHideHeader,
   questionNumber,
@@ -40,46 +40,46 @@ export default function SpeakingQuestion({
       </Box>
     );
   }
-  
+
   // Find parent question if this is a follow-up question
-  const parentQuestion = question.parent_question_id && allQuestions ? 
+  const parentQuestion = question.parent_question_id && allQuestions ?
     allQuestions.find(q => q.id === question.parent_question_id) : null;
-  
-  console.log('[SpeakingQuestion] Parent question check:', { 
+
+  console.log('[SpeakingQuestion] Parent question check:', {
     hasParentId: !!question.parent_question_id,
     parentId: question.parent_question_id,
     foundParent: !!parentQuestion,
     parentMedia: parentQuestion?.additional_media
   });
-  
+
   // Recording states
   const [step, setStep] = useState('recording');
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(120); // Default 2 minutes
   const [audioBlob, setAudioBlob] = useState(null);
   const [audioUrl, setAudioUrl] = useState('');
-  
+
   // Preparation states
   const [isPreparing, setIsPreparing] = useState(false);
   const [preparationTime, setPreparationTime] = useState(0);
-  
+
   // Upload states
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState(null);
   const [uploadRetries, setUploadRetries] = useState(0);
-  
+
   const [showStopConfirmation, setShowStopConfirmation] = useState(false);
-  
+
   const mediaRecorderRef = useRef(null);
   const recordingTimerRef = useRef(null);
   const timeCounterRef = useRef(0);
   const recordingCompletedRef = useRef(false);
   const autoAdvanceTimerRef = useRef(null); // Track auto-advance timer
-  
+
   // Debug logging - after state initialization
-  console.log('[SpeakingQuestion] Render:', { 
-    questionId: question.id, 
+  console.log('[SpeakingQuestion] Render:', {
+    questionId: question.id,
     questionNumber,
     sectionInfo,
     hasAnswer: !!question.answer_data?.audio_url,
@@ -89,7 +89,7 @@ export default function SpeakingQuestion({
     QuestionType: question.QuestionType,
     question_structure: Object.keys(question)
   });
-  
+
   const MAX_UPLOAD_RETRIES = 3;
 
   // Use question type to determine timing
@@ -117,7 +117,7 @@ export default function SpeakingQuestion({
       hasAudio: !!hasExistingAudio,
       audioUrl: hasExistingAudio ? 'present' : 'missing'
     });
-    
+
     if (hasExistingAudio) {
       console.log('[SpeakingQuestion] Audio found from parent update, transitioning to completed');
       setStep('completed');
@@ -130,39 +130,39 @@ export default function SpeakingQuestion({
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mediaRecorder = new MediaRecorder(stream);
       const chunks = [];
-      
+
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           chunks.push(event.data);
         }
       };
-      
+
       mediaRecorder.onstop = async () => {
         const audioBlob = new Blob(chunks, { type: 'audio/webm' });
         const audioUrl = URL.createObjectURL(audioBlob);
-        
+
         console.log('[SpeakingQuestion] Recording stopped, blob created:', {
           size: audioBlob.size,
           type: audioBlob.type
         });
-        
+
         setAudioBlob(audioBlob);
         setAudioUrl(audioUrl);
         setIsRecording(false);
         recordingCompletedRef.current = true;
-        
+
         // Stop all tracks
         stream.getTracks().forEach(track => track.stop());
       };
-      
+
       mediaRecorderRef.current = mediaRecorder;
       mediaRecorder.start();
       setIsRecording(true);
       setRecordingTime(maxRecordingTime);
       timeCounterRef.current = maxRecordingTime;
-      
+
       console.log('[SpeakingQuestion] Recording started successfully');
-      
+
     } catch (error) {
       console.error('[SpeakingQuestion] Microphone error:', error.message);
       alert('Cannot access microphone. Please check permissions.');
@@ -177,9 +177,9 @@ export default function SpeakingQuestion({
       setStep('completed');
       return;
     }
-    
+
     console.log('[SpeakingQuestion] Starting fresh for question', question.id);
-    
+
     // Reset states
     setStep('recording');
     setAudioBlob(null);
@@ -191,13 +191,13 @@ export default function SpeakingQuestion({
     setUploadError(null);
     setUploadRetries(0);
     recordingCompletedRef.current = false;
-    
+
     // Start preparation countdown
     let countdown = maxPreparationTime;
     const prepTimer = setInterval(() => {
       countdown--;
       setPreparationTime(countdown);
-      
+
       if (countdown <= 0) {
         clearInterval(prepTimer);
         setIsPreparing(false);
@@ -207,7 +207,7 @@ export default function SpeakingQuestion({
         }, 500);
       }
     }, 1000);
-    
+
     return () => {
       clearInterval(prepTimer);
       // Clear auto-advance timer if component unmounts
@@ -252,7 +252,7 @@ export default function SpeakingQuestion({
 
   // Store callback refs to avoid stale closures
   const onMoveToNextQuestionRef = useRef(onMoveToNextQuestion);
-  
+
   useEffect(() => {
     onMoveToNextQuestionRef.current = onMoveToNextQuestion;
   }, [onMoveToNextQuestion]);
@@ -261,11 +261,11 @@ export default function SpeakingQuestion({
     if (uploadRetries === 0) {
       console.log('[SpeakingQuestion] Starting upload for question', question.id);
     }
-    
+
     try {
       setIsUploading(true);
       setUploadProgress(0);
-      
+
       // Use attemptService to upload audio
       const response = await attemptService.uploadAudioAnswer(
         attemptId,
@@ -280,17 +280,17 @@ export default function SpeakingQuestion({
       );
 
       console.log('[SpeakingQuestion] Upload successful:', response);
-      
+
       // Extract audio_url from response data
       // Backend returns { success: true, data: { answerId, audio_url, duration, fileSize } }
       const audioUrl = response.data?.data?.audio_url || response.data?.audio_url;
-      
+
       if (!audioUrl) {
         throw new Error('No audio_url in response: ' + JSON.stringify(response.data));
       }
-      
+
       console.log('[SpeakingQuestion] Audio URL from response:', audioUrl);
-      
+
       // Update answer in state with complete data
       onAnswerChange?.(question.id, {
         answer_type: 'audio',
@@ -298,7 +298,7 @@ export default function SpeakingQuestion({
         transcribed_text: null,
         duration: response.data?.data?.duration || response.data?.duration || duration
       });
-      
+
       // Transition to completed immediately after successful upload
       // Don't wait for parent state update since that might be delayed
       setStep('completed');
@@ -309,9 +309,9 @@ export default function SpeakingQuestion({
       setUploadError(null);
       setUploadRetries(0);
       recordingCompletedRef.current = false;
-      
+
       console.log('[SpeakingQuestion] Upload completed successfully, transitioned to completed state');
-      
+
       // Auto-advance after 2 seconds to allow parent state to update
       autoAdvanceTimerRef.current = setTimeout(() => {
         console.log('[SpeakingQuestion] Auto-advancing to next question after delay');
@@ -321,14 +321,14 @@ export default function SpeakingQuestion({
           console.warn('[SpeakingQuestion] onMoveToNextQuestion callback not available!');
         }
       }, 2000);
-      
+
     } catch (error) {
       console.error('[SpeakingQuestion] Upload error:', error);
-      
+
       if (uploadRetries < MAX_UPLOAD_RETRIES) {
         setUploadRetries(prev => prev + 1);
         setUploadError(`Upload failed. Retrying... (${uploadRetries + 1}/${MAX_UPLOAD_RETRIES})`);
-        
+
         // Retry after 2 seconds
         setTimeout(() => {
           uploadAudioToBackend(audioBlob, duration);
@@ -386,11 +386,11 @@ export default function SpeakingQuestion({
             <Typography variant="body2" color="primary" sx={{ mt: 1, fontWeight: 'bold' }}>
               → Moving to next question...
             </Typography>
-            
+
             {hasExistingAudio && question.answer_data?.audio_url && (
               <Box sx={{ mt: 2, mb: 2 }}>
-                <audio 
-                  controls 
+                <audio
+                  controls
                   style={{ width: '100%', maxWidth: '400px' }}
                   src={getAssetUrl(question.answer_data.audio_url)}
                 >
@@ -398,7 +398,7 @@ export default function SpeakingQuestion({
                 </audio>
               </Box>
             )}
-            
+
             {hasExistingAudio && question.answer_data?.transcribed_text && (
               <Paper sx={{ p: 2, mt: 2, backgroundColor: 'white', textAlign: 'left' }}>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
@@ -410,7 +410,7 @@ export default function SpeakingQuestion({
               </Paper>
             )}
           </Paper>
-          
+
           <Paper sx={{ p: 2, backgroundColor: '#f9f9f9' }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1 }}>Question:</Typography>
             <Typography variant="body2" sx={{ lineHeight: 1.6 }}>
@@ -419,7 +419,7 @@ export default function SpeakingQuestion({
           </Paper>
         </Box>
       )}
-      
+
       {/* Recording Step */}
       {step === 'recording' && (
         <Box sx={{ display: 'grid', gridTemplateColumns: '300px 1fr 360px', gap: 2, alignItems: 'start' }}>
@@ -428,9 +428,10 @@ export default function SpeakingQuestion({
             {/* Render images from additional_media (SPEAKING section unified structure) */}
             {(() => {
               // For follow-up questions, use parent question's media
+              // Priority: Parent Question Media > Current Question Media
               const sourceQuestion = parentQuestion || question;
-              
-              // Handle both string and already parsed JSON
+
+              // Handle both string and already parsed JSON for additional_media
               let additionalMedia = sourceQuestion.additional_media;
               if (typeof additionalMedia === 'string') {
                 try {
@@ -440,22 +441,22 @@ export default function SpeakingQuestion({
                   additionalMedia = null;
                 }
               }
-              
-              console.log('[SpeakingQuestion] Media rendering:', { 
+
+              console.log('[SpeakingQuestion] Media rendering:', {
                 questionId: question.id,
                 parentQuestionId: question.parent_question_id,
                 usingParent: !!parentQuestion,
                 sourceQuestionId: sourceQuestion.id,
-                additionalMedia
+                mediaCount: additionalMedia?.length || 0
               });
-              
-              if (additionalMedia && Array.isArray(additionalMedia)) {
+
+              if (additionalMedia && Array.isArray(additionalMedia) && additionalMedia.length > 0) {
                 return (
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {parentQuestion && (
-                      <Typography variant="caption" sx={{ 
-                        color: 'primary.main', 
-                        fontWeight: 'bold', 
+                      <Typography variant="caption" sx={{
+                        color: 'primary.main',
+                        fontWeight: 'bold',
                         mb: 1,
                         padding: '4px 8px',
                         backgroundColor: 'primary.50',
@@ -474,11 +475,14 @@ export default function SpeakingQuestion({
                                 {media.description}
                               </Typography>
                             )}
-                            <img 
-                              src={media.url} 
-                              alt={media.description || 'Question media'} 
-                              style={{ maxWidth: '100%', maxHeight: '280px', borderRadius: '4px', objectFit: 'cover' }}
-                              onError={(e) => { e.target.src = 'https://via.placeholder.com/280x280?text=Image+Not+Found'; }}
+                            <img
+                              src={getAssetUrl(media.url)}
+                              alt={media.description || 'Question media'}
+                              style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', objectFit: 'contain' }}
+                              onError={(e) => {
+                                console.error('Image load failed:', media.url);
+                                e.target.src = 'https://via.placeholder.com/400x300?text=Image+Load+Error';
+                              }}
                             />
                           </Box>
                         ) : media.type === 'audio' ? (
@@ -488,10 +492,10 @@ export default function SpeakingQuestion({
                                 {media.description}
                               </Typography>
                             )}
-                            <audio 
-                              controls 
+                            <audio
+                              controls
                               style={{ width: '100%' }}
-                              src={media.url}
+                              src={getAssetUrl(media.url)}
                             >
                               Browser does not support audio.
                             </audio>
@@ -506,9 +510,9 @@ export default function SpeakingQuestion({
                 return (
                   <Paper sx={{ p: 2, backgroundColor: '#f5f5f5', textAlign: 'center', position: 'sticky', top: '20px' }}>
                     {parentQuestion && (
-                      <Typography variant="caption" sx={{ 
-                        color: 'primary.main', 
-                        fontWeight: 'bold', 
+                      <Typography variant="caption" sx={{
+                        color: 'primary.main',
+                        fontWeight: 'bold',
                         mb: 1,
                         display: 'block'
                       }}>
@@ -516,28 +520,34 @@ export default function SpeakingQuestion({
                       </Typography>
                     )}
                     {sourceQuestion.media_url.includes('.mp3') || sourceQuestion.media_url.includes('audio') ? (
-                      <audio 
-                        controls 
+                      <audio
+                        controls
                         style={{ width: '100%' }}
                         src={getAssetUrl(sourceQuestion.media_url)}
                       >
                         Browser does not support audio.
                       </audio>
                     ) : (
-                      <img 
-                        src={sourceQuestion.media_url} 
-                        alt="Question" 
-                        style={{ maxWidth: '100%', maxHeight: '280px', borderRadius: '4px' }}
+                      <img
+                        src={getAssetUrl(sourceQuestion.media_url)}
+                        alt="Question"
+                        style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '4px', objectFit: 'contain' }}
+                        onError={(e) => { e.target.src = 'https://via.placeholder.com/400x300?text=Image+Not+Found'; }}
                       />
                     )}
                   </Paper>
                 );
               } else {
                 return (
-                  <Paper sx={{ p: 2, backgroundColor: '#f9f9f9', textAlign: 'center', border: '2px dashed #ccc' }}>
-                    <Typography variant="caption" color="text.secondary">
-                      No media available for this question
-                    </Typography>
+                  <Paper sx={{ p: 3, backgroundColor: '#f9f9f9', textAlign: 'center', border: '2px dashed #ccc', minHeight: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Box>
+                      <Typography variant="body2" color="text.secondary" gutterBottom>
+                        No image available
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontStyle: 'italic' }}>
+                        (This question requires manual image upload in Admin)
+                      </Typography>
+                    </Box>
                   </Paper>
                 );
               }
@@ -554,7 +564,7 @@ export default function SpeakingQuestion({
                 </Typography>
               </Paper>
             )}
-            
+
             {/* Requirements */}
             <Box sx={{ p: 2, backgroundColor: '#e3f2fd', borderRadius: 1 }}>
               <Typography variant="caption" sx={{ fontWeight: 'bold', color: '#1976d2', display: 'block', mb: 1 }}>
@@ -577,7 +587,7 @@ export default function SpeakingQuestion({
                 <Typography variant="caption" sx={{ color: '#e65100', fontWeight: 'bold', display: 'block', mb: 2 }}>
                   Preparing...
                 </Typography>
-                
+
                 <Box sx={{
                   position: 'relative',
                   width: 140,
@@ -594,7 +604,7 @@ export default function SpeakingQuestion({
                     thickness={4}
                     sx={{ position: 'absolute', color: '#ff9800' }}
                   />
-                  
+
                   <Box sx={{ textAlign: 'center', zIndex: 1 }}>
                     <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#ff9800', fontSize: '32px', lineHeight: 1 }}>
                       {formatTime(preparationTime)}
@@ -628,7 +638,7 @@ export default function SpeakingQuestion({
                     <Typography variant="caption" sx={{ fontWeight: 'bold', color: '#d32f2f', display: 'block', textAlign: 'center', mb: 1.5 }}>
                       ● Recording
                     </Typography>
-                    
+
                     <Box sx={{
                       position: 'relative',
                       width: 120,
@@ -645,7 +655,7 @@ export default function SpeakingQuestion({
                         thickness={4}
                         sx={{ position: 'absolute', color: '#d32f2f' }}
                       />
-                      
+
                       <Box sx={{ textAlign: 'center', zIndex: 1 }}>
                         <Mic sx={{ fontSize: 40, color: '#d32f2f', mb: 0.5 }} />
                         <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#d32f2f', fontSize: '28px', lineHeight: 1 }}>
@@ -660,8 +670,8 @@ export default function SpeakingQuestion({
                           <Typography variant="caption" sx={{ color: '#4caf50', fontWeight: 'bold', display: 'block', mb: 1, textAlign: 'center' }}>
                             ✓ Can stop
                           </Typography>
-                          <Button 
-                            variant="contained" 
+                          <Button
+                            variant="contained"
                             color="error"
                             onClick={() => setShowStopConfirmation(true)}
                             fullWidth
@@ -712,14 +722,14 @@ export default function SpeakingQuestion({
           </Typography>
         </DialogContent>
         <DialogActions sx={{ justifyContent: 'center', gap: 1, pb: 2 }}>
-          <Button 
+          <Button
             variant="outlined"
             onClick={() => setShowStopConfirmation(false)}
             sx={{ px: 3 }}
           >
             Continue
           </Button>
-          <Button 
+          <Button
             variant="contained"
             color="error"
             onClick={confirmStopRecording}

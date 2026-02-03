@@ -27,7 +27,7 @@ export default function ReadingMatchingHeadingsQuestion({ question, onAnswerChan
         console.error('[ReadingMatchingHeadingsQuestion] Error parsing answer_json:', error);
       }
     }
-    
+
     // Initialize empty matches
     if (question.items) {
       const initialMatches = {};
@@ -38,14 +38,21 @@ export default function ReadingMatchingHeadingsQuestion({ question, onAnswerChan
     }
   }, [question.id, question.answer_data?.answer_json, question.items]);
 
-  const handleMatchChange = (itemId, optionText) => {
-    const newMatches = { ...matches, [itemId]: optionText };
+  const handleMatchChange = (itemId, optionId) => {
+    const newMatches = { ...matches, [itemId]: optionId };
     setMatches(newMatches);
-    
+
     onAnswerChange({
       answer_type: 'json',
       answer_json: JSON.stringify({ matches: newMatches })
     });
+  };
+
+  // Helper to get display text for a selected option ID
+  const getOptionDisplayText = (optionId) => {
+    if (!optionId) return '';
+    const option = question.options.find(opt => opt.id === optionId || opt.id === parseInt(optionId));
+    return option ? option.option_text : '';
   };
 
   if (!question.content || !question.items || !question.options) {
@@ -63,35 +70,131 @@ export default function ReadingMatchingHeadingsQuestion({ question, onAnswerChan
   });
 
   // Parse content to extract main content and paragraph sections
-  const contentLines = question.content.split('\n');
-  const instructionEndIndex = contentLines.findIndex(line => line.includes('Available Headings:'));
-  const paragraphStartIndex = contentLines.findIndex(line => line.includes('PARAGRAPH'));
+  let instructionText = '';
+  // eslint-disable-next-line no-unused-vars
+  let availableHeadingsList = []; // Used for debugging or extra display if needed
+  let paragraphSections = [];
 
-  const instructionText = contentLines.slice(0, instructionEndIndex).join('\n');
-  const availableHeadings = question.options.map(option => option.option_text);
-  
-  // Extract paragraph content between PARAGRAPH markers
-  const paragraphSections = [];
-  let currentParagraph = null;
-  
-  for (let i = paragraphStartIndex; i < contentLines.length; i++) {
-    const line = contentLines[i];
-    if (line.startsWith('PARAGRAPH')) {
-      if (currentParagraph) {
-        paragraphSections.push(currentParagraph);
+  // STRATEGY 1: Parse JSON content (New format)
+  let isJsonParsed = false;
+  try {
+    if (question.content && (question.content.trim().startsWith('{') || question.content.trim().startsWith('['))) {
+      const parsedContent = JSON.parse(question.content);
+
+      // Support both 'paragraphs' and 'passages' keys for flexibility
+      const rawParagraphs = parsedContent.paragraphs || parsedContent.passages;
+
+      if (rawParagraphs && Array.isArray(rawParagraphs)) {
+        console.log('[ReadingMatchingHeadingsQuestion] JSON content detected');
+        instructionText = parsedContent.instructions || parsedContent.instruction || 'Read the passage quickly. Choose a heading for each numbered paragraph from the drop-down box.';
+
+        paragraphSections = rawParagraphs.map((p, index) => ({
+          number: p.title ? p.title.replace(/PARAGRAPH\s*/i, '') : (index + 1).toString(),
+          content: [p.text || '']
+        }));
+
+        isJsonParsed = true;
       }
-      currentParagraph = {
-        number: line.match(/PARAGRAPH (\d+)/)?.[1] || '1',
-        content: []
-      };
-    } else if (currentParagraph && line.trim() !== '') {
-      currentParagraph.content.push(line);
+    }
+  } catch (error) {
+    console.log('[ReadingMatchingHeadingsQuestion] JSON parse failed, fallback to text:', error);
+  }
+
+  // STRATEGY 2: Legacy Text Parsing
+  // STRATEGY 2: Legacy Text Parsing
+  if (!isJsonParsed) {
+    console.log('[ReadingMatchingHeadingsQuestion] Using legacy text parsing');
+    const contentLines = question.content ? question.content.split('\n') : [];
+
+    // 2.1 Determine Instruction & Heading Boundaries
+    const instructionEndIndex = contentLines.findIndex(line => line && line.includes('Available Headings:'));
+
+    // 2.2 Find where paragraphs likely start (look for explicit markers or patterns)
+    // Markers: "PARAGRAPH", "Paragraph 1:", "1.", or digit-only lines
+    const paragraphStartIndex = contentLines.findIndex((line, idx) => {
+      if (!line) return false;
+      if (instructionEndIndex !== -1 && idx <= instructionEndIndex) return false; // Must be after instructions
+      const trimmed = line.trim();
+      return trimmed.startsWith('PARAGRAPH') || trimmed.match(/^Paragraph\s+\d+[:.]?$/i);
+    });
+
+    // Set Instruction Text
+    if (instructionEndIndex !== -1) {
+      instructionText = contentLines.slice(0, instructionEndIndex).join('\n');
+    } else {
+      // If no explicit header, assume first few lines are instruction
+      instructionText = 'Read the passage and match headings.';
+    }
+
+    // 2.3 Extract paragraph content
+    let currentParagraph = null;
+    let foundExplicitMarker = false;
+
+    // Start scanning from where we think paragraphs start, or after instructions
+    const scanStartIdx = paragraphStartIndex !== -1 ? paragraphStartIndex : (instructionEndIndex !== -1 ? instructionEndIndex + 1 : 0);
+
+    for (let i = scanStartIdx; i < contentLines.length; i++) {
+      const line = contentLines[i];
+      if (!line) continue;
+
+      const trimmedLine = line.trim();
+
+      // Check for markers
+      // Regex: Starts with "PARAGRAPH X", "Paragraph X:", or just number like "1." (if confident)
+      const markerMatch = trimmedLine.match(/^(?:PARAGRAPH|Paragraph)\s+(\d+)(?:\.|:)?$/i);
+
+      if (markerMatch) {
+        if (currentParagraph) {
+          paragraphSections.push(currentParagraph);
+        }
+        currentParagraph = {
+          number: markerMatch[1],
+          content: []
+        };
+        foundExplicitMarker = true;
+      } else if (currentParagraph) {
+        currentParagraph.content.push(line);
+      } else if (!paragraphStartIndex && !foundExplicitMarker) {
+        // If we haven't found ANY marker yet, and we are ignoring the instruction block, 
+        // we might be in "orphan text" mode.
+        // Let's verify later.
+      }
+    }
+
+    if (currentParagraph) {
+      paragraphSections.push(currentParagraph);
+    }
+
+    // STRATEGY 3: Ultimate Fallback (If no sections found but we have items)
+    if (paragraphSections.length === 0 && question.items && question.items.length > 0) {
+      console.log('[ReadingMatchingHeadingsQuestion] Fallback: No markers found. assigning text to items.');
+
+      // Gather all remaining text after instruction/headings
+      let bodyLines = [];
+      if (instructionEndIndex !== -1) {
+        // Skip headings list (heuristic: usually ~5-10 lines after "Available Headings")
+        // Here we just skip untill we see non-list item or end of file
+        // Simple hack: Skip 10 lines max after header
+        const skipCount = (question.options ? question.options.length : 0) + 2;
+        bodyLines = contentLines.slice(Math.min(contentLines.length, instructionEndIndex + skipCount));
+      } else {
+        bodyLines = contentLines;
+      }
+
+      const fullBodyText = bodyLines.join('\n').trim() || '(No text content found)';
+
+      // Assign full text to Paragraph 1, and make others "See above"
+      // This ensures the user sees SOMETHING and has dropdowns
+      question.items.forEach((item, idx) => {
+        paragraphSections.push({
+          number: (idx + 1).toString(),
+          content: idx === 0 ? [fullBodyText] : ['(See text above)']
+        });
+      });
     }
   }
-  
-  if (currentParagraph) {
-    paragraphSections.push(currentParagraph);
-  }
+
+  const availableHeadings = question.options ? question.options.map(option => option.option_text) : [];
 
   // Sort items by item_order to match paragraph order
   const sortedItems = [...question.items].sort((a, b) => a.item_order - b.item_order);
@@ -112,7 +215,7 @@ export default function ReadingMatchingHeadingsQuestion({ question, onAnswerChan
           <Paper key={`paragraph-${paragraph.number}`} elevation={1} sx={{ p: 2, mb: 2 }}>
             {/* Paragraph Header with Dropdown */}
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6" sx={{ mr: 2,minWidth: 100 }}>
+              <Typography variant="h6" sx={{ mr: 2, minWidth: 100 }}>
                 Paragraph {paragraph.number}:
               </Typography>
               <FormControl size="small" sx={{ minWidth: 300 }}>
@@ -120,6 +223,7 @@ export default function ReadingMatchingHeadingsQuestion({ question, onAnswerChan
                   value={matches[correspondingItem.id] || ''}
                   onChange={(e) => handleMatchChange(correspondingItem.id, e.target.value)}
                   displayEmpty
+                  renderValue={(selected) => selected ? getOptionDisplayText(selected) : <em>-- Chọn heading --</em>}
                   sx={{
                     backgroundColor: matches[correspondingItem.id] ? '#e3f2fd' : 'white',
                     '& .MuiSelect-select': {
@@ -131,7 +235,7 @@ export default function ReadingMatchingHeadingsQuestion({ question, onAnswerChan
                     <em>-- Chọn heading --</em>
                   </MenuItem>
                   {question.options.map((option) => (
-                    <MenuItem key={option.id} value={option.option_text}>
+                    <MenuItem key={option.id} value={option.id}>
                       {option.option_text}
                     </MenuItem>
                   ))}

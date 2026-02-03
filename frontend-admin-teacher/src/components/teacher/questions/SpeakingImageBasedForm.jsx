@@ -28,7 +28,7 @@ import { CloudUpload, Delete, Image as ImageIcon, Add } from '@mui/icons-materia
 export default function SpeakingImageBasedForm({ questionType, initialData, onSubmit, onBack, isEdit = false }) {
   const isSpeakingDescription = questionType?.code === 'SPEAKING_DESCRIPTION';
   const isSpeakingComparison = questionType?.code === 'SPEAKING_COMPARISON';
-  
+
   // Main question (parent) data
   const [mainQuestion, setMainQuestion] = useState({
     content: initialData?.content || '',
@@ -61,7 +61,7 @@ export default function SpeakingImageBasedForm({ questionType, initialData, onSu
   const handleImageUpload = (event) => {
     const files = Array.from(event.target.files);
     const maxImages = isSpeakingComparison ? 2 : 1;
-    
+
     if (files.length > maxImages) {
       alert(`Bạn chỉ có thể upload tối đa ${maxImages} hình ảnh`);
       return;
@@ -69,7 +69,7 @@ export default function SpeakingImageBasedForm({ questionType, initialData, onSu
 
     const newImageFiles = [...mainQuestion.imageFiles, ...files].slice(0, maxImages);
     const newImagePreviews = newImageFiles.map(file => URL.createObjectURL(file));
-    
+
     setMainQuestion(prev => ({
       ...prev,
       imageFiles: newImageFiles,
@@ -80,7 +80,7 @@ export default function SpeakingImageBasedForm({ questionType, initialData, onSu
   const handleRemoveImage = (index) => {
     const newImageFiles = mainQuestion.imageFiles.filter((_, i) => i !== index);
     const newImagePreviews = mainQuestion.imagePreviews.filter((_, i) => i !== index);
-    
+
     setMainQuestion(prev => ({
       ...prev,
       imageFiles: newImageFiles,
@@ -135,7 +135,7 @@ export default function SpeakingImageBasedForm({ questionType, initialData, onSu
     <Box>
       <Alert severity="info" sx={{ mb: 3 }}>
         <Typography variant="body2">
-          <strong>{isSpeakingDescription ? 'Picture Description' : 'Comparison'}:</strong> 
+          <strong>{isSpeakingDescription ? 'Picture Description' : 'Comparison'}:</strong>
           {' '}Câu hỏi này bao gồm 1 câu hỏi chính có hình ảnh và 2 câu hỏi phụ tham chiếu cùng hình ảnh đó.
         </Typography>
       </Alert>
@@ -145,24 +145,24 @@ export default function SpeakingImageBasedForm({ questionType, initialData, onSu
         <Typography variant="h6" gutterBottom color="primary">
           📷 Câu hỏi chính (có hình ảnh)
         </Typography>
-        
+
         {/* Image Upload */}
         <Box mb={3}>
           <Typography variant="subtitle2" gutterBottom>
             Hình ảnh câu hỏi {isSpeakingComparison ? '(Upload 2 hình để so sánh)' : '(Upload 1 hình)'}
           </Typography>
-          
+
           {mainQuestion.imagePreviews.length > 0 ? (
             <Box>
               <Grid container spacing={2} mb={2}>
                 {mainQuestion.imagePreviews.map((preview, index) => (
                   <Grid item xs={12} sm={6} key={index}>
                     <Box position="relative">
-                      <Box 
-                        component="img" 
-                        src={preview} 
+                      <Box
+                        component="img"
+                        src={preview}
                         alt={`Question image ${index + 1}`}
-                        sx={{ 
+                        sx={{
                           width: '100%',
                           height: 300,
                           objectFit: 'cover',
@@ -185,7 +185,7 @@ export default function SpeakingImageBasedForm({ questionType, initialData, onSu
                       >
                         <Delete />
                       </IconButton>
-                      <Chip 
+                      <Chip
                         label={isSpeakingComparison ? `Hình ${String.fromCharCode(65 + index)}` : 'Hình chính'}
                         size="small"
                         sx={{
@@ -200,7 +200,7 @@ export default function SpeakingImageBasedForm({ questionType, initialData, onSu
                   </Grid>
                 ))}
               </Grid>
-              
+
               {isSpeakingComparison && mainQuestion.imagePreviews.length < 2 && (
                 <Button
                   component="label"
@@ -287,7 +287,7 @@ export default function SpeakingImageBasedForm({ questionType, initialData, onSu
             <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
               Câu hỏi phụ #{index + 1}
             </Typography>
-            
+
             <TextField
               label={`Nội dung câu hỏi phụ ${index + 1}`}
               multiline

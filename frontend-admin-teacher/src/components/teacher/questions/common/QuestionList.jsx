@@ -26,9 +26,9 @@ import { Search, Add, FilterList, Visibility, Delete, Clear } from '@mui/icons-m
 import { Edit } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import { fetchQuestions, fetchFilterOptions, deleteQuestion } from '@/store/slices/questionSlice';
-import { 
-  getDifficultyColor, 
-  getStatusColor 
+import {
+  getDifficultyColor,
+  getStatusColor
 } from '@/constants/filterOptions';
 import DataTable from '@/components/shared/DataTable';
 import QuestionCard from './QuestionCard';
@@ -44,7 +44,7 @@ export default function QuestionList({
   const dispatch = useDispatch();
   const { questions, loading, pagination, filterOptions } = useSelector(state => state.questions);
   const [isClient, setIsClient] = useState(false);
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
     question_type: '', // Maps to question_type_id in backend
@@ -82,15 +82,15 @@ export default function QuestionList({
   // Debounce search and filters - separate from filter state changes
   useEffect(() => {
     if (!isClient) return;
-    
+
     // Create a JSON string to compare filter changes
     const currentFilterString = JSON.stringify({ searchTerm, ...filters });
-    
+
     const timeoutId = setTimeout(() => {
       console.log('[QuestionList] Fetching with filters:', { searchTerm, ...filters });
       handleFetchQuestions(1); // Reset to page 1 when filters change
     }, 500); // 500ms debounce delay
-    
+
     return () => clearTimeout(timeoutId);
   }, [searchTerm, filters, isClient]);
 
@@ -104,14 +104,14 @@ export default function QuestionList({
       status: filters.status || undefined,
       search: searchTerm || undefined
     };
-    
+
     // Remove undefined values
     const cleanFilters = Object.fromEntries(
       Object.entries(apiFilters).filter(([, v]) => v !== undefined)
     );
-    
+
     console.log('[QuestionList] API filters being sent:', cleanFilters);
-    
+
     dispatch(fetchQuestions({
       page,
       limit: 10,
@@ -165,7 +165,7 @@ export default function QuestionList({
 
   const handleConfirmDelete = async () => {
     if (!questionToDelete) return;
-    
+
     try {
       await dispatch(deleteQuestion(questionToDelete.id)).unwrap();
       // Refresh the list after deletion
@@ -188,11 +188,11 @@ export default function QuestionList({
     try {
       // Try to parse as JSON
       const parsed = typeof content === 'string' ? JSON.parse(content) : content;
-      
+
       // Extract title based on content structure
       let title = '';
       let description = '';
-      
+
       if (parsed.title) {
         title = parsed.title;
       } else if (parsed.content) {
@@ -211,7 +211,7 @@ export default function QuestionList({
           }
         }
       }
-      
+
       // Extract description from various possible fields
       if (parsed.passage) {
         description = parsed.passage.substring(0, 80) + (parsed.passage.length > 80 ? '...' : '');
@@ -222,7 +222,7 @@ export default function QuestionList({
       } else if (parsed.prompt) {
         description = parsed.prompt.substring(0, 80) + (parsed.prompt.length > 80 ? '...' : '');
       }
-      
+
       return { title: title || 'Unnamed Question', description };
     } catch (error) {
       // If not JSON, treat as plain text
@@ -248,9 +248,23 @@ export default function QuestionList({
               </Typography>
             </Box>
             {description && (
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 0.5 }}>
                 {description}
               </Typography>
+            )}
+
+            {/* Display Child Questions */}
+            {row.childQuestions && row.childQuestions.length > 0 && (
+              <Box sx={{ mt: 1, pl: 2, borderLeft: '2px solid #e0e0e0' }}>
+                {row.childQuestions.map((child, index) => {
+                  const childInfo = extractTitleAndDescription(child.content);
+                  return (
+                    <Typography key={child.id} variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                      • {childInfo.title}
+                    </Typography>
+                  );
+                })}
+              </Box>
             )}
           </Box>
         );
@@ -260,9 +274,9 @@ export default function QuestionList({
       id: 'question_type',
       label: 'Loại câu',
       render: (row) => (
-        <Chip 
-          label={row.question_type} 
-          size="small" 
+        <Chip
+          label={row.question_type}
+          size="small"
           variant="outlined"
           color="primary"
         />
@@ -272,9 +286,9 @@ export default function QuestionList({
       id: 'skill',
       label: 'Kỹ năng',
       render: (row) => (
-        <Chip 
-          label={row.skill} 
-          size="small" 
+        <Chip
+          label={row.skill}
+          size="small"
           variant="filled"
           color="secondary"
         />
@@ -302,8 +316,8 @@ export default function QuestionList({
       label: 'Số lần dùng',
       align: 'center',
       render: (row) => (
-        <Chip 
-          label={`${row.usage_count} lần`} 
+        <Chip
+          label={`${row.usage_count} lần`}
           size="small"
           variant={row.usage_count > 0 ? 'filled' : 'outlined'}
           color={row.usage_count > 0 ? 'success' : 'default'}
@@ -351,12 +365,12 @@ export default function QuestionList({
   // Don't render until client-side to prevent hydration mismatch
   if (!isClient) {
     return (
-      <Box sx={{ 
-        p: 3, 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        minHeight: '300px' 
+      <Box sx={{
+        p: 3,
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: '300px'
       }}>
         <Typography variant="h6" color="text.secondary">
           Đang tải danh sách câu hỏi...
@@ -435,7 +449,7 @@ export default function QuestionList({
                 </Select>
               </FormControl>
 
-            
+
 
               <Box display="flex" gap={1} alignItems="center">
                 <Button
@@ -450,7 +464,7 @@ export default function QuestionList({
                   Xóa bộ lọc
                 </Button>
                 {activeFiltersCount > 0 && (
-                  <Chip 
+                  <Chip
                     label={`${activeFiltersCount} bộ lọc đang áp dụng`}
                     color="error"
                     size="small"
@@ -479,7 +493,7 @@ export default function QuestionList({
           question={previewQuestion}
         />
       )}
-      
+
       {/* Delete Confirmation Dialog */}
       <Dialog
         open={deleteDialogOpen}
@@ -502,9 +516,9 @@ export default function QuestionList({
           <Button onClick={handleCancelDelete} color="primary">
             Hủy
           </Button>
-          <Button 
-            onClick={handleConfirmDelete} 
-            color="error" 
+          <Button
+            onClick={handleConfirmDelete}
+            color="error"
             variant="contained"
             autoFocus
           >

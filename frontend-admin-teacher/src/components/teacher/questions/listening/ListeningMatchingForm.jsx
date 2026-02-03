@@ -11,7 +11,11 @@ import {
   Paper,
   Alert,
   Avatar,
-  Divider
+  Divider,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -28,7 +32,7 @@ import { questionApi } from '../../../../services/questionService';
  * APTIS Listening Speaker Matching Form  
  * Part 2-4: Listening comprehension with speaker matching tasks
  */
-const ListeningMatchingForm = ({ questionData, onChange, onValidate, isEdit = false }) => {
+const ListeningMatchingForm = ({ questionData, onChange, onAudioFilesChange, onValidate, isEdit = false }) => {
   const [formData, setFormData] = React.useState({
     content: questionData?.content || '',
     title: questionData?.title || '',
@@ -37,7 +41,7 @@ const ListeningMatchingForm = ({ questionData, onChange, onValidate, isEdit = fa
     speakers: questionData?.speakers || [
       {
         id: 1,
-        name: 'Speaker A', 
+        name: 'Speaker A',
         audioFile: null,
         audioUrl: '',
         description: ''
@@ -45,7 +49,7 @@ const ListeningMatchingForm = ({ questionData, onChange, onValidate, isEdit = fa
       {
         id: 2,
         name: 'Speaker B',
-        audioFile: null, 
+        audioFile: null,
         audioUrl: '',
         description: ''
       }
@@ -65,54 +69,85 @@ const ListeningMatchingForm = ({ questionData, onChange, onValidate, isEdit = fa
   const [isValidated, setIsValidated] = React.useState(false);
   const [isUploading, setIsUploading] = React.useState(false);
 
+  // Sync audio files to parent whenever they change
+  React.useEffect(() => {
+    if (onAudioFilesChange) {
+      const speakerFiles = formData.speakers
+        .map(s => s.audioFile)
+        .filter(f => f && f instanceof File);
+
+      onAudioFilesChange({
+        mainAudio: formData.audioFile,
+        speakerAudios: speakerFiles
+      });
+    }
+  }, [formData.audioFile, formData.speakers, onAudioFilesChange]);
+
   // Main audio file selection handler
   const handleMainAudioFileSelect = (file) => {
     if (!file) return;
-    
-    setFormData(prev => ({ ...prev, audioFile: file }));
+
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(file);
+
+    setFormData(prev => ({
+      ...prev,
+      audioFile: file,
+      audioUrl: previewUrl
+    }));
+
     console.log('✅ Main audio file selected:', file.name);
   };
 
   // Speaker audio file selection handler
   const handleSpeakerAudioFileSelect = (speakerIndex, file) => {
     if (!file) return;
-    
+
     const newSpeakers = [...formData.speakers];
     newSpeakers[speakerIndex].audioFile = file;
+    // Create preview URL for the new file
+    if (newSpeakers[speakerIndex].audioUrl && newSpeakers[speakerIndex].audioUrl.startsWith('blob:')) {
+      URL.revokeObjectURL(newSpeakers[speakerIndex].audioUrl); // Clean up old blob
+    }
+    newSpeakers[speakerIndex].audioUrl = URL.createObjectURL(file);
+
     setFormData(prev => ({ ...prev, speakers: newSpeakers }));
     console.log(`✅ Speaker ${speakerIndex + 1} audio file selected:`, file.name);
   };
 
   const validateForm = () => {
     const newErrors = {};
-    
+
     // Check title
     if (!formData.title.trim()) {
       newErrors.title = 'Tiêu đề không được để trống';
     }
-    
+
     // Không cần validate audio chính cho phần này
-    
+
     // Check speakers
     const validSpeakers = formData.speakers.filter(s => s.name.trim() && (s.audioUrl || s.audioFile));
     if (validSpeakers.length < 2) {
       newErrors.speakers = 'Phải có ít nhất 2 người nói với file audio';
     }
-    
+
     // Check statements
     const validStatements = formData.statements.filter(s => s.statement.trim());
     if (validStatements.length === 0) {
       newErrors.statements = 'Phải có ít nhất 1 câu nói';
     }
-    
+
     setErrors(newErrors);
     const isValid = Object.keys(newErrors).length === 0;
     setIsValidated(isValid);
-    
+
     if (isValid && onChange) {
       // Prepare data for backend helper function
       const structuredData = {
-        speakers: validSpeakers.map(speaker => speaker.name),
+        speakers: validSpeakers.map(speaker => ({
+          name: speaker.name,
+          id: speaker.id // Keep ID for matching with statements
+        })),
         statements: validStatements.map(statement => ({
           text: statement.statement,
           speaker: validSpeakers.find(s => s.id === statement.speaker_id)?.name || ''
@@ -121,11 +156,11 @@ const ListeningMatchingForm = ({ questionData, onChange, onValidate, isEdit = fa
         instructions: formData.instructions.trim(),
         title: formData.title.trim()
       };
-      
+
       // Send content as JSON string for backend auto-generation
       onChange(JSON.stringify(structuredData));
     }
-    
+
     return isValid;
   };
 
@@ -182,7 +217,7 @@ const ListeningMatchingForm = ({ questionData, onChange, onValidate, isEdit = fa
       <Typography variant="h6" gutterBottom>
         Listening Speaker Matching
       </Typography>
-      
+
       <Typography variant="body2" color="text.secondary" mb={3}>
         Tạo bài nghe ghép người nói với câu nói tương ứng
       </Typography>
@@ -265,7 +300,7 @@ const ListeningMatchingForm = ({ questionData, onChange, onValidate, isEdit = fa
                     <Typography variant="caption" display="block" mb={1}>
                       File audio mẫu của người nói:
                     </Typography>
-                    
+
                     <Button
                       variant="text"
                       component="label"
@@ -286,10 +321,16 @@ const ListeningMatchingForm = ({ questionData, onChange, onValidate, isEdit = fa
                         }}
                       />
                     </Button>
-                    
+
+                    {speaker.audioFile && (
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                        File: {speaker.audioFile.name}
+                      </Typography>
+                    )}
+
                     {speaker.audioUrl && (
-                      <audio controls style={{ width: '100%', marginTop: 8 }}>
-                        <source src={speaker.audioUrl} type="audio/mpeg" />
+                      <audio controls style={{ width: '100%', marginTop: 8 }} src={speaker.audioUrl}>
+                        Your browser does not support the audio element.
                       </audio>
                     )}
                   </Box>
@@ -340,16 +381,35 @@ const ListeningMatchingForm = ({ questionData, onChange, onValidate, isEdit = fa
                   </IconButton>
                 </Box>
 
-                <TextField
-                  label="Nội dung câu nói"
-                  value={statement.statement}
-                  onChange={(e) => handleStatementChange(index, 'statement', e.target.value)}
-                  fullWidth
-                  multiline
-                  rows={3}
-                  size="small"
-                  margin="normal"
-                />
+                <Box display="flex" gap={2}>
+                  <TextField
+                    label="Nội dung câu nói"
+                    value={statement.statement}
+                    onChange={(e) => handleStatementChange(index, 'statement', e.target.value)}
+                    fullWidth
+                    multiline
+                    rows={2}
+                    size="small"
+                    margin="normal"
+                    sx={{ flex: 2 }}
+                    placeholder="Ví dụ: Thích tập thể dục buổi sáng..."
+                  />
+
+                  <FormControl margin="normal" size="small" sx={{ flex: 1 }}>
+                    <InputLabel>Người nói (Đáp án)</InputLabel>
+                    <Select
+                      value={statement.speaker_id}
+                      label="Người nói (Đáp án)"
+                      onChange={(e) => handleStatementChange(index, 'speaker_id', e.target.value)}
+                    >
+                      {formData.speakers.map(speaker => (
+                        <MenuItem key={speaker.id} value={speaker.id}>
+                          {speaker.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Box>
               </CardContent>
             </Card>
           </Box>

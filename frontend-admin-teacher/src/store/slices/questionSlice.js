@@ -68,22 +68,22 @@ export const createQuestion = createAsyncThunk(
   async (questionData, { rejectWithValue }) => {
     try {
       console.log('[createQuestion thunk] Input data:', questionData);
-      
+
       // Use question_type_code and aptis_type_code directly if provided
       let question_type_id = questionData.question_type_id;
       let aptis_type_id = questionData.aptis_type_id;
-      
+
       // If codes are provided, fetch the IDs
       if (questionData.question_type_code && !question_type_id) {
         const questionTypeResponse = await questionApi.getQuestionTypeByCode(questionData.question_type_code);
         question_type_id = questionTypeResponse.data.id;
       }
-      
+
       if (questionData.aptis_type_code && !aptis_type_id) {
         const aptisTypeResponse = await questionApi.getAptisTypeByCode(questionData.aptis_type_code);
         aptis_type_id = aptisTypeResponse.data.id;
       }
-      
+
       if (!question_type_id || !aptis_type_id) {
         throw new Error('Missing required question_type_id or aptis_type_id');
       }
@@ -104,17 +104,32 @@ export const createQuestion = createAsyncThunk(
         additional_media: questionData.additional_media || null,
         status: questionData.status || 'draft'
       };
-      
-      console.log('[createQuestion thunk] Backend data:', backendData);
-      console.log('[createQuestion thunk] Content type:', typeof backendData.content);
-      console.log('[createQuestion thunk] Content length:', backendData.content?.length);
-      console.log('[createQuestion thunk] Content value:', backendData.content);
+
+      // Clean up null/undefined optional fields to satisfy strict validators
+      Object.keys(backendData).forEach(key => {
+        if (backendData[key] === null || backendData[key] === undefined) {
+          delete backendData[key];
+        }
+      });
+
+      console.log('[createQuestion thunk] 🚀 CLEANED BACKEND PAYLOAD:', JSON.stringify(backendData, null, 2));
       const response = await questionApi.createQuestion(backendData);
       console.log('[createQuestion thunk] Response:', response);
-      return response.data;
+      // questionService already returns response.data (the backend's JSON: { success, data, questionId })
+      // So we return it as-is, not unwrap further
+      return response;
     } catch (error) {
-      console.error('[createQuestion thunk] Error:', error);
-      return rejectWithValue(error.message || 'Failed to create question');
+      console.error('❌ [createQuestion thunk] FAILED:', error);
+      if (error.response) {
+        console.error('📊 [createQuestion thunk] Error Response Status:', error.response.status);
+        console.error('📊 [createQuestion thunk] Error Response Data:', JSON.stringify(error.response.data, null, 2));
+      }
+
+      const message = error.response?.data?.error?.message
+        || error.response?.data?.message
+        || error.message
+        || 'Không thể tạo câu hỏi';
+      return rejectWithValue(message);
     }
   }
 );
@@ -325,7 +340,9 @@ const questionSlice = createSlice({
       })
       .addCase(createQuestion.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.questions.unshift(action.payload);
+        // Unwrap the response to get the actual question object
+        const newQuestion = action.payload.data || action.payload;
+        state.questions.unshift(newQuestion);
         state.pagination.total += 1;
         state.error = null;
       })
@@ -401,7 +418,9 @@ const questionSlice = createSlice({
       })
       .addCase(duplicateQuestion.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.questions.unshift(action.payload);
+        // Unwrap the response to get the actual question object
+        const duplicatedQuestion = action.payload.data || action.payload;
+        state.questions.unshift(duplicatedQuestion);
         state.pagination.total += 1;
         state.error = null;
       })

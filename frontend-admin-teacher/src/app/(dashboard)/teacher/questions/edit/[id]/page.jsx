@@ -34,9 +34,9 @@ export default function EditQuestionPage() {
   const dispatch = useDispatch();
   const params = useParams();
   const questionId = params.id;
-  
+
   const { aptisTypes, skillTypes, questionTypes, loading: publicDataLoading } = usePublicData();
-  
+
   const [activeStep, setActiveStep] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -56,7 +56,7 @@ export default function EditQuestionPage() {
       setLoading(true);
       const response = await questionApi.getQuestionById(questionId);
       console.log('✅ Loaded question data:', response.data);
-      
+
       setQuestionData(response.data);
       setOriginalQuestionData(response.data);
       setFormData(response.data);
@@ -89,26 +89,26 @@ export default function EditQuestionPage() {
     setSaving(true);
     try {
       console.log('🔍 Updating question with data:', formData);
-      
+
       // Check if it's a speaking image-based question
-      const isSpeakingImageBased = questionData?.question_type_code === 'SPEAKING_DESCRIPTION' || 
-                                    questionData?.question_type_code === 'SPEAKING_COMPARISON';
-      
+      const isSpeakingImageBased = questionData?.question_type_code === 'SPEAKING_DESCRIPTION' ||
+        questionData?.question_type_code === 'SPEAKING_COMPARISON';
+
       if (isSpeakingImageBased && formData.mainQuestion && formData.childQuestions) {
         // Handle speaking image-based questions
         console.log('🎤 Updating Speaking image-based questions...');
-        
+
         // Update main question
         const mainQuestionData = {
           ...formData.mainQuestion,
           id: questionData.id
         };
-        
+
         const result = await dispatch(updateQuestion({
           id: questionData.id,
           questionData: mainQuestionData
         }));
-        
+
         if (updateQuestion.fulfilled.match(result)) {
           // Handle image uploads if new images
           if (formData.imageFiles && formData.imageFiles.length > 0) {
@@ -124,25 +124,25 @@ export default function EditQuestionPage() {
               }));
             }
           }
-          
+
           // Update child questions if they exist
           if (formData.childQuestions && formData.childQuestions.length > 0) {
             console.log('👶 Updating child questions...');
             // You might need to implement child question updates here
             // For now, we'll just show success
           }
-          
+
           dispatch(showNotification({
             message: 'Cập nhật câu hỏi Speaking thành công!',
             type: 'success'
           }));
-          
+
           router.push('/teacher/questions');
         }
       } else if (questionData?.skill_type_code === 'listening' && formData.content) {
         // Handle listening questions
         console.log('🎧 Updating Listening questions...');
-        
+
         // Parse content for audio files
         let contentData;
         try {
@@ -182,7 +182,7 @@ export default function EditQuestionPage() {
           id: questionData.id,
           questionData: cleanedFormData
         }));
-        
+
         if (updateQuestion.fulfilled.match(result)) {
           // Upload audio files if new ones
           const hasNewAudioFiles = audioFiles.mainAudio || audioFiles.speakerAudios.length > 0;
@@ -199,12 +199,12 @@ export default function EditQuestionPage() {
               }));
             }
           }
-          
+
           dispatch(showNotification({
             message: 'Cập nhật câu hỏi Listening thành công!',
             type: 'success'
           }));
-          
+
           router.push('/teacher/questions');
         }
       } else {
@@ -213,13 +213,13 @@ export default function EditQuestionPage() {
           id: questionData.id,
           questionData: formData
         }));
-        
+
         if (updateQuestion.fulfilled.match(result)) {
           dispatch(showNotification({
             message: 'Cập nhật câu hỏi thành công!',
             type: 'success'
           }));
-          
+
           router.push('/teacher/questions');
         }
       }
@@ -244,26 +244,26 @@ export default function EditQuestionPage() {
         const skillData = skillTypes.find(s => s.id === questionData.skill_type_id);
         const questionTypeData = questionTypes.find(qt => qt.id === questionData.question_type_id);
         const isAIScoring = questionTypeData?.scoring_method === 'ai';
-        
+
         return (
           <Box>
             <Typography variant="h6" gutterBottom>
               Thông tin câu hỏi
             </Typography>
-            
+
             <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
               <Grid container spacing={3}>
                 <Grid item xs={12} md={6}>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                     Loại APTIS
                   </Typography>
-                  <Chip 
-                    label={aptisData?.aptis_type_name || 'N/A'} 
-                    color="primary" 
-                    variant="outlined" 
+                  <Chip
+                    label={aptisData?.aptis_type_name || 'N/A'}
+                    color="primary"
+                    variant="outlined"
                   />
                 </Grid>
-                
+
                 <Grid item xs={12} md={6}>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                     Loại câu hỏi
@@ -279,14 +279,14 @@ export default function EditQuestionPage() {
                         {questionTypeData?.question_type_name || 'N/A'}
                       </Typography>
                     </Box>
-                    <Chip 
-                      label={isAIScoring ? 'AI Scoring' : 'Auto Scoring'} 
-                      size="small" 
+                    <Chip
+                      label={isAIScoring ? 'AI Scoring' : 'Auto Scoring'}
+                      size="small"
                       color={isAIScoring ? 'secondary' : 'primary'}
                     />
                   </Box>
                 </Grid>
-                
+
 
                 <Grid item xs={12} md={6}>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
@@ -294,7 +294,7 @@ export default function EditQuestionPage() {
                   </Typography>
                   <Typography variant="body1">#{questionData.id}</Typography>
                 </Grid>
-                
+
                 {/* <Grid item xs={12} md={6}>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                     Trạng thái
@@ -305,7 +305,7 @@ export default function EditQuestionPage() {
                     color={questionData.status === 'published' ? 'success' : 'default'}
                   />
                 </Grid> */}
-                
+
                 <Grid item xs={12}>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                     Ngày tạo / Cập nhật
@@ -318,7 +318,7 @@ export default function EditQuestionPage() {
                 </Grid>
               </Grid>
             </Paper>
-            
+
             <Button
               variant="contained"
               onClick={handleNext}
@@ -328,12 +328,12 @@ export default function EditQuestionPage() {
             </Button>
           </Box>
         );
-        
+
       case 1:
         // Edit form
-        const isSpeakingImageBased = questionData?.question_type_code === 'SPEAKING_DESCRIPTION' || 
-                                      questionData?.question_type_code === 'SPEAKING_COMPARISON';
-        
+        const isSpeakingImageBased = questionData?.question_type_code === 'SPEAKING_DESCRIPTION' ||
+          questionData?.question_type_code === 'SPEAKING_COMPARISON';
+
         if (isSpeakingImageBased) {
           return (
             <SpeakingImageBasedForm
@@ -346,7 +346,7 @@ export default function EditQuestionPage() {
             />
           );
         }
-        
+
         return (
           <QuestionForm
             key={`edit-question-form-${questionData.id}`}
@@ -362,7 +362,7 @@ export default function EditQuestionPage() {
             isEdit={true}
           />
         );
-        
+
       case 2:
         // Preview
         return (
@@ -397,7 +397,7 @@ export default function EditQuestionPage() {
             </Box>
           </Box>
         );
-        
+
       default:
         return 'Unknown step';
     }

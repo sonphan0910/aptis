@@ -19,12 +19,12 @@ import {
 // CERF Level mapping based on APTIS score (0-50 scale per skill)
 // Reference: A1=4, A2=16, B1=26, B2=41, C=48
 const getCERFLevel = (score) => {
-  if (score >= 48) return { level: 'C', label: 'C', color: '#C41E3A' };
-  if (score >= 41) return { level: 'B2', label: 'B2', color: '#C41E3A' };
-  if (score >= 26) return { level: 'B1', label: 'B1', color: '#C41E3A' };
-  if (score >= 16) return { level: 'A2', label: 'A2', color: '#C41E3A' };
-  if (score >= 4) return { level: 'A1', label: 'A1', color: '#C41E3A' };
-  return { level: 'A0', label: 'A0', color: '#CCCCCC' };
+  if (score >= 48) return { level: 'C', label: 'C', color: '#002E5C' }; // Navy Blue
+  if (score >= 41) return { level: 'B2', label: 'B2', color: '#1976d2' }; // Blue
+  if (score >= 26) return { level: 'B1', label: 'B1', color: '#2e7d32' }; // Green
+  if (score >= 16) return { level: 'A2', label: 'A2', color: '#ed6c02' }; // Orange
+  if (score >= 4) return { level: 'A1', label: 'A1', color: '#d32f2f' }; // Red
+  return { level: 'A0', label: 'A0', color: '#9e9e9e' }; // Grey
 };
 
 // Check if a CERF level should be filled based on achieved level
@@ -50,7 +50,7 @@ export default function ResultsSummary({ attempt, exam, skillScores, overallStat
     // Normalize to 50-point scale
     const normalizedScore = skillMaxScore > 0 ? (skillScore / skillMaxScore) * 50 : 0;
     const cerf = getCERFLevel(normalizedScore);
-    
+
     return {
       name: skill.skillName || skill.skill_type || 'Unknown',
       score: Math.round(skillScore),
@@ -61,7 +61,7 @@ export default function ResultsSummary({ attempt, exam, skillScores, overallStat
   });
 
   // Calculate overall CERF level (average of all skills)
-  const averageNormalizedScore = skillsWithCERF.length > 0 
+  const averageNormalizedScore = skillsWithCERF.length > 0
     ? skillsWithCERF.reduce((sum, s) => sum + s.normalizedScore, 0) / skillsWithCERF.length
     : 0;
   const overallCERF = getCERFLevel(averageNormalizedScore);
@@ -72,11 +72,11 @@ export default function ResultsSummary({ attempt, exam, skillScores, overallStat
     <Card sx={{ mb: 3, border: '4px solid #002E5C', borderRadius: 2 }}>
       <CardContent sx={{ p: 4, backgroundColor: '#ffffff' }}>
         {/* Title */}
-        <Typography 
-          variant="h5" 
-          sx={{ 
-            color: '#E63946', 
-            fontWeight: 'bold', 
+        <Typography
+          variant="h5"
+          sx={{
+            color: '#E63946',
+            fontWeight: 'bold',
             mb: 3,
             fontSize: '1.5rem'
           }}
@@ -88,10 +88,10 @@ export default function ResultsSummary({ attempt, exam, skillScores, overallStat
         <Grid container spacing={4}>
           {/* LEFT COLUMN: Scale Score Table */}
           <Grid item xs={12} md={6}>
-            <Typography 
-              variant="h6" 
-              sx={{ 
-                fontWeight: 'bold', 
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: 'bold',
                 color: '#002E5C',
                 mb: 2,
                 fontSize: '1.1rem'
@@ -122,7 +122,7 @@ export default function ResultsSummary({ attempt, exam, skillScores, overallStat
                         {skill.name}
                       </TableCell>
                       <TableCell align="center" sx={{ fontWeight: 'bold', color: '#002E5C', fontSize: '0.9rem' }}>
-                        {skill.score}/{skill.maxScore}
+                        {skill.normalizedScore}/50
                       </TableCell>
                       <TableCell align="center">
                         <Box
@@ -145,14 +145,14 @@ export default function ResultsSummary({ attempt, exam, skillScores, overallStat
                       </TableCell>
                     </TableRow>
                   ))}
-                  
+
                   {/* Final Score Row */}
                   <TableRow sx={{ backgroundColor: '#f0f0f0', fontWeight: 'bold' }}>
                     <TableCell sx={{ fontWeight: 'bold', fontSize: '0.9rem' }}>
                       Final scale score
                     </TableCell>
                     <TableCell align="center" sx={{ fontWeight: 'bold', color: '#002E5C', fontSize: '0.9rem' }}>
-                      {Math.round(totalScore)}
+                      {Math.round(skillsWithCERF.reduce((sum, s) => sum + s.normalizedScore, 0))}/{skillsWithCERF.length * 50}
                     </TableCell>
                     <TableCell align="center">
                       <Box
@@ -181,10 +181,10 @@ export default function ResultsSummary({ attempt, exam, skillScores, overallStat
 
           {/* RIGHT COLUMN: CERF Skill Profile Chart */}
           <Grid item xs={12} md={6}>
-            <Typography 
-              variant="h6" 
-              sx={{ 
-                fontWeight: 'bold', 
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: 'bold',
                 color: '#002E5C',
                 mb: 2,
                 fontSize: '1.1rem'
@@ -201,11 +201,11 @@ export default function ResultsSummary({ attempt, exam, skillScores, overallStat
                     CERF
                   </Box>
                   {['C', 'B2', 'B1', 'A2', 'A1', 'A0'].map((level) => (
-                    <Box 
+                    <Box
                       key={level}
-                      sx={{ 
-                        height: 28, 
-                        display: 'flex', 
+                      sx={{
+                        height: 28,
+                        display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         fontWeight: 'bold',
@@ -227,7 +227,7 @@ export default function ResultsSummary({ attempt, exam, skillScores, overallStat
                     {['C', 'B2', 'B1', 'A2', 'A1', 'A0'].map((level) => {
                       const isReached = isLevelReached(level, skill.cerf.label);
                       const isTopLevel = level === skill.cerf.label;
-                      
+
                       return (
                         <Box
                           key={level}
@@ -249,13 +249,13 @@ export default function ResultsSummary({ attempt, exam, skillScores, overallStat
                         </Box>
                       );
                     })}
-                    
+
                     {/* Skill name and score at bottom */}
                     <Box sx={{ height: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', pt: 1 }}>
                       <Typography variant="caption" sx={{ fontWeight: 'bold', textAlign: 'center', color: '#333', fontSize: '0.75rem' }}>
                         {skill.name.split(' ')[0]}
                       </Typography>
-           
+
                     </Box>
                   </Box>
                 ))}
@@ -265,7 +265,7 @@ export default function ResultsSummary({ attempt, exam, skillScores, overallStat
                   {['C', 'B2', 'B1', 'A2', 'A1', 'A0'].map((level) => {
                     const isReached = isLevelReached(level, overallCERF.label);
                     const isTopLevel = level === overallCERF.label;
-                    
+
                     return (
                       <Box
                         key={level}
@@ -287,7 +287,7 @@ export default function ResultsSummary({ attempt, exam, skillScores, overallStat
                       </Box>
                     );
                   })}
-                  
+
                   {/* Overall label at bottom */}
                   <Box sx={{ height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center', pt: 1 }}>
                     <Typography variant="caption" sx={{ fontWeight: 'bold', textAlign: 'center', color: '#333', fontSize: '0.75rem' }}>

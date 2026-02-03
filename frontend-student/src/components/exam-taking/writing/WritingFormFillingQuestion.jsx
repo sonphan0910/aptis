@@ -13,24 +13,45 @@ export default function WritingFormFillingQuestion({ question, onAnswerChange })
 
   // Parse question content
   const questionData = React.useMemo(() => {
+    if (!question.content) return { title: "Form Filling", question: "Please fill in the form." };
+
     try {
-      // If content is text format, parse it
-      if (typeof question.content === 'string' && !question.content.startsWith('{')) {
-        // Parse the text content to extract title
-        const lines = question.content.split('\n').filter(line => line.trim());
-        const title = lines[0] || "Form Filling Task";
-        
+      // 1. Try to parse as JSON first
+      if (typeof question.content === 'string' && (question.content.trim().startsWith('{') || question.content.trim().startsWith('['))) {
+        const parsed = JSON.parse(question.content);
+
+        // Handle common JSON structures
+        const title = parsed.title || parsed.instructions || "Form Filling Task";
+        const questionText = parsed.question || parsed.content || parsed.prompt || "";
+
         return {
           title,
-          question: question.content // Use full content as question for display
+          question: questionText || "Please provide your answer:"
         };
       }
-      
-      // Legacy JSON format support
-      return typeof question.content === 'string' ? JSON.parse(question.content) : question.content;
+
+      // 2. If it's already an object
+      if (typeof question.content === 'object' && question.content !== null) {
+        return {
+          title: question.content.title || question.content.instructions || "Form Filling Task",
+          question: question.content.question || question.content.content || "Please provide your answer:"
+        };
+      }
+
+      // 3. Fallback: Parse as plain text
+      const lines = question.content.split('\n').filter(line => line.trim());
+      const title = lines[0] || "Form Filling Task";
+
+      return {
+        title,
+        question: question.content
+      };
     } catch (error) {
-      console.error('Failed to parse question content:', error);
-      return null;
+      console.warn('[WritingFormFillingQuestion] Content parsing failed:', error);
+      return {
+        title: "Form Filling Task",
+        question: typeof question.content === 'string' ? question.content : "Please provide your answer:"
+      };
     }
   }, [question.content]);
 
@@ -59,7 +80,7 @@ export default function WritingFormFillingQuestion({ question, onAnswerChange })
   const handleAnswerChange = (event) => {
     const newText = event.target.value;
     setAnswer(newText);
-    
+
     onAnswerChange({
       answer_type: 'text',
       text_answer: newText
@@ -70,18 +91,20 @@ export default function WritingFormFillingQuestion({ question, onAnswerChange })
     return <Box sx={{ p: 2 }}><Typography color="error">Không thể tải câu hỏi</Typography></Box>;
   }
 
+  const questionText = String(questionData.question || '');
+
   return (
     <Box sx={{ maxHeight: '100vh', overflow: 'auto', p: 2 }}>
       {/* Question Content */}
       <Box sx={{ mb: 3 }}>
-        {questionData.question.split('\n').map((line, index) => {
+        {questionText.split('\n').map((line, index) => {
           if (line.trim() === '') return null;
-          
+
           return (
-            <Typography 
-              key={index} 
-              variant="body1" 
-              sx={{ mb: 1, whiteSpace: 'pre-line' }}
+            <Typography
+              key={index}
+              variant="body1"
+              sx={{ mb: 1, whiteSpace: 'pre-line', fontWeight: 500 }}
             >
               {line}
             </Typography>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Box,
   TextField,
@@ -23,41 +23,76 @@ import { questionApi } from '../../../../services/questionService';
  * Listening MCQ Multiple Questions Form - Part 4 của Listening skill
  * Nhiều câu hỏi liên quan đến cùng một đoạn audio
  */
-export default function ListeningMCQMultiForm({ content, onChange, isEdit = false }) {
+export default function ListeningMCQMultiForm({ content, onChange, onAudioFilesChange, isEdit = false }) {
   const [title, setTitle] = useState('');
   const [audioFile, setAudioFile] = useState(null);
   const [audioUrl, setAudioUrl] = useState('');
+  const [audioPreviewUrl, setAudioPreviewUrl] = useState(''); // For local file preview
   const [questions, setQuestions] = useState([
     { question: '', options: ['', '', ''], correctAnswer: 0 }
   ]);
   const [instructions, setInstructions] = useState('Listen carefully to the audio and answer all questions.');
-  
+
   // Error handling states
   const [errors, setErrors] = useState({});
   const [isValidated, setIsValidated] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
+  // Cleanup preview URL when component unmounts or file changes
+  useEffect(() => {
+    return () => {
+      if (audioPreviewUrl) {
+        URL.revokeObjectURL(audioPreviewUrl);
+      }
+    };
+  }, [audioPreviewUrl]);
+
   // Audio file selection function
   const handleAudioFileSelect = (file) => {
     if (!file) return;
-    
+
     setAudioFile(file);
+
+    // Create preview URL for local playback
+    if (audioPreviewUrl) {
+      URL.revokeObjectURL(audioPreviewUrl); // Clean up old URL
+    }
+    const previewUrl = URL.createObjectURL(file);
+    setAudioPreviewUrl(previewUrl);
+
+    // Pass file to parent QuestionForm via callback (clean approach)
+    if (onAudioFilesChange) {
+      onAudioFilesChange({
+        mainAudio: file,
+        speakerAudios: []
+      });
+    }
+
     console.log('✅ Audio file selected:', file.name);
+
+    // Clear error immediately
+    if (errors.audio) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors.audio;
+        return newErrors;
+      });
+    }
   };
 
   const validateData = useCallback(() => {
     const newErrors = {};
-    
+
     // Check title
     if (!title.trim()) {
       newErrors.title = 'Tiêu đề không được để trống';
     }
-    
+
     // Check audio file - allow either audioUrl OR audioFile
     if (!audioUrl && !audioFile) {
       newErrors.audio = 'Vui lòng chọn file audio';
     }
-    
+
     // Check questions
     const validQuestions = questions.filter(q => {
       const hasQuestion = q.question.trim();
@@ -65,11 +100,11 @@ export default function ListeningMCQMultiForm({ content, onChange, isEdit = fals
       const hasValidAnswer = q.correctAnswer >= 0 && q.correctAnswer < q.options.length && q.options[q.correctAnswer].trim();
       return hasQuestion && hasOptions && hasValidAnswer;
     });
-    
+
     if (validQuestions.length === 0) {
       newErrors.questions = 'Phải có ít nhất 1 câu hỏi hợp lệ';
     }
-    
+
     // Check individual questions
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
@@ -85,15 +120,15 @@ export default function ListeningMCQMultiForm({ content, onChange, isEdit = fals
         }
       }
     }
-    
+
     setErrors(newErrors);
     const isValid = Object.keys(newErrors).length === 0;
     setIsValidated(isValid);
-    
+
     // Send data to parent when valid
     if (isValid && onChange) {
       const questionsToSend = questions.filter(q => q.question.trim());
-      
+
       // Prepare data for backend helper function
       const structuredData = {
         questions: questionsToSend.map(q => ({
@@ -103,16 +138,18 @@ export default function ListeningMCQMultiForm({ content, onChange, isEdit = fals
         })),
         isMultiple: true, // Multiple choice MCQ
         audioUrl: audioUrl,
+        audioFile: audioFile, // Include File object for upload
         instructions: instructions.trim(),
         title: title.trim()
       };
-      
+
       // Send content as JSON string for backend auto-generation
+      // Also send audioFile separately (similar to SpeakingImageBasedForm)
       onChange(JSON.stringify(structuredData));
     }
-    
+
     return isValid;
-  }, [title, audioUrl, questions, instructions, onChange]);
+  }, [title, audioUrl, audioFile, questions, instructions, onChange]);
 
   // Handle question changes
   const handleQuestionChange = (index, field, value) => {
@@ -151,19 +188,19 @@ export default function ListeningMCQMultiForm({ content, onChange, isEdit = fals
   const handleRemoveOption = (qIndex, optIndex) => {
     const newQuestions = [...questions];
     const question = newQuestions[qIndex];
-    
+
     if (question.options.length <= 2) return; // Minimum 2 options required
-    
+
     // Remove the option
     question.options = question.options.filter((_, i) => i !== optIndex);
-    
+
     // Adjust correct answer if necessary
     if (question.correctAnswer === optIndex) {
       question.correctAnswer = 0; // Reset to first option
     } else if (question.correctAnswer > optIndex) {
       question.correctAnswer -= 1; // Adjust index
     }
-    
+
     setQuestions(newQuestions);
   };
 
@@ -172,7 +209,7 @@ export default function ListeningMCQMultiForm({ content, onChange, isEdit = fals
       <Typography variant="h6" gutterBottom>
         Listening MCQ - Multiple Questions
       </Typography>
-      
+
       <Typography variant="body2" color="text.secondary" mb={3}>
         Tạo nhiều câu hỏi Listening liên quan đến cùng một đoạn audio
       </Typography>
@@ -193,7 +230,7 @@ export default function ListeningMCQMultiForm({ content, onChange, isEdit = fals
         <Typography variant="subtitle1" gutterBottom>
           File Audio
         </Typography>
-        
+
         <Box display="flex" alignItems="center" gap={2}>
           <Button
             variant="outlined"
@@ -215,21 +252,40 @@ export default function ListeningMCQMultiForm({ content, onChange, isEdit = fals
               }}
             />
           </Button>
-          
+
           {audioFile && (
             <Typography variant="body2" color="text.secondary">
               {audioFile.name}
             </Typography>
           )}
-          
-          {audioUrl && (
-            <audio controls style={{ maxWidth: 300 }}>
+        </Box>
+
+        {/* Audio Preview - for newly selected file */}
+        {audioPreviewUrl && (
+          <Box mt={2}>
+            <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+              🎧 Nghe thử audio đã chọn:
+            </Typography>
+            <audio controls style={{ width: '100%', maxWidth: 400 }}>
+              <source src={audioPreviewUrl} />
+              Your browser does not support the audio element.
+            </audio>
+          </Box>
+        )}
+
+        {/* Existing audio URL (for edit mode) */}
+        {audioUrl && !audioPreviewUrl && (
+          <Box mt={2}>
+            <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+              Audio hiện tại:
+            </Typography>
+            <audio controls style={{ width: '100%', maxWidth: 400 }}>
               <source src={audioUrl} type="audio/mpeg" />
               Your browser does not support the audio element.
             </audio>
-          )}
-        </Box>
-        
+          </Box>
+        )}
+
         {errors.audio && (
           <Typography variant="caption" color="error" display="block" mt={1}>
             {errors.audio}
@@ -274,7 +330,7 @@ export default function ListeningMCQMultiForm({ content, onChange, isEdit = fals
           <Typography variant="body2" color="text.secondary" mt={2} mb={1}>
             Lựa chọn:
           </Typography>
-          
+
           {q.options.map((option, optIndex) => (
             <Box key={optIndex} display="flex" alignItems="center" mb={1}>
               <TextField

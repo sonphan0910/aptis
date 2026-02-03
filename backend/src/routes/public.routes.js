@@ -38,7 +38,7 @@ router.get('/question-types', apiLimiter, publicController.getQuestionTypes);
 // Các endpoint này dùng cho development và testing AI
 
 // GET /public/ai/status - Kiểm tra trạng thái các dịch vụ AI
-// Kiểm tra sức khỏe của Database, Gemini API, AI Criteria
+// Kiểm tra sức khỏe của Database, OpenAI ChatGPT API, AI Criteria
 // Response: status của từng service và số lượng criteria
 router.get('/ai/status', aiTestController.getAiStatus);
 

@@ -19,7 +19,10 @@ const publicRoutes = require('./routes/public.routes');
 const app = express();
 
 // Security middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 
 // CORS configuration
 app.use(
@@ -45,12 +48,12 @@ app.use('/uploads', (req, res, next) => {
   res.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.header('Cross-Origin-Resource-Policy', 'cross-origin');
-  
+
   // Handle OPTIONS request
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
-  
+
   next();
 }, express.static(path.join(__dirname, '../uploads')));
 

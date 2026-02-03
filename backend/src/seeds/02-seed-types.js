@@ -93,6 +93,13 @@ async function seedQuestionTypes() {
     },
     {
       skill_type_id: listening.id,
+      code: 'LISTENING_MCQ_MULTI',
+      question_type_name: 'Multiple Choice (Multi-Questions)',
+      instruction_template: 'Listen to the audio and answer the questions.',
+      scoring_method: 'auto',
+    },
+    {
+      skill_type_id: listening.id,
       code: 'LISTENING_STATEMENT_MATCHING',
       question_type_name: 'Statement Matching',
       instruction_template: 'Listen to the conversation and match each statement with the correct person.',
@@ -178,7 +185,7 @@ async function seedQuestionTypes() {
     {
       skill_type_id: writing.id,
       code: 'WRITING_LONG',
-      question_type_name: 'Chat Responses', 
+      question_type_name: 'Chat Responses',
       scoring_method: 'ai',
       description: 'Task 3: Chat room with 3 questions, B1 level, 0-5 scale'
     },

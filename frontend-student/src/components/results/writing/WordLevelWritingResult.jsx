@@ -18,7 +18,7 @@ export default function WordLevelWritingResult({ answer, question, feedback = nu
   // Parse student answers from formatted text "Answer 1: text\n\nAnswer 2: text"
   const textAnswer = answer.text_answer || '';
   const parsedAnswers = {};
-  
+
   if (textAnswer) {
     const answerParts = textAnswer.split('\n\n');
     answerParts.forEach(part => {
@@ -29,17 +29,72 @@ export default function WordLevelWritingResult({ answer, question, feedback = nu
       }
     });
   }
-  
+
+  // Helper to safely parse JSON
+  const parseContent = (content) => {
+    if (typeof content !== 'string') return content;
+    try {
+      if (content.trim().startsWith('{') || content.trim().startsWith('[')) {
+        const parsed = JSON.parse(content);
+        if (typeof parsed === 'string') return parseContent(parsed);
+        return parsed;
+      }
+    } catch (e) {
+      return content;
+    }
+    return content;
+  };
+
   // Parse questions from content
-  const questions = question.content.split('\n').filter(q => q.trim() && q.includes('?'));
-  
+  let questions = [];
+  try {
+    const parsed = parseContent(question.content);
+    if (Array.isArray(parsed)) {
+      questions = parsed.map(p => typeof p === 'string' ? p : (p.content || JSON.stringify(p)));
+    } else if (parsed && typeof parsed === 'object') {
+      if (parsed.questions && Array.isArray(parsed.questions)) {
+        questions = parsed.questions;
+      } else if (parsed.content) {
+        // Handle "content" string with newlines
+        if (typeof parsed.content === 'string' && parsed.content.includes('\n')) {
+          questions = parsed.content.split('\n').filter(q => q.trim().length > 0);
+        } else {
+          questions = [parsed.content];
+        }
+      }
+    } else {
+      // Plain string
+      const str = parsed || '';
+      if (str.includes('\n')) {
+        questions = str.split('\n').filter(q => q.trim().length > 0);
+      } else {
+        questions = [str];
+      }
+    }
+  } catch (e) {
+    console.error("Error parsing WordLevel questions", e);
+    questions = [question.content];
+  }
+
+  // Filter out empty or non-question lines if needed, but Form Filling usually implies all lines are prompts
+  questions = questions.filter(q => q && q.trim().length > 0);
+
   // Extract score and feedback
   const score = feedback?.score || answer.final_score || answer.score || 0;
   const maxScore = answer.max_score || question.max_score || 10; // Use actual max_score from answer/question
   const cefrLevel = feedback?.cefr_level || 'Not assessed';
   const comment = feedback?.comment || '';
-  const suggestions = feedback?.suggestions || '';
-  
+  let suggestions = feedback?.suggestions || [];
+  if (typeof suggestions === 'string') {
+    try {
+      if (suggestions.trim().startsWith('[') || suggestions.trim().startsWith('{')) {
+        suggestions = JSON.parse(suggestions);
+      }
+    } catch (e) {
+      console.error("Failed to parse suggestions JSON", e);
+    }
+  }
+
   // Convert parsed answers to array format for display
   const answers = questions.map((_, index) => parsedAnswers[index + 1] || '');
 
@@ -74,55 +129,37 @@ export default function WordLevelWritingResult({ answer, question, feedback = nu
         </Typography>
       </Paper>
 
-      {/* Score Summary */}
-      <Paper sx={{ p: 3, mb: 3 }}>
-        <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" sx={{ mb: 2 }}>
-          <Chip 
-            label={`Score: ${score}/${maxScore}`}
-            color={getScoreColor(score)}
-            size="large"
-            sx={{ fontWeight: 'bold' }}
-          />
-          <Chip 
-            label={getCefrDisplay(cefrLevel)}
-            variant="outlined"
-            color="primary"
-          />
-          <Chip 
-            label={`Responses: ${answers.length}/${questions.length}`}
-            variant="outlined"
-            color={answers.length >= questions.length ? 'success' : 'warning'}
-          />
-        </Stack>
-        
-        {comment && (
+      {/* Score and CEFR removed as per request */}
+
+      {comment && (
+        <Paper sx={{ p: 3, mb: 3 }}>
           <Typography variant="body2" sx={{ color: 'text.secondary', fontStyle: 'italic' }}>
             {comment}
           </Typography>
-        )}
-      </Paper>
+        </Paper>
+      )}
 
       {/* Questions and Answers */}
       <Paper sx={{ p: 3, mb: 3 }}>
         <Typography variant="h6" sx={{ mb: 2, color: 'text.primary' }}>
           Your Responses
         </Typography>
-        
+
         <Grid container spacing={2}>
           {questions.map((question, index) => (
             <Grid item xs={12} key={index}>
-              <Box sx={{ 
-                p: 2, 
-                border: '1px solid #e0e0e0', 
+              <Box sx={{
+                p: 2,
+                border: '1px solid #e0e0e0',
                 borderRadius: 1,
                 bgcolor: answers[index] ? 'success.50' : 'grey.50'
               }}>
                 <Typography variant="body1" sx={{ fontWeight: 'bold', mb: 1 }}>
                   {index + 1}. {question.trim()}
                 </Typography>
-                <Typography 
-                  variant="body1" 
-                  sx={{ 
+                <Typography
+                  variant="body1"
+                  sx={{
                     color: answers[index] ? 'text.primary' : 'text.secondary',
                     fontStyle: answers[index] ? 'normal' : 'italic',
                     p: 1,
@@ -140,8 +177,50 @@ export default function WordLevelWritingResult({ answer, question, feedback = nu
         </Grid>
       </Paper>
 
+      {/* Teacher Feedback */}
+      {answer.manual_feedback && (
+        <Paper sx={{ mb: 3, borderRadius: 2, overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
+          <Box sx={{
+            background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
+            px: 3,
+            py: 1.5,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between'
+          }}>
+            <Typography variant="h6" sx={{ color: 'white', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+              👨‍🏫 Teacher Review
+            </Typography>
+            {answer.final_score !== null && (
+              <Chip
+                label={`Score: ${answer.final_score}/${answer.max_score || question.max_score || 10}`}
+                sx={{
+                  bgcolor: 'rgba(255,255,255,0.9)',
+                  color: '#1565c0',
+                  fontWeight: 700,
+                  fontSize: '0.875rem'
+                }}
+                size="medium"
+              />
+            )}
+          </Box>
+          <Box sx={{ bgcolor: '#f8faff', p: 3 }}>
+            <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, color: 'text.primary', mb: 2 }}>
+              {answer.manual_feedback}
+            </Typography>
+            {answer.reviewed_at && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, pt: 2, borderTop: '1px solid #e3e8ef' }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                  📅 Reviewed on: {new Date(answer.reviewed_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </Typography>
+              </Box>
+            )}
+          </Box>
+        </Paper>
+      )}
+
       {/* AI Feedback */}
-      {feedback?.suggestions && feedback.suggestions.length > 0 && (
+      {suggestions && (suggestions.length > 0 || typeof suggestions === 'string') && (
         <Paper sx={{ p: 3, mb: 3, bgcolor: 'orange.50', border: '1px solid #fff3e0' }}>
           <Typography variant="h6" sx={{ mb: 2, color: 'orange.800' }}>
             🤖 AI Comprehensive Assessment
@@ -149,13 +228,13 @@ export default function WordLevelWritingResult({ answer, question, feedback = nu
           <Typography variant="h6" sx={{ mb: 2, fontSize: '1rem', color: 'orange.900', fontWeight: 'bold' }}>
             Suggestions for Improvement
           </Typography>
-          
-          {Array.isArray(feedback.suggestions) ? (
+
+          {Array.isArray(suggestions) ? (
             <Stack spacing={2}>
-              {feedback.suggestions.map((suggestion, idx) => (
-                <Box key={idx} sx={{ 
-                  p: 2, 
-                  bgcolor: 'white', 
+              {suggestions.map((suggestion, idx) => (
+                <Box key={idx} sx={{
+                  p: 2,
+                  bgcolor: 'white',
                   border: '1px solid #ffe0b2',
                   borderRadius: 1
                 }}>
@@ -192,22 +271,13 @@ export default function WordLevelWritingResult({ answer, question, feedback = nu
             </Stack>
           ) : (
             <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-              {feedback.suggestions}
+              {typeof suggestions === 'string' ? suggestions : JSON.stringify(suggestions, null, 2)}
             </Typography>
           )}
         </Paper>
       )}
 
-      {/* Task Requirements Reminder */}
-      <Paper sx={{ p: 2, mt: 3, bgcolor: 'grey.100' }}>
-        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-          <strong>APTIS Task 1 Scoring (0-3 scale):</strong><br/>
-          3 = All responses intelligible, complete task achievement<br/>
-          2 = 3-4 responses intelligible<br/>
-          1 = 1-2 responses intelligible<br/>
-          0 = No intelligible responses
-        </Typography>
-      </Paper>
+
     </Box>
   );
 }

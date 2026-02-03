@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -18,7 +18,42 @@ export default function OrderingQuestionResult({ answer, question, showCorrectAn
   const userOrderData = answer.answer_json ? JSON.parse(answer.answer_json) : {};
   const userOrder = userOrderData.ordered_items || userOrderData.order || [];
   const items = question?.items || [];
-  
+
+  // Parse content and extract instruction
+  const { displayContent, instructionText } = useMemo(() => {
+    let content = question?.content || '';
+    let instruction = '';
+
+    // Try to parse JSON content
+    try {
+      if (content && content.trim().startsWith('{')) {
+        const parsed = JSON.parse(content);
+        if (parsed.instruction) {
+          instruction = parsed.instruction;
+        }
+        if (parsed.passage || parsed.text) {
+          content = parsed.passage || parsed.text || '';
+        }
+      }
+    } catch (e) {
+      // Not JSON, continue with text parsing
+    }
+
+    // Extract instruction from text content if not in JSON
+    if (!instruction && content) {
+      const contentLines = content.split('\n').filter(line => line && line.trim());
+      const instructionLine = contentLines.find(line => line && line.match(/^0\./));
+      instruction = instructionLine ? instructionLine.replace(/^0\.\s*/, '') : '';
+
+      // Filter out instruction lines for display
+      content = contentLines
+        .filter(line => line && !line.match(/^0\./) && line.trim() !== '')
+        .join('\n');
+    }
+
+    return { displayContent: content, instructionText: instruction };
+  }, [question?.content]);
+
   // Get correct order from items based on answer_text field (contains correct position)
   const correctOrder = [...items].sort((a, b) => {
     // answer_text contains the correct position (1, 2, 3...) from backend
@@ -32,29 +67,19 @@ export default function OrderingQuestionResult({ answer, question, showCorrectAn
     const position = item.answer_text ? parseInt(item.answer_text) : 0;
     return position > 0;
   });
-  
+
   // Calculate score - check if user order matches correct order
-  const userOrderIds = Array.isArray(userOrder) && userOrder.length > 0 
+  const userOrderIds = Array.isArray(userOrder) && userOrder.length > 0
     ? (typeof userOrder[0] === 'object' ? userOrder.map(item => item.id) : userOrder)
     : [];
-  
+
   const correctOrderIds = orderableItems.map(item => item.id);
   const isCompletelyCorrect = JSON.stringify(userOrderIds) === JSON.stringify(correctOrderIds);
-  
+
   const correctPositions = userOrderIds.reduce((count, userItemId, userIndex) => {
     const correctIndex = correctOrderIds.indexOf(userItemId);
     return userIndex === correctIndex ? count + 1 : count;
   }, 0);
-
-  // Extract instruction from content
-  const contentLines = question.content.split('\n');
-  const instructionLine = contentLines.find(line => line.match(/^0\./));
-  const instructionText = instructionLine ? instructionLine.replace(/^0\.\s*/, '') : '';
-  
-  // Filter out instruction lines for display
-  const displayContent = contentLines
-    .filter(line => !line.match(/^0\./) && line.trim() !== '')
-    .join('\n');
 
   return (
     <Box>
@@ -78,20 +103,20 @@ export default function OrderingQuestionResult({ answer, question, showCorrectAn
       <Box sx={{ mb: 3 }}>
         <Typography variant="h6" gutterBottom>
           Your Order:
-          <Chip 
+          <Chip
             label={isCompletelyCorrect ? 'Perfect!' : `${correctPositions}/${orderableItems.length} correct positions`}
             color={isCompletelyCorrect ? 'success' : correctPositions > 0 ? 'warning' : 'error'}
             sx={{ ml: 2 }}
           />
         </Typography>
-        
+
         {userOrderIds.length > 0 ? (
           <Stack direction="column" spacing={1} sx={{ mb: 2 }}>
             {userOrderIds.map((itemId, userIndex) => {
               const item = orderableItems.find(i => i.id === itemId);
               const correctIndex = correctOrderIds.indexOf(itemId);
               const isInCorrectPosition = userIndex === correctIndex;
-              
+
               return (
                 <Chip
                   key={`${itemId}-${userIndex}`}
@@ -99,7 +124,7 @@ export default function OrderingQuestionResult({ answer, question, showCorrectAn
                   color={isInCorrectPosition ? 'success' : 'error'}
                   variant={isInCorrectPosition ? 'filled' : 'outlined'}
                   icon={isInCorrectPosition ? undefined : undefined}
-                  sx={{ 
+                  sx={{
                     width: '100%',
                     justifyContent: 'flex-start',
                     fontWeight: isInCorrectPosition ? 600 : 400,
@@ -129,7 +154,7 @@ export default function OrderingQuestionResult({ answer, question, showCorrectAn
                 label={`${index + 1}. ${item.item_text}`}
                 color="success"
                 variant="outlined"
-                sx={{ 
+                sx={{
                   width: '100%',
                   justifyContent: 'flex-start',
                   padding: '20px 12px'
@@ -146,7 +171,7 @@ export default function OrderingQuestionResult({ answer, question, showCorrectAn
         <List>
           {orderableItems.map((item, index) => (
             <ListItem key={item.id} sx={{ bgcolor: 'grey.50', mb: 1, borderRadius: 1 }}>
-              <ListItemText 
+              <ListItemText
                 primary={`${index + 1}. ${item.item_text}`}
               />
             </ListItem>

@@ -14,90 +14,130 @@ export default function WritingChatQuestion({ question, onAnswerChange }) {
 
   // Parse question content - separates context messages from reply prompts
   const questionData = React.useMemo(() => {
+    if (!question.content) return null;
+
     try {
-      // If content is text format, parse it
-      if (typeof question.content === 'string' && !question.content.startsWith('{')) {
-        // Parse the text content to extract chat exchanges with replies
-        const lines = question.content.split('\n');
-        const title = lines[0]?.trim() || "Chat Messages";
-        
-        // Build structured chat exchanges: [{speaker, message, hasReply, replyKey}, ...]
-        const chatExchanges = [];
-        let replyIndex = 0; // Counter for unique reply keys
-        let i = 1; // Skip title
-        
-        while (i < lines.length) {
-          const line = lines[i].trim();
-          i++;
-          
-          // Skip empty lines, instructions with multiple words in parentheses
-          if (!line) continue;
-          const isInstruction = line.includes('(') && line.includes(')') && line.length > 50;
-          if (isInstruction) continue;
-          
-          // Check if this is a speaker message (Name: message format)
-          if (line.includes(':')) {
-            const colonIndex = line.indexOf(':');
-            const potentialName = line.substring(0, colonIndex).trim();
-            const message = line.substring(colonIndex + 1).trim();
-            
-            // Validate name format
-            const isValidName = /^[A-Za-z][A-Za-z\s]*$/.test(potentialName) && 
-                               potentialName.length < 30 && 
-                               message.length > 0 &&
-                               !potentialName.toLowerCase().includes('your') &&
-                               !potentialName.toLowerCase().includes('you');
-            
-            if (isValidName) {
-              // Check if next line is "Your reply:" or contains underscore placeholders
-              let hasReply = false;
-              if (i < lines.length) {
-                const nextLine = lines[i].trim();
-                if (nextLine.toLowerCase().includes('your reply') || nextLine.includes('_')) {
-                  hasReply = true;
-                  i++; // Skip the "Your reply:" line
-                }
+      let contentString = '';
+
+      // 1. Handle JSON or string content
+      if (typeof question.content === 'string') {
+        if (question.content.trim().startsWith('{')) {
+          const parsed = JSON.parse(question.content);
+          contentString = parsed.content || parsed.chatContent || question.content;
+
+          // If the JSON already has structure we want
+          if (parsed.chatExchanges) return parsed;
+        } else {
+          contentString = question.content;
+        }
+      } else if (typeof question.content === 'object') {
+        if (question.content.chatExchanges) return question.content;
+        contentString = question.content.content || question.content.chatContent || '';
+      }
+
+      if (!contentString) return null;
+
+      // 2. Parse the text content to extract chat exchanges with replies
+      const lines = contentString.split('\n');
+      const title = lines[0]?.trim() || "Chat Messages";
+
+      // Build structured chat exchanges: [{speaker, message, hasReply, replyKey}, ...]
+      const chatExchanges = [];
+      let replyIndex = 0; // Counter for unique reply keys
+      let i = 1; // Skip title
+
+      while (i < lines.length) {
+        const line = lines[i].trim();
+        i++;
+
+        // Skip empty lines, instructions with multiple words in parentheses
+        if (!line) continue;
+        const isInstruction = line.includes('(') && line.includes(')') && line.length > 50;
+        if (isInstruction) continue;
+
+        // Check if this is a speaker message (Name: message format)
+        if (line.includes(':')) {
+          const colonIndex = line.indexOf(':');
+          const potentialName = line.substring(0, colonIndex).trim();
+          const message = line.substring(colonIndex + 1).trim();
+
+          // Validate name format - be more permissive
+          const isValidName = potentialName.length > 0 &&
+            potentialName.length < 30 &&
+            message.length > 0 &&
+            !potentialName.toLowerCase().includes('your') &&
+            !potentialName.toLowerCase().includes('you');
+
+          if (isValidName) {
+            // Check if next line is "Your reply:" or contains underscore placeholders
+            let hasReply = false;
+            if (i < lines.length) {
+              const nextLine = lines[i].trim();
+              if (nextLine.toLowerCase().includes('your reply') || nextLine.includes('_')) {
+                hasReply = true;
+                i++; // Skip the "Your reply:" line
               }
-              
-              // Generate unique reply key for this exchange
-              const replyKey = hasReply ? `reply_${replyIndex}` : null;
-              if (hasReply) {
-                replyIndex++;
-              }
-              
-              chatExchanges.push({
-                speaker: potentialName,
-                message,
-                hasReply,
-                replyKey
-              });
+            } else if (line.includes('?')) {
+              // Fallback: If it's a question, assume it needs a reply in many cases
+              // but only if it's the last line or we want to be aggressive
             }
+
+            // Generate unique reply key for this exchange
+            const replyKey = hasReply ? `reply_${replyIndex}` : null;
+            if (hasReply) {
+              replyIndex++;
+            }
+
+            chatExchanges.push({
+              speaker: potentialName,
+              message,
+              hasReply,
+              replyKey
+            });
           }
         }
-        
+      }
+
+      // 3. Fallback: If no exchanges found, treat the whole thing as one prompt
+      if (chatExchanges.length === 0) {
         return {
-          title,
-          chatExchanges
+          title: "Chat Message",
+          chatExchanges: [{
+            speaker: "Prompt",
+            message: contentString,
+            hasReply: true,
+            replyKey: "reply_0"
+          }]
         };
       }
-      
-      // Legacy JSON format support
-      return typeof question.content === 'string' ? JSON.parse(question.content) : question.content;
+
+      return {
+        title,
+        chatExchanges
+      };
     } catch (error) {
-      console.error('Failed to parse question content:', error);
-      return null;
+      console.warn('[WritingChatQuestion] Parsing failed:', error);
+      return {
+        title: "Chat Task",
+        chatExchanges: [{
+          speaker: "Task",
+          message: typeof question.content === 'string' ? question.content : "Please reply to the messages.",
+          hasReply: true,
+          replyKey: "reply_0"
+        }]
+      };
     }
   }, [question.content]);
 
   // Initialize answers from question.answer_data - ONLY on mount
   useEffect(() => {
     console.log('[WritingChatQuestion] Initializing for question:', question.id);
-    
+
     if (!questionData || !questionData.chatExchanges) {
       setAnswers({});
       return;
     }
-    
+
     // Initialize answers object with all reply keys
     const initialAnswers = {};
     questionData.chatExchanges.forEach(exchange => {
@@ -105,16 +145,16 @@ export default function WritingChatQuestion({ question, onAnswerChange }) {
         initialAnswers[exchange.replyKey] = '';
       }
     });
-    
+
     if (question.answer_data && typeof question.answer_data === 'object') {
       if (question.answer_data.text_answer) {
         console.log('[WritingChatQuestion] Found existing answer:', question.answer_data.text_answer);
-        
+
         const textAnswer = question.answer_data.text_answer;
-        
+
         // Parse replies based on pattern "Reply N:"
         const replyMatches = textAnswer.match(/Reply \d+:\n([\s\S]*?)(?=Reply \d+:|$)/g);
-        
+
         if (replyMatches && replyMatches.length > 0) {
           replyMatches.forEach((match, idx) => {
             const replyKey = `reply_${idx}`;
@@ -127,27 +167,27 @@ export default function WritingChatQuestion({ question, onAnswerChange }) {
         console.log('[WritingChatQuestion] No existing answer, using empty');
       }
     }
-    
+
     setAnswers(initialAnswers);
     isInitialized.current = true;
   }, [question.id]); // ONLY depend on question.id, not answer_data
 
   const handleAnswerChange = (replyKey, value) => {
     console.log(`[WritingChatQuestion] Updating ${replyKey}:`, value);
-    
+
     const newAnswers = {
       ...answers,
       [replyKey]: value
     };
-    
+
     // Update local state immediately - this is what the user sees
     setAnswers(newAnswers);
-    
+
     // Clear existing debounce timer for this reply
     if (debounceTimers.current[replyKey]) {
       clearTimeout(debounceTimers.current[replyKey]);
     }
-    
+
     // Set new debounce timer - but don't save yet, just schedule
     // We'll save on blur or unmount instead
     debounceTimers.current[replyKey] = setTimeout(() => {
@@ -158,12 +198,12 @@ export default function WritingChatQuestion({ question, onAnswerChange }) {
   const saveAnswers = (answersToSave) => {
     // Check if there's any actual content to save
     const hasContent = Object.values(answersToSave).some(answer => answer && answer.trim().length > 0);
-    
+
     if (!hasContent) {
       console.log(`[WritingChatQuestion] No content to save, skipping`);
       return;
     }
-    
+
     // Build reply text with proper numbering based on reply keys in order
     const replyKeys = Object.keys(answersToSave).sort();
     let formattedText = '';
@@ -174,9 +214,9 @@ export default function WritingChatQuestion({ question, onAnswerChange }) {
         formattedText += '\n\n';
       }
     });
-    
+
     console.log(`[WritingChatQuestion] Saving formatted answer:`, formattedText);
-    
+
     // Send update to parent
     onAnswerChange({
       answer_type: 'text',
@@ -186,12 +226,12 @@ export default function WritingChatQuestion({ question, onAnswerChange }) {
 
   const handleInputBlur = (replyKey) => {
     console.log(`[WritingChatQuestion] Input blur for ${replyKey}`);
-    
+
     // Clear existing debounce timer
     if (debounceTimers.current[replyKey]) {
       clearTimeout(debounceTimers.current[replyKey]);
     }
-    
+
     // Save current answers immediately on blur
     console.log(`[WritingChatQuestion] Saving on blur:`, answers);
     saveAnswers(answers);
@@ -205,12 +245,12 @@ export default function WritingChatQuestion({ question, onAnswerChange }) {
   useEffect(() => {
     return () => {
       console.log(`[WritingChatQuestion] Component unmounting, saving final answer`);
-      
+
       // Clear all timers
       Object.values(debounceTimers.current).forEach(timer => {
         if (timer) clearTimeout(timer);
       });
-      
+
       // Save final answer on unmount (only if there's actual content)
       if (isInitialized.current) {
         const hasContent = Object.values(answers).some(answer => answer && answer.trim().length > 0);

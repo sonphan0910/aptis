@@ -66,6 +66,17 @@ User.hasMany(Question, {
   as: 'createdQuestions',
 });
 
+// Recursive relationship for parent-child questions
+Question.belongsTo(Question, {
+  foreignKey: 'parent_question_id',
+  as: 'parentQuestion',
+});
+Question.hasMany(Question, {
+  foreignKey: 'parent_question_id',
+  as: 'childQuestions',
+  onDelete: 'CASCADE', // Delete children when parent is deleted
+});
+
 // QuestionItem thuộc Question (mục câu hỏi)
 QuestionItem.belongsTo(Question, {
   foreignKey: 'question_id',

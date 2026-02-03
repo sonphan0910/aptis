@@ -25,14 +25,14 @@ import { useAudioPlay } from '@/contexts/AudioPlayContext';
  * Each speaker has their own audio file (stored in QuestionItem.media_url)
  * Students match speakers with options
  */
-export default function ListeningMatchingQuestion({ 
-  question, 
+export default function ListeningMatchingQuestion({
+  question,
   onAnswerChange
 }) {
   const [selectedAnswers, setSelectedAnswers] = useState({});
   const [playingIndex, setPlayingIndex] = useState(null);
   const audioRefs = useRef({});
-  
+
   // Use global audio play context
   const { getItemPlayCount, incrementItemPlayCount } = useAudioPlay();
   const questionId = question.id;
@@ -70,9 +70,9 @@ export default function ListeningMatchingQuestion({
       ...selectedAnswers,
       [itemId]: optionId
     };
-    
+
     setSelectedAnswers(newAnswers);
-    
+
     if (onAnswerChange) {
       // Send as JSON string for backend
       onAnswerChange({
@@ -122,15 +122,38 @@ export default function ListeningMatchingQuestion({
   };
 
   // Parse question content to extract instruction
-  const instruction = question.content || question.question_content?.instruction || 
-    'Listen to each speaker and match them with the correct option.';
+  let instruction = 'Listen to each speaker and match them with the correct option.';
+  let contentAudioUrl = null;
+
+  try {
+    if (question.content) {
+      if (question.content.trim().startsWith('{') || question.content.trim().startsWith('[')) {
+        const parsed = JSON.parse(question.content);
+        instruction = parsed.instructions || parsed.instruction || parsed.title || parsed.text || instruction;
+        if (parsed.audioUrl) contentAudioUrl = parsed.audioUrl;
+      } else {
+        instruction = question.content;
+      }
+    }
+  } catch (e) {
+    console.warn('Error parsing question content:', e);
+    instruction = question.content;
+  }
 
   // Get items (speakers) and options from question
   const items = question.items || [];
   const options = question.options || [];
 
   const getAudioUrl = (item) => {
-    const audioUrl = item.media_url || item.audio_url;
+    // Check item-level audio first
+    let audioUrl = item.media_url || item.audio_url;
+
+    // If not found, check global question audio (sometimes shared)
+    if (!audioUrl && question.media_url) audioUrl = question.media_url;
+
+    // Check fallback content audio
+    if (!audioUrl && contentAudioUrl) audioUrl = contentAudioUrl;
+
     if (!audioUrl) return null;
 
     if (audioUrl.startsWith('http://') || audioUrl.startsWith('https://')) {
@@ -227,7 +250,7 @@ export default function ListeningMatchingQuestion({
                     onClick={() => {
                       const canClickButton = currentPlayCount < 2 || playingIndex === index;
                       if (!canClickButton) return;
-                      
+
                       if (playingIndex === index) {
                         handlePauseAudio(index);
                       } else {

@@ -50,18 +50,18 @@ import {
   Stop as StopIcon
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
-import { 
-  addExamSection, 
-  removeExamSection, 
-  addQuestionToSection, 
-  removeQuestionFromSection 
+import {
+  addExamSection,
+  removeExamSection,
+  addQuestionToSection,
+  removeQuestionFromSection
 } from '@/store/slices/examSlice';
 import { questionService } from '@/services/questionService';
 
 const ExamBuilder = ({ examData, onSubmit, isEditing = false, loading = false }) => {
   const dispatch = useDispatch();
   const { user } = useSelector(state => state.auth);
-  
+
   // State
   const [sections, setSections] = useState(examData?.sections || []);
   const [availableQuestions, setAvailableQuestions] = useState([]);
@@ -69,12 +69,12 @@ const ExamBuilder = ({ examData, onSubmit, isEditing = false, loading = false })
   const [availableSkillTypes, setAvailableSkillTypes] = useState([]);
   const [selectedSection, setSelectedSection] = useState(null);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
-  
+
   // Search and filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSkill, setFilterSkill] = useState('all');
   const [filterType, setFilterType] = useState('all');
-  
+
   // Dialog states
   const [sectionDialog, setSectionDialog] = useState({ open: false, section: null });
   const [questionPreview, setQuestionPreview] = useState({ open: false, question: null });
@@ -132,25 +132,25 @@ const ExamBuilder = ({ examData, onSubmit, isEditing = false, loading = false })
   const filterQuestions = () => {
     let filtered = availableQuestions.filter(q => {
       // Filter out questions already in exam
-      const usedQuestionIds = sections.flatMap(s => 
+      const usedQuestionIds = sections.flatMap(s =>
         (s.questions || []).map(sq => sq.question?.id || sq.question_id)
       );
       if (usedQuestionIds.includes(q.id)) return false;
-      
+
       // Search filter
       if (searchTerm && !q.title?.toLowerCase().includes(searchTerm.toLowerCase())) {
         return false;
       }
-      
+
       // Skill filter
       if (filterSkill !== 'all' && q.skill_type_id !== parseInt(filterSkill)) return false;
-      
+
       // Type filter - would need question type filter
       if (filterType !== 'all' && q.question_type_id !== parseInt(filterType)) return false;
-      
+
       return true;
     });
-    
+
     setFilteredQuestions(filtered);
   };
 
@@ -166,18 +166,18 @@ const ExamBuilder = ({ examData, onSubmit, isEditing = false, loading = false })
   const handleSaveSection = async (sectionData) => {
     try {
       setSaving(true);
-      
+
       if (sectionDialog.section) {
         // Update existing section (not implemented in backend yet)
-        const updatedSections = sections.map(s => 
-          s.id === sectionDialog.section.id 
+        const updatedSections = sections.map(s =>
+          s.id === sectionDialog.section.id
             ? { ...s, ...sectionData }
             : s
         );
         setSections(updatedSections);
       } else {
         // Add new section via API
-        const result = await dispatch(addExamSection({ 
+        const result = await dispatch(addExamSection({
           examId: examData.id,
           sectionData: {
             skill_type_id: sectionData.skill_type_id,
@@ -186,7 +186,7 @@ const ExamBuilder = ({ examData, onSubmit, isEditing = false, loading = false })
             instruction: sectionData.instruction || null
           }
         }));
-        
+
         if (result.type === addExamSection.fulfilled.type) {
           // Add section to local state
           const newSection = {
@@ -198,11 +198,11 @@ const ExamBuilder = ({ examData, onSubmit, isEditing = false, loading = false })
             instruction: sectionData.instruction,
             questions: []
           };
-          
+
           const updatedSections = [...sections, newSection];
           setSections(updatedSections);
           setSelectedSection(newSection);
-          
+
           // Notify parent component
           onSubmit({ sections: updatedSections });
         }
@@ -212,7 +212,7 @@ const ExamBuilder = ({ examData, onSubmit, isEditing = false, loading = false })
     } finally {
       setSaving(false);
     }
-    
+
     setSectionDialog({ open: false, section: null });
   };
 
@@ -220,19 +220,19 @@ const ExamBuilder = ({ examData, onSubmit, isEditing = false, loading = false })
     if (window.confirm(`Bạn có chắc chắn muốn xóa phần "${section.skillType?.skill_type_name}"?`)) {
       try {
         setSaving(true);
-        
-        await dispatch(removeExamSection({ 
+
+        await dispatch(removeExamSection({
           examId: examData.id,
-          sectionId: section.id 
+          sectionId: section.id
         }));
-        
+
         const updatedSections = sections.filter(s => s.id !== section.id);
         setSections(updatedSections);
-        
+
         if (selectedSection?.id === section.id) {
           setSelectedSection(updatedSections.length > 0 ? updatedSections[0] : null);
         }
-        
+
         // Notify parent component
         onSubmit({ sections: updatedSections });
       } catch (error) {
@@ -246,10 +246,10 @@ const ExamBuilder = ({ examData, onSubmit, isEditing = false, loading = false })
   // Question management
   const handleAddQuestionToSection = async (question) => {
     if (!selectedSection) return;
-    
+
     try {
       setSaving(true);
-      
+
       const result = await dispatch(addQuestionToSection({
         examId: examData.id,
         sectionId: selectedSection.id,
@@ -259,7 +259,7 @@ const ExamBuilder = ({ examData, onSubmit, isEditing = false, loading = false })
           max_score: question.default_score || 10
         }
       }));
-      
+
       if (result.type === addQuestionToSection.fulfilled.type) {
         // Update local state
         const updatedSections = sections.map(section => {
@@ -277,10 +277,10 @@ const ExamBuilder = ({ examData, onSubmit, isEditing = false, loading = false })
           }
           return section;
         });
-        
+
         setSections(updatedSections);
         setSelectedSection(updatedSections.find(s => s.id === selectedSection.id));
-        
+
         // Notify parent component
         onSubmit({ sections: updatedSections });
       }
@@ -293,16 +293,16 @@ const ExamBuilder = ({ examData, onSubmit, isEditing = false, loading = false })
 
   const handleRemoveQuestionFromSection = async (sectionQuestion) => {
     if (!selectedSection) return;
-    
+
     try {
       setSaving(true);
-      
+
       await dispatch(removeQuestionFromSection({
         examId: examData.id,
         sectionId: selectedSection.id,
         questionId: sectionQuestion.question_id
       }));
-      
+
       // Update local state
       const updatedSections = sections.map(section => {
         if (section.id === selectedSection.id) {
@@ -313,10 +313,10 @@ const ExamBuilder = ({ examData, onSubmit, isEditing = false, loading = false })
         }
         return section;
       });
-      
+
       setSections(updatedSections);
       setSelectedSection(updatedSections.find(s => s.id === selectedSection.id));
-      
+
       // Notify parent component
       onSubmit({ sections: updatedSections });
     } catch (error) {
@@ -327,8 +327,8 @@ const ExamBuilder = ({ examData, onSubmit, isEditing = false, loading = false })
   };
 
   const SectionDialog = () => (
-    <Dialog 
-      open={sectionDialog.open} 
+    <Dialog
+      open={sectionDialog.open}
       onClose={() => setSectionDialog({ open: false, section: null })}
       maxWidth="sm"
       fullWidth
@@ -337,7 +337,7 @@ const ExamBuilder = ({ examData, onSubmit, isEditing = false, loading = false })
         {sectionDialog.section ? 'Chỉnh sửa phần thi' : 'Thêm phần thi mới'}
       </DialogTitle>
       <DialogContent>
-        <SectionForm 
+        <SectionForm
           section={sectionDialog.section}
           skillTypes={availableSkillTypes}
           onSave={handleSaveSection}
@@ -410,10 +410,10 @@ const ExamBuilder = ({ examData, onSubmit, isEditing = false, loading = false })
     );
   };
 
-  const totalQuestions = sections.reduce((total, section) => 
+  const totalQuestions = sections.reduce((total, section) =>
     total + (section.questions?.length || 0), 0);
-  const totalScore = sections.reduce((total, section) => 
-    total + (section.questions || []).reduce((sectionTotal, q) => 
+  const totalScore = sections.reduce((total, section) =>
+    total + (section.questions || []).reduce((sectionTotal, q) =>
       sectionTotal + (q.max_score || 0), 0), 0);
 
   return (
@@ -426,7 +426,7 @@ const ExamBuilder = ({ examData, onSubmit, isEditing = false, loading = false })
           <Chip label={`${totalQuestions} câu hỏi`} variant="outlined" />
           <Chip label={`${totalScore} điểm`} variant="outlined" />
         </Box>
-        
+
         <Alert severity="info" sx={{ mb: 2 }}>
           Một bài thi cần có ít nhất 1 phần và mỗi phần cần có ít nhất 1 câu hỏi để có thể xuất bản.
         </Alert>
@@ -520,8 +520,8 @@ const ExamBuilder = ({ examData, onSubmit, isEditing = false, loading = false })
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                {selectedSection 
-                  ? `Phần ${sections.indexOf(selectedSection) + 1}: ${selectedSection.skillType?.skill_type_name}` 
+                {selectedSection
+                  ? `Phần ${sections.indexOf(selectedSection) + 1}: ${selectedSection.skillType?.skill_type_name}`
                   : 'Chọn một phần thi'
                 }
               </Typography>
@@ -562,9 +562,9 @@ const ExamBuilder = ({ examData, onSubmit, isEditing = false, loading = false })
                           <ListItemSecondaryAction>
                             <IconButton
                               size="small"
-                              onClick={() => setQuestionPreview({ 
-                                open: true, 
-                                question: sectionQuestion.question 
+                              onClick={() => setQuestionPreview({
+                                open: true,
+                                question: sectionQuestion.question
                               })}
                             >
                               <ViewIcon fontSize="small" />
@@ -598,7 +598,7 @@ const ExamBuilder = ({ examData, onSubmit, isEditing = false, loading = false })
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>Ngân hàng câu hỏi</Typography>
-              
+
               {/* Search and filters */}
               <Box sx={{ mb: 2 }}>
                 <TextField
@@ -612,7 +612,7 @@ const ExamBuilder = ({ examData, onSubmit, isEditing = false, loading = false })
                   }}
                   sx={{ mb: 1 }}
                 />
-                
+
                 <Box display="flex" gap={1}>
                   <FormControl size="small" sx={{ flex: 1 }}>
                     <InputLabel>Kỹ năng</InputLabel>
@@ -695,7 +695,7 @@ const ExamBuilder = ({ examData, onSubmit, isEditing = false, loading = false })
 
       {/* Dialogs */}
       <SectionDialog />
-      
+
       {/* Question Preview Dialog */}
       <Dialog
         open={questionPreview.open}

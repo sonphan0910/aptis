@@ -175,6 +175,8 @@ const questionSchemas = {
     content: Joi.string().required(),
     media_url: Joi.string().allow('').allow(null).optional(),
     duration_seconds: Joi.number().integer().positive().allow(null).optional(),
+    parent_question_id: Joi.number().integer().positive().allow(null).optional(), // ADDED: Allow linking child questions
+    additional_media: Joi.any().allow(null).optional(), // ADDED: Allow additional_media field
     status: Joi.string().valid('draft', 'active').optional(),
   }),
 

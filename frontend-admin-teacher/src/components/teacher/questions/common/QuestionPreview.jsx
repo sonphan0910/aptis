@@ -19,11 +19,11 @@ import {
 } from '@mui/material';
 import { Edit, Close } from '@mui/icons-material';
 
-export default function QuestionPreview({ 
-  question, 
-  open = true, 
-  onClose, 
-  onEdit, 
+export default function QuestionPreview({
+  question,
+  open = true,
+  onClose,
+  onEdit,
   showActions = true,
   aptisData = null,
   skillData = null,
@@ -68,22 +68,22 @@ export default function QuestionPreview({
     const exactIdMapping = {
       // Listening types (1-4)
       1: 'LISTENING_MCQ',           // Multiple Choice
-      2: 'LISTENING_GAP_FILL',      // Gap Filling  
-      3: 'LISTENING_MATCHING',      // Speaker Matching
+      2: 'LISTENING_MATCHING',      // Speaker Matching (FIXED: was Gap Fill)
+      3: 'LISTENING_MCQ_MULTI',     // Multi-Question (FIXED: was Matching)
       4: 'LISTENING_STATEMENT_MATCHING', // Statement Matching
-      
+
       // Reading types (5-8) 
       5: 'READING_GAP_FILL',        // Gap Filling
       6: 'READING_ORDERING',        // Ordering
       7: 'READING_MATCHING',        // Matching
       8: 'READING_MATCHING_HEADINGS', // Matching Headings
-      
+
       // Speaking types (9-12)
       9: 'SPEAKING_INTRO',          // Personal Introduction
       10: 'SPEAKING_DESCRIPTION',   // Picture Description
       11: 'SPEAKING_COMPARISON',    // Comparison
       12: 'SPEAKING_DISCUSSION',    // Topic Discussion
-      
+
       // Writing types (13-17)
       13: 'WRITING_SHORT',          // Short Answers (1-5 words)
       14: 'WRITING_FORM',           // Form Filling (20-30 words)
@@ -91,32 +91,32 @@ export default function QuestionPreview({
       16: 'WRITING_EMAIL',          // Email Writing (50 & 120-150 words)
       17: 'WRITING_ESSAY',          // Essay Writing
     };
-    
+
     const mappedCode = exactIdMapping[questionTypeId];
-    
+
     if (mappedCode) {
       console.log(`Mapped question_type_id ${questionTypeId} -> ${mappedCode}`);
       return mappedCode;
     }
-    
+
     // Fallback với skill context nếu không tìm thấy mapping chính xác
     if (skillType) {
       const skillLower = skillType.toLowerCase();
       console.log(`Using skill-based fallback for ID ${questionTypeId}, skill: ${skillType}`);
-      
+
       if (skillLower.includes('listening')) return 'LISTENING_MCQ';
-      if (skillLower.includes('reading')) return 'READING_GAP_FILL'; 
+      if (skillLower.includes('reading')) return 'READING_GAP_FILL';
       if (skillLower.includes('speaking')) return 'SPEAKING_INTRO';
       if (skillLower.includes('writing')) return 'WRITING_SHORT';
     }
-    
+
     console.warn(`Could not map question_type_id ${questionTypeId} with skill ${skillType}`);
     return null;
   };
 
   const renderQuestionContent = () => {
     const { content, questionType } = question;
-    
+
     // Parse content - handle both JSON and plain text from database
     let parsedContent;
     try {
@@ -131,7 +131,7 @@ export default function QuestionPreview({
         isPlainText: true
       };
     }
-    
+
     console.log('📝 Content processing result:', {
       originalType: typeof content,
       isJSON: !parsedContent.isPlainText,
@@ -141,46 +141,46 @@ export default function QuestionPreview({
     // Get question type code - try multiple sources with better priority
     let questionTypeCode = null;
     let debugSource = '';
-    
+
     // Priority 1: From nested questionType object returned by API (MAIN SOURCE)
     if (question?.questionType?.code) {
       questionTypeCode = question.questionType.code;
       debugSource = 'question.questionType.code (API response)';
       console.log('✅ Got questionTypeCode from API:', questionTypeCode);
     }
-    
+
     // Priority 2: Direct code from questionTypeData props
     else if (questionTypeData?.code) {
       questionTypeCode = questionTypeData?.code;
       debugSource = 'questionTypeData.code (props)';
       console.log('✅ Got questionTypeCode from props:', questionTypeCode);
     }
-    
+
     // Priority 3: From question_type_code property 
     else if (question?.question_type_code) {
       questionTypeCode = question.question_type_code;
       debugSource = 'question.question_type_code (direct)';
       console.log('✅ Got questionTypeCode from direct property:', questionTypeCode);
     }
-    
+
     // Priority 4: Map from question_type_id using exact database mapping
     else if (question?.question_type_id) {
-      const skillType = question?.questionType?.skillType?.skill_type_name 
-        || question?.skill 
+      const skillType = question?.questionType?.skillType?.skill_type_name
+        || question?.skill
         || question?.questionType?.skillType?.code;
-      
+
       questionTypeCode = getQuestionTypeCodeFromId(question.question_type_id, skillType);
       debugSource = `ID mapping (${question.question_type_id} + ${skillType})`;
       console.log('✅ Mapped from ID:', question.question_type_id, 'skill:', skillType, '-> code:', questionTypeCode);
     }
-    
+
     // Priority 5: Map from question_type string (name) - fallback
     else if (question?.question_type) {
       questionTypeCode = getQuestionTypeCodeFromString(question.question_type);
       debugSource = `string mapping (${question.question_type})`;
       console.log('✅ Mapped from string:', question.question_type, '-> code:', questionTypeCode);
     }
-    
+
     console.log(`🎯 FINAL RESULT: questionTypeCode = "${questionTypeCode}" from ${debugSource}`);
     console.log('📊 Question data structure:', {
       questionId: question?.id,
@@ -205,7 +205,7 @@ export default function QuestionPreview({
               🔍 Debug Information:
             </Typography>
             <pre style={{ fontSize: '11px', overflow: 'auto', maxHeight: '400px' }}>
-              {JSON.stringify({ 
+              {JSON.stringify({
                 question_id: question?.id,
                 question_type_id: question?.question_type_id,
                 question_type_name: question?.questionType?.question_type_name,
@@ -226,35 +226,38 @@ export default function QuestionPreview({
       case 'READING_GAP_FILL':
       case 'LISTENING_GAP_FILL':
         return renderGapFillingContent(parsedContent);
-        
+
       case 'READING_MATCHING':
       case 'READING_MATCHING_HEADINGS':
       case 'LISTENING_MATCHING':
       case 'LISTENING_STATEMENT_MATCHING':
         return renderMatchingContent(parsedContent);
-        
+
       case 'READING_ORDERING':
         return renderOrderingContent(parsedContent);
-        
+
       case 'LISTENING_MCQ':
         return renderMCQContent(parsedContent);
-        
+
+      case 'LISTENING_MCQ_MULTI':
+        return renderListeningMCQMulti(parsedContent);
+
       case 'WRITING_SHORT':
       case 'WRITING_FORM':
       case 'WRITING_LONG':
       case 'WRITING_EMAIL':
       case 'WRITING_ESSAY':
         return renderWritingContent(parsedContent);
-        
+
       case 'SPEAKING_INTRO':
       case 'SPEAKING_DESCRIPTION':
       case 'SPEAKING_COMPARISON':
       case 'SPEAKING_DISCUSSION':
         return renderSpeakingContent(parsedContent);
-        
+
       default:
         console.warn('Unsupported question type:', questionTypeCode);
-        
+
         // Fallback: render plain content for unknown types
         if (parsedContent.isPlainText || typeof parsedContent === 'string') {
           return (
@@ -273,7 +276,7 @@ export default function QuestionPreview({
             </Box>
           );
         }
-        
+
         return (
           <Box>
             <Typography variant="body2" color="text.secondary" gutterBottom>
@@ -319,7 +322,7 @@ export default function QuestionPreview({
         <Typography variant="body1" paragraph>
           {content.prompt || 'Choose one word from the list for each gap.'}
         </Typography>
-        
+
         <Typography variant="body2" color="primary" gutterBottom>
           Đoạn văn:
         </Typography>
@@ -328,7 +331,7 @@ export default function QuestionPreview({
             {content.passage || 'Chưa có nội dung'}
           </Typography>
         </Box>
-        
+
         {content.options && content.options.length > 0 && (
           <>
             <Typography variant="body2" color="primary" gutterBottom>
@@ -341,7 +344,7 @@ export default function QuestionPreview({
             </Box>
           </>
         )}
-        
+
         {content.correctAnswers && content.correctAnswers.length > 0 && (
           <>
             <Typography variant="body2" color="success.main" gutterBottom>
@@ -349,10 +352,10 @@ export default function QuestionPreview({
             </Typography>
             <Box display="flex" flexWrap="wrap" gap={1}>
               {content.correctAnswers.map((answer, index) => (
-                <Chip 
-                  key={index} 
-                  label={`GAP${index + 1}: ${answer}`} 
-                  size="small" 
+                <Chip
+                  key={index}
+                  label={`GAP${index + 1}: ${answer}`}
+                  size="small"
                   color="success"
                   variant="outlined"
                 />
@@ -365,12 +368,47 @@ export default function QuestionPreview({
   };
 
   const renderMatchingContent = (content) => {
+    // Determine if it's Listening Speaker Matching or Reading/Statement Matching
+    const isListeningMatching = content.speakers && content.statements;
+
+    if (isListeningMatching) {
+      return (
+        <Box>
+          <Typography variant="body1" paragraph>
+            {content.instructions || content.instruction || 'Listen and match each speaker with what they say.'}
+          </Typography>
+
+          <Box sx={{ mt: 2 }}>
+            <Typography variant="subtitle2" gutterBottom color="primary">Speakers:</Typography>
+            <Box display="flex" flexWrap="wrap" gap={1} mb={2}>
+              {content.speakers.map((s, idx) => (
+                <Chip key={idx} label={typeof s === 'object' ? s.name : s} variant="outlined" size="small" />
+              ))}
+            </Box>
+
+            <Typography variant="subtitle2" gutterBottom color="primary">Statements:</Typography>
+            <List dense>
+              {content.statements.map((s, idx) => (
+                <ListItem key={idx} sx={{ bgcolor: 'grey.50', mb: 1, borderRadius: 1 }}>
+                  <ListItemText
+                    primary={`${idx + 1}. ${s.text}`}
+                    secondary={`Matched to: ${s.speaker}`}
+                  />
+                </ListItem>
+              ))}
+            </List>
+          </Box>
+        </Box>
+      );
+    }
+
+    // Default Reading Matching
     return (
       <Box>
         <Typography variant="body1" paragraph>
           {content.instruction || content.prompt || 'Ghép các mục tương ứng'}
         </Typography>
-        
+
         {content.leftItems && content.rightItems ? (
           <Box display="grid" gridTemplateColumns="1fr 1fr" gap={2}>
             <Box>
@@ -409,7 +447,7 @@ export default function QuestionPreview({
         <Typography variant="body1" paragraph>
           {content.instruction || content.prompt || 'Sắp xếp các câu theo thứ tự đúng'}
         </Typography>
-        
+
         {content.sentences && content.sentences.length > 0 ? (
           <List>
             {content.sentences.map((sentence, index) => (
@@ -427,13 +465,58 @@ export default function QuestionPreview({
     );
   };
 
+  const renderListeningMCQMulti = (content) => {
+    const questions = content.questions || [];
+    const title = content.title || content.prompt || 'Multiple Choice Questions';
+
+    return (
+      <Box>
+        <Typography variant="body1" paragraph fontWeight="bold">
+          {title}
+        </Typography>
+
+        {questions.length > 0 ? (
+          questions.map((q, qIdx) => (
+            <Box key={qIdx} sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Question {qIdx + 1}: {q.question || q.text || 'N/A'}
+              </Typography>
+              {q.options && q.options.length > 0 && (
+                <RadioGroup value={q.correct_answer || q.answer}>
+                  {q.options.map((option, oIdx) => (
+                    <FormControlLabel
+                      key={oIdx}
+                      value={option.id || oIdx}
+                      control={<Radio disabled />}
+                      label={`${String.fromCharCode(65 + oIdx)}. ${typeof option === 'string' ? option : (option.text || option.option_text)}`}
+                      sx={{
+                        backgroundColor: (option.id === q.correct_answer || oIdx === q.correct_answer) ? 'success.light' : 'transparent',
+                        borderRadius: 1,
+                        px: 1,
+                        my: 0.5
+                      }}
+                    />
+                  ))}
+                </RadioGroup>
+              )}
+            </Box>
+          ))
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            Chưa có câu hỏi nào được thiết lập.
+          </Typography>
+        )}
+      </Box>
+    );
+  };
+
   const renderMCQContent = (content) => {
     return (
       <Box>
         <Typography variant="body1" paragraph>
           {content.question || content.prompt || 'Câu hỏi trắc nghiệm'}
         </Typography>
-        
+
         {content.options && content.options.length > 0 ? (
           <RadioGroup value={content.correct_answer}>
             {content.options.map((option, index) => (
@@ -442,7 +525,7 @@ export default function QuestionPreview({
                 value={option.id || index}
                 control={<Radio disabled />}
                 label={`${String.fromCharCode(65 + index)}. ${option.text || option}`}
-                sx={{ 
+                sx={{
                   backgroundColor: (option.id || index) === content.correct_answer ? 'success.light' : 'transparent',
                   borderRadius: 1,
                   px: 1
@@ -465,7 +548,7 @@ export default function QuestionPreview({
         <Typography variant="body1" paragraph>
           {content.prompt || content.task || 'Nhiệm vụ viết'}
         </Typography>
-        
+
         <Box display="flex" gap={2} mb={2}>
           {content.min_words && (
             <Chip label={`Tối thiểu: ${content.min_words} từ`} size="small" />
@@ -477,7 +560,7 @@ export default function QuestionPreview({
             <Chip label={`Thời gian: ${content.timeLimit} phút`} size="small" />
           )}
         </Box>
-        
+
         {content.guidelines && (
           <Box>
             <Typography variant="subtitle2" color="primary">Gợi ý:</Typography>
@@ -494,14 +577,14 @@ export default function QuestionPreview({
         <Typography variant="body1" paragraph>
           {content.task || content.prompt || 'Nhiệm vụ nói'}
         </Typography>
-        
+
         {content.preparationTime && (
           <Chip label={`Chuẩn bị: ${content.preparationTime} giây`} size="small" sx={{ mr: 1, mb: 2 }} />
         )}
         {content.recordingTime && (
           <Chip label={`Ghi âm: ${content.recordingTime} giây`} size="small" sx={{ mb: 2 }} />
         )}
-        
+
         {content.instructions && (
           <Box>
             <Typography variant="subtitle2" color="primary">Hướng dẫn:</Typography>
@@ -517,12 +600,12 @@ export default function QuestionPreview({
     if (questionTypeData?.question_type_name) {
       return questionTypeData.question_type_name;
     }
-    
+
     // Try from nested questionType in question object
     if (question?.questionType?.question_type_name) {
       return question.questionType.question_type_name;
     }
-    
+
     // Fall back to mapping
     const typeMap = {
       'READING_GAP_FILL': 'Reading - Điền từ',
@@ -531,6 +614,7 @@ export default function QuestionPreview({
       'READING_ORDERING': 'Reading - Sắp xếp',
       'LISTENING_GAP_FILL': 'Listening - Điền từ',
       'LISTENING_MCQ': 'Listening - Trắc nghiệm',
+      'LISTENING_MCQ_MULTI': 'Listening - Trắc nghiệm nhiều câu',
       'LISTENING_MATCHING': 'Listening - Ghép người nói',
       'LISTENING_STATEMENT_MATCHING': 'Listening - Ghép tuyên bố',
       'WRITING_SHORT': 'Writing - Văn bản ngắn',
@@ -543,23 +627,23 @@ export default function QuestionPreview({
       'SPEAKING_COMPARISON': 'Speaking - So sánh',
       'SPEAKING_DISCUSSION': 'Speaking - Thảo luận'
     };
-    
-    let code = questionTypeData?.code 
-      || question?.questionType?.code 
+
+    let code = questionTypeData?.code
+      || question?.questionType?.code
       || question?.question_type_code;
-    
+
     // Try mapping from question_type_id with better skill context
     if (!code && question?.question_type_id) {
-      const skillType = question?.questionType?.skillType?.skill_type_name 
+      const skillType = question?.questionType?.skillType?.skill_type_name
         || question?.skill;
       code = getQuestionTypeCodeFromId(question.question_type_id, skillType);
     }
-    
+
     // Try mapping from question_type string (name) if code still not found
     if (!code && question?.question_type) {
       code = getQuestionTypeCodeFromString(question.question_type);
     }
-    
+
     return typeMap[code] || code || 'Không xác định';
   };
 
@@ -577,39 +661,39 @@ export default function QuestionPreview({
     return (
       <Box>
         <Box display="flex" gap={1} mb={3} flexWrap="wrap">
-          <Chip 
-            label={getQuestionTypeLabel()} 
-            color="primary" 
-            size="small" 
+          <Chip
+            label={getQuestionTypeLabel()}
+            color="primary"
+            size="small"
           />
-          <Chip 
-            label={skillData?.skill_type_name || 'Kỹ năng'} 
-            color="secondary" 
-            size="small" 
+          <Chip
+            label={skillData?.skill_type_name || 'Kỹ năng'}
+            color="secondary"
+            size="small"
           />
-          <Chip 
-            label={aptisData?.aptis_type_name || 'APTIS'} 
-            variant="outlined" 
-            size="small" 
+          <Chip
+            label={aptisData?.aptis_type_name || 'APTIS'}
+            variant="outlined"
+            size="small"
           />
-          <Chip 
-            label={question.difficulty || 'medium'} 
-            color={getDifficultyColor(question.difficulty)} 
-            size="small" 
+          <Chip
+            label={question.difficulty || 'medium'}
+            color={getDifficultyColor(question.difficulty)}
+            size="small"
           />
         </Box>
-        
+
         <Divider sx={{ mb: 2 }} />
-        
+
         {renderQuestionContent()}
       </Box>
     );
   }
   return (
-    <Dialog 
-      open={open} 
-      onClose={onClose} 
-      maxWidth="md" 
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="md"
       fullWidth
     >
       <DialogTitle>
@@ -622,36 +706,36 @@ export default function QuestionPreview({
           </Typography>
         )}
       </DialogTitle>
-      
+
       <DialogContent>
         <Box display="flex" gap={1} mb={3} flexWrap="wrap">
-          <Chip 
-            label={getQuestionTypeLabel()} 
-            color="primary" 
-            size="small" 
+          <Chip
+            label={getQuestionTypeLabel()}
+            color="primary"
+            size="small"
           />
-          <Chip 
-            label={skillData?.skill_type_name || 'Kỹ năng'} 
-            color="secondary" 
-            size="small" 
+          <Chip
+            label={skillData?.skill_type_name || 'Kỹ năng'}
+            color="secondary"
+            size="small"
           />
-          <Chip 
-            label={aptisData?.aptis_type_name || 'APTIS'} 
-            variant="outlined" 
-            size="small" 
+          <Chip
+            label={aptisData?.aptis_type_name || 'APTIS'}
+            variant="outlined"
+            size="small"
           />
-          <Chip 
-            label={question.difficulty || 'medium'} 
-            color={getDifficultyColor(question.difficulty)} 
-            size="small" 
+          <Chip
+            label={question.difficulty || 'medium'}
+            color={getDifficultyColor(question.difficulty)}
+            size="small"
           />
         </Box>
-        
+
         <Divider sx={{ mb: 2 }} />
-        
+
         {renderQuestionContent()}
       </DialogContent>
-      
+
       {showActions && (
         <DialogActions>
           <Button onClick={onClose} startIcon={<Close />}>

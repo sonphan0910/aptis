@@ -20,22 +20,23 @@ import {
   MenuItem,
   Grid,
   Chip,
-  Pagination
+  Pagination,
+  Checkbox
 } from '@mui/material';
-import { Search, FilterList } from '@mui/icons-material';
+import { Search, FilterList, AudioFile } from '@mui/icons-material';
 import { examApi } from '@/services/examService';
 import { publicApi } from '@/services/publicService';
 import { showNotification } from '@/store/slices/uiSlice';
 import QuestionRenderer from './QuestionRenderer';
 
-export default function AddQuestionDialog({ 
-  open, 
-  onClose, 
-  section, 
-  onQuestionAdded 
+export default function AddQuestionDialog({
+  open,
+  onClose,
+  section,
+  onQuestionAdded
 }) {
   const dispatch = useDispatch();
-  
+
   const [availableQuestions, setAvailableQuestions] = useState([]);
   const [filteredQuestions, setFilteredQuestions] = useState([]);
   const [questionsLoading, setQuestionsLoading] = useState(false);
@@ -50,12 +51,15 @@ export default function AddQuestionDialog({
     question_order: 1,
     max_score: 10
   });
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState([]);
+  const [openBulkAddForm, setOpenBulkAddForm] = useState(false);
 
   // Filter states
   const [filters, setFilters] = useState({
     search: '',
     difficulty: 'all',
-    questionType: 'all'
+    questionType: 'all',
+    usageStatus: 'unused'
   });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
@@ -97,6 +101,19 @@ export default function AddQuestionDialog({
     }
   };
 
+  // Auto-select question type based on section instruction
+  useEffect(() => {
+    if (open && section) {
+      const suggestedType = getSuggestedQuestionType(section.instruction);
+      setFilters(prev => ({
+        ...prev,
+        questionType: suggestedType,
+        usageStatus: 'unused' // Always default to unused when opening dialog
+      }));
+      setSelectedQuestionIds([]);
+    }
+  }, [open, section]);
+
   useEffect(() => {
     if (open && section) {
       loadAvailableQuestions();
@@ -125,9 +142,14 @@ export default function AddQuestionDialog({
       if (filters.questionType && filters.questionType !== 'all') {
         params.question_type_code = filters.questionType;
       }
+      // Add usage status filter
+      if (filters.usageStatus && filters.usageStatus !== 'all') {
+        params.used_status = filters.usageStatus;
+      }
+
       const result = await examApi.getQuestions(params);
       console.log('[AddQuestionDialog] Response:', result);
-      
+
       if (result.success && result.data) {
         setAvailableQuestions(result.data);
       } else {
@@ -151,7 +173,7 @@ export default function AddQuestionDialog({
     // Search filter
     if (filters.search.trim()) {
       const searchTerm = filters.search.toLowerCase().trim();
-      filtered = filtered.filter(q => 
+      filtered = filtered.filter(q =>
         (q.content && q.content.toLowerCase().includes(searchTerm)) ||
         (q.question_type && q.question_type.toLowerCase().includes(searchTerm)) ||
         (q.questionType?.question_type_name && q.questionType.question_type_name.toLowerCase().includes(searchTerm)) ||
@@ -207,6 +229,59 @@ export default function AddQuestionDialog({
     }
   };
 
+  // Bulk Selection Logic
+  const handleToggleQuestion = (questionId) => {
+    setSelectedQuestionIds(prev => {
+      if (prev.includes(questionId)) {
+        return prev.filter(id => id !== questionId);
+      } else {
+        return [...prev, questionId];
+      }
+    });
+  };
+
+  const handleBulkAddClick = () => {
+    if (selectedQuestionIds.length === 0) return;
+    setOpenBulkAddForm(true);
+  };
+
+  const handleConfirmBulkAdd = async () => {
+    setAddingQuestion(true);
+    try {
+      const startOrder = parseInt(questionForm.question_order);
+      const score = parseFloat(questionForm.max_score);
+
+      // Get selected question objects
+      const questionsToAdd = availableQuestions.filter(q => selectedQuestionIds.includes(q.id));
+
+      // Add one by one sequentially
+      for (let i = 0; i < questionsToAdd.length; i++) {
+        const q = questionsToAdd[i];
+        await onQuestionAdded({
+          question_id: q.id,
+          question_order: startOrder + i,
+          max_score: score
+        });
+      }
+
+      setOpenBulkAddForm(false);
+      setSelectedQuestionIds([]);
+      onClose(); // Close main dialog after bulk add
+      dispatch(showNotification({
+        message: `Đã thêm thành công ${questionsToAdd.length} câu hỏi`,
+        type: 'success'
+      }));
+    } catch (error) {
+      console.error('Bulk add error:', error);
+      dispatch(showNotification({
+        message: 'Có lỗi xảy ra khi thêm câu hỏi hàng loạt',
+        type: 'error'
+      }));
+    } finally {
+      setAddingQuestion(false);
+    }
+  };
+
   // Pagination
   const totalPages = Math.ceil(filteredQuestions.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -215,8 +290,8 @@ export default function AddQuestionDialog({
   return (
     <>
       {/* Main Dialog */}
-      <Dialog 
-        open={open && !openAddForm} 
+      <Dialog
+        open={open && !openAddForm}
         onClose={onClose}
         maxWidth="lg"
         fullWidth
@@ -242,7 +317,7 @@ export default function AddQuestionDialog({
           {/* Filters */}
           <Box sx={{ mb: 3 }}>
             <Grid container spacing={2}>
-              <Grid item xs={12} md={4}>
+              <Grid item xs={12} md={3}>
                 <TextField
                   fullWidth
                   size="small"
@@ -254,7 +329,7 @@ export default function AddQuestionDialog({
                   }}
                 />
               </Grid>
-              <Grid item xs={6} md={4}>
+              <Grid item xs={6} md={3}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Loại câu hỏi</InputLabel>
                   <Select
@@ -271,7 +346,7 @@ export default function AddQuestionDialog({
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={6} md={4}>
+              <Grid item xs={6} md={3}>
                 <FormControl fullWidth size="small">
                   <InputLabel>Độ khó</InputLabel>
                   <Select
@@ -287,22 +362,69 @@ export default function AddQuestionDialog({
                   </Select>
                 </FormControl>
               </Grid>
+              <Grid item xs={6} md={3}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Trạng thái sử dụng</InputLabel>
+                  <Select
+                    value={filters.usageStatus}
+                    label="Trạng thái sử dụng"
+                    onChange={(e) => handleFilterChange('usageStatus', e.target.value)}
+                  >
+                    <MenuItem value="all">Tất cả</MenuItem>
+                    <MenuItem value="unused">Chưa sử dụng</MenuItem>
+                    <MenuItem value="used">Đã sử dụng</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
             </Grid>
           </Box>
 
           {/* Questions List */}
-          <Box>
+          <Box display="flex" flexDirection="column" gap={2}>
+            {selectedQuestionIds.length > 0 && (
+              <Alert severity="info" action={
+                <Button size="small" onClick={handleBulkAddClick} variant="contained" color="primary">
+                  Thêm {selectedQuestionIds.length} câu
+                </Button>
+              }>
+                Đã chọn {selectedQuestionIds.length} câu hỏi
+              </Alert>
+            )}
+
+            <Box display="flex" justifyContent="space-between" alignItems="center">
+              <Box>
+                <Button
+                  size="small"
+                  onClick={() => {
+                    const allIds = paginatedQuestions.map(q => q.id);
+                    const newSelected = [...new Set([...selectedQuestionIds, ...allIds])];
+                    setSelectedQuestionIds(newSelected);
+                  }}
+                >
+                  Chọn trang này
+                </Button>
+                <Button
+                  size="small"
+                  onClick={() => setSelectedQuestionIds([])}
+                  sx={{ ml: 1 }}
+                  disabled={selectedQuestionIds.length === 0}
+                >
+                  Bỏ chọn
+                </Button>
+              </Box>
+            </Box>
+
             {questionsLoading ? (
               <Alert severity="info" sx={{ py: 1 }}>Đang tải danh sách câu hỏi...</Alert>
             ) : paginatedQuestions.length > 0 ? (
               <Box>
                 <List sx={{ py: 0 }}>
                   {paginatedQuestions.map((question, index) => (
-                    <ListItem 
-                      key={question.id} 
-                      divider 
-                      sx={{ 
-                        py: 2, 
+                    <ListItem
+                      key={question.id}
+                      divider
+                      sx={{
+                        py: 2,
                         px: 2,
                         flexDirection: 'column',
                         alignItems: 'stretch',
@@ -315,35 +437,43 @@ export default function AddQuestionDialog({
                     >
                       {/* Question Header */}
                       <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
-                        <Box flex={1}>
-                          <Typography variant="subtitle2" fontWeight={600}>
-                            Q{startIndex + index + 1} (ID: {question.id})
-                          </Typography>
-                          <Box display="flex" gap={1} mt={0.5} flexWrap="wrap">
-                            <Chip 
-                              size="small" 
-                              label={question.questionType?.question_type_name || question.questionType?.code || question.question_type || 'N/A'}
-                              color="primary"
-                              variant="outlined"
-                            />
-                            <Chip 
-                              size="small" 
-                              label={question.difficulty || 'medium'}
-                              color={
-                                question.difficulty === 'easy' ? 'success' : 
-                                question.difficulty === 'hard' ? 'error' : 'warning'
-                              }
-                              variant="outlined"
-                            />
-                            {question.media_url && (
-                              <Chip 
-                                size="small" 
-                                label="Media" 
-                                color="info" 
+                        <Box display="flex" alignItems="flex-start" gap={1} flex={1}>
+                          <Checkbox
+                            checked={selectedQuestionIds.includes(question.id)}
+                            onChange={() => handleToggleQuestion(question.id)}
+                            size="small"
+                            sx={{ p: 0.5, mt: -0.5 }}
+                          />
+                          <Box flex={1}>
+                            <Typography variant="subtitle2" fontWeight={600}>
+                              Q{startIndex + index + 1} (ID: {question.id})
+                            </Typography>
+                            <Box display="flex" gap={1} mt={0.5} flexWrap="wrap">
+                              <Chip
+                                size="small"
+                                label={question.questionType?.question_type_name || question.questionType?.code || question.question_type || 'N/A'}
+                                color="primary"
                                 variant="outlined"
-                                icon={<AudioFile fontSize="small" />}
                               />
-                            )}
+                              <Chip
+                                size="small"
+                                label={question.difficulty || 'medium'}
+                                color={
+                                  question.difficulty === 'easy' ? 'success' :
+                                    question.difficulty === 'hard' ? 'error' : 'warning'
+                                }
+                                variant="outlined"
+                              />
+                              {question.media_url && (
+                                <Chip
+                                  size="small"
+                                  label="Media"
+                                  color="info"
+                                  variant="outlined"
+                                  icon={<AudioFile fontSize="small" />}
+                                />
+                              )}
+                            </Box>
                           </Box>
                         </Box>
                         <Button
@@ -366,7 +496,7 @@ export default function AddQuestionDialog({
                 {/* Pagination */}
                 {totalPages > 1 && (
                   <Box display="flex" justifyContent="center" mt={2}>
-                    <Pagination 
+                    <Pagination
                       count={totalPages}
                       page={currentPage}
                       onChange={(e, page) => setCurrentPage(page)}
@@ -378,7 +508,7 @@ export default function AddQuestionDialog({
               </Box>
             ) : (
               <Alert severity="warning" sx={{ py: 1 }}>
-                {availableQuestions.length === 0 
+                {availableQuestions.length === 0
                   ? 'Không tìm thấy câu hỏi nào. Tạo câu hỏi trước khi thêm vào phần thi.'
                   : 'Không có câu hỏi nào phù hợp với bộ lọc hiện tại.'
                 }
@@ -391,7 +521,7 @@ export default function AddQuestionDialog({
           <Button onClick={onClose} size="small">
             Đóng
           </Button>
-          <Button 
+          <Button
             variant="contained"
             size="small"
             onClick={() => window.open('/teacher/questions/new', '_blank')}
@@ -402,8 +532,8 @@ export default function AddQuestionDialog({
       </Dialog>
 
       {/* Add Question Form Dialog */}
-      <Dialog 
-        open={openAddForm} 
+      <Dialog
+        open={openAddForm}
         onClose={() => setOpenAddForm(false)}
         maxWidth="sm"
         fullWidth
@@ -444,13 +574,13 @@ export default function AddQuestionDialog({
           )}
         </DialogContent>
         <DialogActions>
-          <Button 
+          <Button
             onClick={() => setOpenAddForm(false)}
             disabled={addingQuestion}
           >
             Hủy
           </Button>
-          <Button 
+          <Button
             onClick={handleConfirmAddQuestion}
             variant="contained"
             disabled={addingQuestion || !questionForm.question_order || !questionForm.max_score}
@@ -459,6 +589,92 @@ export default function AddQuestionDialog({
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Bulk Add Form Dialog */}
+      <Dialog
+        open={openBulkAddForm}
+        onClose={() => setOpenBulkAddForm(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Thêm {selectedQuestionIds.length} câu hỏi đã chọn</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Các câu hỏi sẽ được thêm liên tiếp bắt đầu từ vị trí bạn chọn.
+            </Alert>
+
+            <Box display="flex" flexDirection="column" gap={2}>
+              <TextField
+                fullWidth
+                label="Bắt đầu từ vị trí (Order)"
+                type="number"
+                value={questionForm.question_order}
+                onChange={(e) => setQuestionForm(prev => ({ ...prev, question_order: e.target.value }))}
+                inputProps={{ min: 1 }}
+                helperText={`Các câu hỏi sẽ có thứ tự từ ${questionForm.question_order} đến ${parseInt(questionForm.question_order) + selectedQuestionIds.length - 1}`}
+              />
+
+              <TextField
+                fullWidth
+                label="Điểm mặc định (mỗi câu)"
+                type="number"
+                value={questionForm.max_score}
+                onChange={(e) => setQuestionForm(prev => ({ ...prev, max_score: e.target.value }))}
+                inputProps={{ min: 0.1, step: 0.1 }}
+                helperText="Điểm này sẽ được áp dụng cho tất cả câu hỏi được chọn"
+              />
+            </Box>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setOpenBulkAddForm(false)}
+            disabled={addingQuestion}
+          >
+            Hủy
+          </Button>
+          <Button
+            onClick={handleConfirmBulkAdd}
+            variant="contained"
+            disabled={addingQuestion || !questionForm.question_order || !questionForm.max_score}
+          >
+            {addingQuestion ? 'Đang thêm...' : 'Xác nhận thêm'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
+}
+
+// Helper to determine question type from instruction text
+function getSuggestedQuestionType(instruction) {
+  if (!instruction) return 'all';
+  const lower = instruction.toLowerCase();
+
+  // Listening
+  if (lower.includes('extended mcq')) return 'LISTENING_MCQ_MULTI';
+  if (lower.includes('multiple choice')) return 'LISTENING_MCQ';
+  if (lower.includes('speaker matching')) return 'LISTENING_MATCHING';
+  if (lower.includes('statement matching')) return 'LISTENING_STATEMENT_MATCHING';
+
+  // Reading
+  if (lower.includes('gap filling') || lower.includes('gap fill')) return 'READING_GAP_FILL';
+  if (lower.includes('ordering')) return 'READING_ORDERING';
+  if (lower.includes('matching headings')) return 'READING_MATCHING_HEADINGS';
+  if (lower.includes('matching')) return 'READING_MATCHING';
+
+  // Writing
+  if (lower.includes('form filling')) return 'WRITING_SHORT';
+  if (lower.includes('short response')) return 'WRITING_FORM';
+  if (lower.includes('chat responses')) return 'WRITING_LONG';
+  if (lower.includes('email writing')) return 'WRITING_EMAIL';
+
+  // Speaking
+  if (lower.includes('personal introduction')) return 'SPEAKING_INTRO';
+  if (lower.includes('picture description')) return 'SPEAKING_DESCRIPTION';
+  if (lower.includes('comparison')) return 'SPEAKING_COMPARISON';
+  if (lower.includes('topic discussion')) return 'SPEAKING_DISCUSSION';
+
+  return 'all';
 }

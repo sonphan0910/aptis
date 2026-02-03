@@ -1,19 +1,19 @@
 'use client';
 
-import { 
-  ListItem, 
-  ListItemText, 
-  ListItemIcon, 
-  IconButton, 
-  Box, 
-  Typography, 
+import {
+  ListItem,
+  ListItemText,
+  ListItemIcon,
+  IconButton,
+  Box,
+  Typography,
   Chip,
   Collapse,
   Paper,
   Divider
 } from '@mui/material';
-import { 
-  QuestionAnswer as QuestionIcon, 
+import {
+  QuestionAnswer as QuestionIcon,
   Delete as DeleteIcon,
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon
@@ -25,11 +25,11 @@ import QuestionRenderer from './QuestionRenderer';
  * Component để hiển thị câu hỏi trong section với thông tin đầy đủ
  * Có thể expand để xem nội dung chi tiết của câu hỏi
  */
-export default function SectionQuestionItem({ 
-  question, 
+export default function SectionQuestionItem({
+  question,
   questionData,
-  onRemove, 
-  removing = false 
+  onRemove,
+  removing = false
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -42,6 +42,7 @@ export default function SectionQuestionItem({
       case 'READING_MATCHING': return 'Matching';
       case 'READING_MATCHING_HEADINGS': return 'Matching Headings';
       case 'LISTENING_MCQ': return 'Multiple Choice';
+      case 'LISTENING_MCQ_MULTI': return 'Multiple Choice (Multi-Questions)';
       case 'LISTENING_MATCHING': return 'Speaker Matching';
       case 'LISTENING_STATEMENT_MATCHING': return 'Statement Matching';
       case 'WRITING_SHORT': return 'Short Response';
@@ -61,7 +62,7 @@ export default function SectionQuestionItem({
     const difficulty = questionData?.difficulty;
     switch (difficulty) {
       case 'easy': return 'success';
-      case 'medium': return 'warning'; 
+      case 'medium': return 'warning';
       case 'hard': return 'error';
       default: return 'default';
     }
@@ -76,6 +77,14 @@ export default function SectionQuestionItem({
     if (typeof content === 'string') {
       try {
         const parsed = JSON.parse(content);
+
+        // Handle Multiple Choice Multi-Questions
+        if (parsed.questions && Array.isArray(parsed.questions) && parsed.questions.length > 0) {
+          const firstQuestion = parsed.questions[0].question;
+          const count = parsed.questions.length;
+          return `[${count} câu hỏi] ${firstQuestion}`;
+        }
+
         content = parsed.prompt || parsed.passage || parsed.content || content;
       } catch (e) {
         // Keep as string
@@ -85,15 +94,15 @@ export default function SectionQuestionItem({
     // Extract first meaningful line
     const lines = String(content).split('\n').filter(line => line.trim());
     const preview = lines[0] || 'No content';
-    
+
     return preview.length > 100 ? preview.substring(0, 100) + '...' : preview;
   };
 
   return (
     <>
-      <ListItem 
+      <ListItem
         dense
-        sx={{ 
+        sx={{
           bgcolor: 'background.paper',
           mb: 1,
           borderRadius: 1,
@@ -103,27 +112,27 @@ export default function SectionQuestionItem({
         }}
       >
         <ListItemIcon sx={{ minWidth: 40 }}>
-          <QuestionIcon 
-            fontSize="small" 
-            color={expanded ? 'primary' : 'action'} 
+          <QuestionIcon
+            fontSize="small"
+            color={expanded ? 'primary' : 'action'}
           />
         </ListItemIcon>
-        
+
         <ListItemText
           primary={
             <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
               <Typography variant="body2" fontWeight={500}>
                 Câu {question.question_order}
               </Typography>
-              <Chip 
-                label={getQuestionTypeDisplay()} 
-                size="small" 
+              <Chip
+                label={getQuestionTypeDisplay()}
+                size="small"
                 variant="outlined"
                 color="primary"
               />
-              <Chip 
-                label={questionData?.difficulty || 'medium'} 
-                size="small" 
+              <Chip
+                label={questionData?.difficulty || 'medium'}
+                size="small"
                 color={getDifficultyColor()}
               />
               <Typography variant="caption" color="text.secondary">
@@ -137,10 +146,10 @@ export default function SectionQuestionItem({
                 Điểm tối đa: {question.max_score}
               </Typography>
               {!expanded && (
-                <Typography 
-                  variant="body2" 
-                  color="text.secondary" 
-                  sx={{ 
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{
                     mt: 0.5,
                     display: '-webkit-box',
                     WebkitLineClamp: 2,
@@ -154,7 +163,7 @@ export default function SectionQuestionItem({
             </Box>
           }
         />
-        
+
         <Box display="flex" alignItems="center" gap={0.5}>
           <IconButton
             size="small"
@@ -177,9 +186,9 @@ export default function SectionQuestionItem({
       {/* Expanded Content */}
       <Collapse in={expanded} timeout="auto" unmountOnExit>
         <Box sx={{ pl: 4, pr: 2, pb: 2 }}>
-          <Paper 
-            sx={{ 
-              p: 2, 
+          <Paper
+            sx={{
+              p: 2,
               bgcolor: 'background.default',
               border: '1px solid',
               borderColor: 'divider'
@@ -193,9 +202,9 @@ export default function SectionQuestionItem({
                 Question ID: {question.question_id}
               </Typography>
             </Box>
-            
+
             <Divider sx={{ mb: 2 }} />
-            
+
             {questionData ? (
               <QuestionRenderer question={questionData} compact={false} />
             ) : (

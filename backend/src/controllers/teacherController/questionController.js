@@ -34,9 +34,10 @@ async function createItemsAndOptionsFromContent(questionId, questionTypeCode, pa
     case 'READING_SHORT_TEXT':
       await createShortTextMatchingItemsAndOptions(questionId, parsedContent);
       break;
-    
+
     // Listening question types
     case 'LISTENING_MCQ':
+    case 'LISTENING_MCQ_MULTI':
       await createListeningMCQItemsAndOptions(questionId, parsedContent);
       break;
     case 'LISTENING_MATCHING':
@@ -45,7 +46,7 @@ async function createItemsAndOptionsFromContent(questionId, questionTypeCode, pa
     case 'LISTENING_STATEMENT_MATCHING':
       await createListeningStatementMatchingItemsAndOptions(questionId, parsedContent);
       break;
-    
+
     default:
       console.log(`No auto-generation logic for question type: ${questionTypeCode}`);
       break;
@@ -57,7 +58,7 @@ async function createItemsAndOptionsFromContent(questionId, questionTypeCode, pa
  */
 async function createGapFillingItemsAndOptions(questionId, data) {
   const { options = [], correctAnswers = [] } = data;
-  
+
   // Create options
   for (let i = 0; i < options.length; i++) {
     await QuestionOption.create({
@@ -68,7 +69,7 @@ async function createGapFillingItemsAndOptions(questionId, data) {
       is_correct: false,
     });
   }
-  
+
   // Create gap items with correct answers
   for (let i = 0; i < correctAnswers.length; i++) {
     await QuestionItem.create({
@@ -86,15 +87,15 @@ async function createGapFillingItemsAndOptions(questionId, data) {
  */
 async function createOrderingItems(questionId, data) {
   const { sentences = [], correctOrder = [] } = data;
-  
+
   // Shuffle sentences for random display order
   const shuffled = sentences
     .map((s, idx) => ({ text: s, originalIdx: idx + 1 }))
     .sort(() => Math.random() - 0.5);
-  
+
   for (let i = 0; i < shuffled.length; i++) {
     const correctPosition = correctOrder[shuffled[i].originalIdx - 1];
-    
+
     await QuestionItem.create({
       question_id: questionId,
       item_text: `${shuffled[i].originalIdx}. ${shuffled[i].text}`,
@@ -109,30 +110,36 @@ async function createOrderingItems(questionId, data) {
  */
 async function createMatchingItemsAndOptions(questionId, data) {
   const { questions = [], persons = [] } = data;
-  
+  console.log(`[createMatching] Starting for Q ${questionId}`);
+
   // Create person options
   const optionMap = {};
   for (let i = 0; i < persons.length; i++) {
     const person = persons[i];
+    const personName = String(person.name || person || `Person ${String.fromCharCode(65 + i)}`);
+    console.log(`  - Creating option: "${personName}"`);
     const option = await QuestionOption.create({
       question_id: questionId,
       item_id: null,
-      option_text: person.name || `Person ${String.fromCharCode(65 + i)}`,
+      option_text: personName,
       option_order: i + 1,
       is_correct: false,
     });
-    optionMap[person.name || `Person ${String.fromCharCode(65 + i)}`] = option.id;
+    optionMap[personName] = option.id;
   }
-  
+
   // Create question items
   for (let i = 0; i < questions.length; i++) {
     const questionItem = questions[i];
+    const itemText = String(questionItem.text || questionItem || "");
+    const correctAnswer = String(questionItem.correct || "");
+    console.log(`  - Creating item: "${itemText}", Ans: "${correctAnswer}"`);
     await QuestionItem.create({
       question_id: questionId,
-      item_text: questionItem.text,
+      item_text: itemText,
       item_order: i + 1,
-      answer_text: questionItem.correct,
-      correct_option_id: optionMap[questionItem.correct],
+      answer_text: correctAnswer,
+      correct_option_id: optionMap[correctAnswer],
     });
   }
 }
@@ -142,7 +149,7 @@ async function createMatchingItemsAndOptions(questionId, data) {
  */
 async function createMatchingHeadingsItemsAndOptions(questionId, data) {
   const { headingOptions = [], passages = [] } = data;
-  
+
   // Create heading options
   const headingOptionMap = {};
   for (let i = 0; i < headingOptions.length; i++) {
@@ -155,7 +162,7 @@ async function createMatchingHeadingsItemsAndOptions(questionId, data) {
     });
     headingOptionMap[headingOptions[i]] = option.id;
   }
-  
+
   // Create paragraph items
   for (let i = 0; i < passages.length; i++) {
     const passage = passages[i];
@@ -174,7 +181,7 @@ async function createMatchingHeadingsItemsAndOptions(questionId, data) {
  */
 async function createShortTextMatchingItemsAndOptions(questionId, data) {
   const { descriptions = [], short_texts = [], correct_matches = {} } = data;
-  
+
   // Create description options
   const descriptionOptionMap = {};
   for (let i = 0; i < descriptions.length; i++) {
@@ -188,12 +195,12 @@ async function createShortTextMatchingItemsAndOptions(questionId, data) {
     });
     descriptionOptionMap[desc.letter] = option.id;
   }
-  
+
   // Create short text items
   for (let i = 0; i < short_texts.length; i++) {
     const text = short_texts[i];
     const correctLetter = correct_matches[text.id] || correct_matches[i + 1];
-    
+
     await QuestionItem.create({
       question_id: questionId,
       item_text: text.text,
@@ -209,28 +216,30 @@ async function createShortTextMatchingItemsAndOptions(questionId, data) {
  */
 async function createListeningMCQItemsAndOptions(questionId, data) {
   const { questions = [], isMultiple = false } = data;
-  
+
   for (let i = 0; i < questions.length; i++) {
     const question = questions[i];
-    
+    const itemText = String(question.question || question.text || "");
+
     // Create question item
     const item = await QuestionItem.create({
       question_id: questionId,
-      item_text: question.question,
+      item_text: itemText,
       item_order: i + 1,
       answer_text: null,
       correct_option_id: null,
     });
-    
+
     // Create options for this question
     for (let j = 0; j < question.options.length; j++) {
       const option = question.options[j];
+      const optionText = String(option.text || option || "");
       const isCorrect = isMultiple ? option.correct : (j === question.correctAnswer);
-      
+
       await QuestionOption.create({
         question_id: questionId,
         item_id: item.id,
-        option_text: option.text,
+        option_text: optionText,
         option_order: j + 1,
         is_correct: isCorrect,
       });
@@ -243,32 +252,46 @@ async function createListeningMCQItemsAndOptions(questionId, data) {
  */
 async function createListeningMatchingItemsAndOptions(questionId, data) {
   const { speakers = [], statements = [] } = data;
-  
-  // Create speaker options
-  const speakerOptionMap = {};
-  for (let i = 0; i < speakers.length; i++) {
-    const speaker = speakers[i];
+  console.log(`[createListeningMatching] 🛠️ GENERATING for Q ${questionId}`);
+
+  // 1. Create statement options (Right column - what speakers say)
+  const statementOptionMap = {};
+  for (let i = 0; i < statements.length; i++) {
+    const rawStatement = statements[i];
+    const statementText = String((typeof rawStatement === 'object' ? (rawStatement.text || rawStatement.statement) : rawStatement) || "");
+
+    console.log(`  - Adding Option Text: "${statementText}"`);
+
     const option = await QuestionOption.create({
       question_id: questionId,
       item_id: null,
-      option_text: speaker,
+      option_text: statementText,
       option_order: i + 1,
       is_correct: false,
     });
-    speakerOptionMap[speaker] = option.id;
+    // Map text to ID for matching later
+    statementOptionMap[statementText] = option.id;
   }
-  
-  // Create statement items
-  for (let i = 0; i < statements.length; i++) {
-    const statement = statements[i];
-    const correctSpeaker = statement.speaker;
-    
+
+  // 2. Create speaker items (Left column - the people speaking)
+  for (let i = 0; i < speakers.length; i++) {
+    const speaker = speakers[i];
+    const speakerName = String((typeof speaker === 'object' ? speaker.name : speaker) || "");
+
+    // Find matching statement to set correct answer
+    const matchingStatement = statements.find(s => s.speaker === speakerName);
+    const correctStatementText = matchingStatement ? String(matchingStatement.text || matchingStatement.statement || "") : "";
+    const correctOptionId = matchingStatement ? statementOptionMap[correctStatementText] : null;
+
+    console.log(`  - Adding Speaker Item: "${speakerName}", Correct Option ID: ${correctOptionId}`);
+
     await QuestionItem.create({
       question_id: questionId,
-      item_text: statement.text,
+      item_text: speakerName,
       item_order: i + 1,
-      answer_text: correctSpeaker,
-      correct_option_id: speakerOptionMap[correctSpeaker],
+      answer_text: correctStatementText || null,
+      correct_option_id: correctOptionId,
+      media_url: speaker.audioUrl ? String(speaker.audioUrl) : null
     });
   }
 }
@@ -277,15 +300,36 @@ async function createListeningMatchingItemsAndOptions(questionId, data) {
  * Listening Statement Matching: Create statements with correct speakers
  */
 async function createListeningStatementMatchingItemsAndOptions(questionId, data) {
-  const { statements = [], correctSpeakers = [] } = data;
-  
+  const { speakers = [], statements = [] } = data;
+
+  // Create speaker options (Man, Woman, Both, etc.)
+  const speakerOptionMap = {};
+  for (let i = 0; i < speakers.length; i++) {
+    const speaker = speakers[i];
+    const speakerName = String((typeof speaker === 'object' ? speaker.name : speaker) || "");
+
+    const option = await QuestionOption.create({
+      question_id: questionId,
+      item_id: null,
+      option_text: speakerName,
+      option_order: i + 1,
+      is_correct: false,
+    });
+    speakerOptionMap[speakerName] = option.id;
+  }
+
+  // Create statement items linked to correct speaker
   for (let i = 0; i < statements.length; i++) {
+    const statement = statements[i];
+    const statementText = String(statement.text || statement || "");
+    const correctSpeaker = String(statement.speaker || "");
+
     await QuestionItem.create({
       question_id: questionId,
-      item_text: statements[i],
+      item_text: statementText,
       item_order: i + 1,
-      answer_text: correctSpeakers[i] || null,
-      correct_option_id: null,
+      answer_text: correctSpeaker || null,
+      correct_option_id: speakerOptionMap[correctSpeaker] || null,
     });
   }
 }
@@ -308,6 +352,11 @@ exports.createQuestion = async (req, res, next) => {
 
     const teacherId = req.user.userId;
 
+    console.log('[createQuestion] 📥 Request Body keys:', Object.keys(req.body));
+    console.log('[createQuestion] 📥 Has manual options?', !!(req.body.options && req.body.options.length > 0));
+    console.log('[createQuestion] 📥 Has manual items?', !!(req.body.items && req.body.items.length > 0));
+    console.log('[createQuestion] 👤 Teacher ID:', teacherId);
+
     const question = await Question.create({
       question_type_id,
       aptis_type_id,
@@ -321,18 +370,23 @@ exports.createQuestion = async (req, res, next) => {
       status: 'draft',
     });
 
-    // Parse JSON content to create items and options for Reading questions
+    // Parse JSON content to create items and options
     let parsedContent = null;
-    if (content && typeof content === 'string') {
-      try {
-        parsedContent = JSON.parse(content);
-      } catch (error) {
-        console.warn('Content is not valid JSON, treating as plain text');
+    if (content) {
+      if (typeof content === 'string') {
+        try {
+          parsedContent = JSON.parse(content);
+        } catch (error) {
+          console.warn('[createQuestion] Content is string but not valid JSON');
+        }
+      } else if (typeof content === 'object') {
+        parsedContent = content;
       }
     }
 
     // Auto-generate items and options based on question type and content
     if (parsedContent) {
+      console.log('[createQuestion] 🛠️ Auto-generating items for code:', parsedContent.type);
       const questionType = await QuestionType.findByPk(question_type_id);
       await createItemsAndOptionsFromContent(question.id, questionType?.code, parsedContent);
     }
@@ -352,13 +406,14 @@ exports.createQuestion = async (req, res, next) => {
 
     // Create manual options if provided
     if (options && options.length > 0) {
+      console.log('[createQuestion] 🏷️ Creating manual options:', options.length);
       for (const option of options) {
         await QuestionOption.create({
           question_id: question.id,
           item_id: option.item_id || null,
-          option_text: option.option_text,
+          option_text: String(option.option_text || ""),
           option_order: option.option_order || null,
-          is_correct: option.is_correct || false,
+          is_correct: !!option.is_correct,
         });
       }
     }
@@ -370,6 +425,15 @@ exports.createQuestion = async (req, res, next) => {
         { model: QuestionItem, as: 'items' },
         { model: QuestionOption, as: 'options' },
       ],
+    });
+
+    console.log('[createQuestion] ✅ Question created successfully:');
+    console.log('  - ID:', question.id);
+    console.log('  - parent_question_id:', question.parent_question_id);
+    console.log('  - Response structure:', {
+      success: true,
+      data: fullQuestion,
+      questionId: question.id
     });
 
     res.status(201).json({
@@ -387,7 +451,7 @@ exports.uploadQuestionImages = async (req, res, next) => {
     console.log('📸 Upload images endpoint called');
     console.log('Question ID:', req.params.questionId);
     console.log('Files received:', req.files ? req.files.length : 0);
-    
+
     const { questionId } = req.params;
     const files = req.files;
 
@@ -403,10 +467,10 @@ exports.uploadQuestionImages = async (req, res, next) => {
       throw new NotFoundError('Question not found');
     }
 
-    console.log('📁 Files to process:', files.map(f => ({ 
-      filename: f.filename, 
+    console.log('📁 Files to process:', files.map(f => ({
+      filename: f.filename,
       size: f.size,
-      mimetype: f.mimetype 
+      mimetype: f.mimetype
     })));
 
     // Build additional_media array
@@ -442,7 +506,7 @@ exports.uploadQuestionAudios = async (req, res, next) => {
     console.log('🎧 Upload audios endpoint called');
     console.log('Question ID:', req.params.questionId);
     console.log('Files received:', req.files);
-    
+
     const { questionId } = req.params;
     const { mainAudio, speakerAudios } = req.files || {};
 
@@ -459,16 +523,16 @@ exports.uploadQuestionAudios = async (req, res, next) => {
     }
 
     const audioData = {};
-    
+
     // Process main audio
     if (mainAudio && mainAudio[0]) {
       audioData.mainAudioUrl = `/uploads/audio/${mainAudio[0].filename}`;
       console.log('📁 Main audio processed:', audioData.mainAudioUrl);
     }
-    
+
     // Process speaker audios
     if (speakerAudios && speakerAudios.length > 0) {
-      audioData.speakerAudioUrls = speakerAudios.map(file => 
+      audioData.speakerAudioUrls = speakerAudios.map(file =>
         `/uploads/audio/${file.filename}`
       );
       console.log('📁 Speaker audios processed:', audioData.speakerAudioUrls);
@@ -490,14 +554,19 @@ exports.uploadQuestionAudios = async (req, res, next) => {
       // Also update media_url for main audio
       await question.update({ media_url: audioData.mainAudioUrl });
     }
-    
+
     if (audioData.speakerAudioUrls) {
       // Update speakers with their audio URLs
       if (updatedContent.speakers && Array.isArray(updatedContent.speakers)) {
-        updatedContent.speakers = updatedContent.speakers.map((speaker, index) => ({
-          ...speaker,
-          audioUrl: audioData.speakerAudioUrls[index] || speaker.audioUrl
-        }));
+        updatedContent.speakers = updatedContent.speakers.map((speaker, index) => {
+          // If speaker is a string, convert to object
+          const speakerObj = typeof speaker === 'object' ? { ...speaker } : { name: speaker };
+
+          return {
+            ...speakerObj,
+            audioUrl: audioData.speakerAudioUrls[index] || speakerObj.audioUrl
+          };
+        });
       }
     }
 
@@ -535,15 +604,17 @@ exports.getQuestions = async (req, res, next) => {
       status,
       search,
     } = req.query;
-    
+
     console.log('[questionController.getQuestions] Received params:', {
       page, limit, question_type_id, question_type_code, aptis_type_id, skill_type_id, difficulty, status, search
     });
-    
+
     const { offset, limit: validLimit } = paginate(page, limit);
 
 
-    const where = {};
+    const where = {
+      parent_question_id: null // Only fetch root/parent questions by default
+    };
 
     if (question_type_id) {
       where.question_type_id = question_type_id;
@@ -566,10 +637,26 @@ exports.getQuestions = async (req, res, next) => {
       console.log('[questionController] Filtering by search:', search);
     }
 
+    let finalWhere = where;
+
+    // Usage status filter
+    const { used_status } = req.query;
+    if (used_status === 'unused') {
+      finalWhere.id = {
+        [Op.notIn]: require('sequelize').literal('(SELECT DISTINCT question_id FROM exam_section_questions)')
+      };
+      console.log('[questionController] Filtering by unused status');
+    } else if (used_status === 'used') {
+      finalWhere.id = {
+        [Op.in]: require('sequelize').literal('(SELECT DISTINCT question_id FROM exam_section_questions)')
+      };
+      console.log('[questionController] Filtering by used status');
+    }
+
     const include = [
-      { 
-        model: QuestionType, 
-        as: 'questionType', 
+      {
+        model: QuestionType,
+        as: 'questionType',
         attributes: ['id', 'question_type_name', 'code'],
         include: [
           {
@@ -580,9 +667,14 @@ exports.getQuestions = async (req, res, next) => {
         ]
       },
       { model: AptisType, as: 'aptisType', attributes: ['id', 'aptis_type_name', 'code'] },
+      {
+        model: Question,
+        as: 'childQuestions',
+        attributes: ['id', 'content', 'question_type_id', 'difficulty'],
+        required: false
+      }
     ];
 
-    let finalWhere = where;
     if (skill_type_id) {
       include[0].where = { skill_type_id: skill_type_id };
       include[0].required = true; // INNER JOIN to enforce the filter
@@ -608,6 +700,7 @@ exports.getQuestions = async (req, res, next) => {
       order: [['created_at', 'DESC']],
       raw: false,
       distinct: true, // Important for counting with joins
+      subQuery: false, // Fix: Prevent subquery alias issues when filtering by related models (skill_type)
     });
 
     const transformedRows = await Promise.all(rows.map(async (question) => {
@@ -622,6 +715,8 @@ exports.getQuestions = async (req, res, next) => {
         description: question.content?.substring(0, 200) || '',
         content: question.content,
         question_type: question.questionType?.question_type_name || 'Unknown',
+        question_type_code: question.questionType?.code,
+        questionType: question.questionType,
         question_type_id: question.question_type_id,
         skill: question.questionType?.skillType?.skill_type_name || 'General',
         skill_id: question.questionType?.skillType?.id,
@@ -633,6 +728,7 @@ exports.getQuestions = async (req, res, next) => {
         status: question.status,
         usage_count: usageCount,
         is_used_in_exam: usageCount > 0,
+        childQuestions: question.childQuestions, // Include child questions
         created_at: question.created_at,
         updated_at: question.updated_at,
       };
@@ -756,8 +852,9 @@ exports.deleteQuestion = async (req, res, next) => {
         await StorageService.deleteFile(question.media_url);
       }
 
-      // Xóa tất cả QuestionItem và QuestionOption liên quan (cascade)
+      // Xóa tất cả question dependencies (cascade)
       await Promise.all([
+        require('../../models').AttemptAnswer.destroy({ where: { question_id: questionId } }),
         require('../../models').QuestionItem.destroy({ where: { question_id: questionId } }),
         require('../../models').QuestionOption.destroy({ where: { question_id: questionId } })
       ]);
@@ -771,7 +868,7 @@ exports.deleteQuestion = async (req, res, next) => {
 
       console.log(`[deleteQuestion] Deleting parent question ${questionId} with ${childQuestions.length} child questions`);
 
-      // Delete all child questions
+      // Delete child questions with dependencies
       for (const childQuestion of childQuestions) {
         // Check if child is used in exams
         const childUsage = await ExamSectionQuestion.count({
@@ -787,8 +884,9 @@ exports.deleteQuestion = async (req, res, next) => {
           await StorageService.deleteFile(childQuestion.media_url);
         }
 
-        // Delete child question items and options
+        // Delete child question dependencies
         await Promise.all([
+          require('../../models').AttemptAnswer.destroy({ where: { question_id: childQuestion.id } }),
           require('../../models').QuestionItem.destroy({ where: { question_id: childQuestion.id } }),
           require('../../models').QuestionOption.destroy({ where: { question_id: childQuestion.id } })
         ]);
@@ -803,8 +901,9 @@ exports.deleteQuestion = async (req, res, next) => {
         await StorageService.deleteFile(question.media_url);
       }
 
-      // Delete parent question items and options
+      // Delete parent question dependencies
       await Promise.all([
+        require('../../models').AttemptAnswer.destroy({ where: { question_id: questionId } }),
         require('../../models').QuestionItem.destroy({ where: { question_id: questionId } }),
         require('../../models').QuestionOption.destroy({ where: { question_id: questionId } })
       ]);

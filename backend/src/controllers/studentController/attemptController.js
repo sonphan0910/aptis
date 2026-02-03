@@ -119,20 +119,20 @@ exports.startAttempt = async (req, res, next) => {
         // Auto-detect answer_type based on question type code
         const questionTypeCode = esq.question.questionType.code.toLowerCase();
         let defaultAnswerType = 'text';
-        
-        if (questionTypeCode.includes('mcq') || 
-            questionTypeCode.includes('true_false') || 
-            questionTypeCode.includes('multiple_choice')) {
+
+        if (questionTypeCode.includes('mcq') ||
+          questionTypeCode.includes('true_false') ||
+          questionTypeCode.includes('multiple_choice')) {
           defaultAnswerType = 'option';
         } else if (questionTypeCode.includes('speaking')) {
           defaultAnswerType = 'audio';
-        } else if (questionTypeCode.includes('matching') || 
-                   questionTypeCode.includes('ordering') ||
-                   questionTypeCode.includes('gap_filling')) {
+        } else if (questionTypeCode.includes('matching') ||
+          questionTypeCode.includes('ordering') ||
+          questionTypeCode.includes('gap_filling')) {
           defaultAnswerType = 'json';
         }
         // else: writing, reading short answer, etc. = 'text'
-        
+
         await AttemptAnswer.findOrCreate({
           where: {
             attempt_id: attempt.id,
@@ -176,7 +176,7 @@ exports.startAttempt = async (req, res, next) => {
     });
 
     const plainAttempt = lightAttempt.toJSON();
-    
+
     console.log('[startAttempt] Lightweight attempt created:');
     console.log('[startAttempt] - Attempt ID:', plainAttempt.id);
     console.log('[startAttempt] - Sections count:', plainAttempt.sections?.length || 0);
@@ -238,7 +238,7 @@ exports.getAttempt = async (req, res, next) => {
     }
 
     const plainAttempt = attempt.toJSON();
-    
+
     console.log('[getAttempt] Retrieved lightweight attempt:');
     console.log('[getAttempt] - Attempt ID:', plainAttempt.id);
     console.log('[getAttempt] - Use /attempts/:id/questions to load questions');
@@ -263,7 +263,7 @@ exports.getAttempt = async (req, res, next) => {
  */
 exports.submitAttempt = async (req, res, next) => {
   const submitStartTime = Date.now();
-  
+
   try {
     const { attemptId } = req.params;
     const studentId = req.user.userId;
@@ -288,11 +288,27 @@ exports.submitAttempt = async (req, res, next) => {
       status: 'submitted',
     });
 
-    // Calculate total score for auto-graded questions only
+    // 1. Ensure all auto-gradable questions are scored before calculating final score
+    const allAnswers = await AttemptAnswer.findAll({
+      where: { attempt_id: attemptId },
+      include: [{
+        model: Question, as: 'question',
+        include: [{ model: QuestionType, as: 'questionType' }]
+      }]
+    });
+
+    for (const ans of allAnswers) {
+      if (ans.question?.questionType?.scoring_method === SCORING_METHODS.AUTO && ans.score === null) {
+        console.log(`[submitAttempt] Auto-grading missed answer for Q${ans.question_id}`);
+        await ScoringService.autoGradeAnswer(ans.id);
+      }
+    }
+
+    // 2. Calculate total score
     const totalScore = await ScoringService.calculateAttemptScore(attemptId);
     await attempt.update({ total_score: totalScore });
 
-    console.log(`[submitAttempt] Auto-graded score: ${totalScore}`);
+    console.log(`[submitAttempt] Final total score calculated: ${totalScore}`);
 
     // Get all answers to check for Writing/Speaking that need AI grading
     const answers = await AttemptAnswer.findAll({
@@ -315,10 +331,10 @@ exports.submitAttempt = async (req, res, next) => {
     // Find answers that need AI scoring
     const aiAnswersToScore = [];
     const speakingAnswersNeedTranscription = [];
-    
+
     for (const answer of answers) {
       const questionType = answer.question.questionType;
-      
+
       // Skip if already scored
       if (answer.score !== null && answer.score !== undefined) {
         continue;
@@ -390,7 +406,7 @@ exports.submitAttempt = async (req, res, next) => {
             }
             // NO WAIT - transcription queue will handle scoring automatically
           }
-          
+
 
           // Step 2: Score writing answers and already-transcribed speaking answers
           // Speaking answers queued for transcription will be scored automatically after transcription
@@ -402,7 +418,7 @@ exports.submitAttempt = async (req, res, next) => {
           for (const answerItem of aiAnswersToScore) {
             try {
               const itemStartTime = Date.now();
-              
+
               if (answerItem.type === 'writing') {
                 console.log(`[submitAttempt-Background] Scoring Writing answer ${answerItem.answerId} comprehensively...`);
                 await AiScoringService.scoreAnswerComprehensively(answerItem.answerId, false);
@@ -528,7 +544,7 @@ exports.getAttemptStatus = async (req, res, next) => {
     const aiAnswers = answers.filter(
       a => a.question?.questionType?.scoring_method === SCORING_METHODS.AI
     );
-    
+
     const scoredAiAnswers = aiAnswers.filter(a => a.score !== null && a.score !== undefined);
     const pendingAiAnswers = aiAnswers.filter(a => a.score === null || a.score === undefined);
 
@@ -536,7 +552,7 @@ exports.getAttemptStatus = async (req, res, next) => {
       total_ai_answers: aiAnswers.length,
       scored_ai_answers: scoredAiAnswers.length,
       pending_ai_answers: pendingAiAnswers.length,
-      progress_percentage: aiAnswers.length > 0 
+      progress_percentage: aiAnswers.length > 0
         ? Math.round((scoredAiAnswers.length / aiAnswers.length) * 100)
         : 100,
       is_complete: pendingAiAnswers.length === 0,
@@ -548,7 +564,7 @@ exports.getAttemptStatus = async (req, res, next) => {
         attemptId: attempt.id,
         status: attempt.status,
         total_score: attempt.total_score,
-        scoring_status: attempt.status === 'submitted' 
+        scoring_status: attempt.status === 'submitted'
           ? (scoringProgress.is_complete ? 'complete' : 'in_progress')
           : 'not_submitted',
         scoring_progress: scoringProgress,
@@ -583,13 +599,13 @@ exports.getAttemptQuestions = async (req, res, next) => {
 
     // Build where clause for filtering
     const where = { attempt_id: attemptId };
-    
+
     // If section_id provided, filter questions by section
     if (section_id) {
       const attemptSection = await AttemptSection.findOne({
-        where: { 
+        where: {
           attempt_id: attemptId,
-          exam_section_id: section_id 
+          exam_section_id: section_id
         },
         include: [{
           model: ExamSection,
@@ -617,23 +633,39 @@ exports.getAttemptQuestions = async (req, res, next) => {
           as: 'question',
           attributes: ['id', 'question_type_id', 'aptis_type_id', 'difficulty', 'content', 'media_url', 'additional_media', 'parent_question_id', 'duration_seconds', 'status'],
           include: [
-            { 
-              model: QuestionItem, 
+            {
+              model: QuestionItem,
               as: 'items',
               separate: true, // Prevent cartesian product
               order: [['item_order', 'ASC']]
             },
-            { 
-              model: QuestionOption, 
+            {
+              model: QuestionOption,
               as: 'options',
               separate: true, // Prevent cartesian product
               order: [['option_order', 'ASC']]
             },
-            { 
-              model: QuestionType, 
+            {
+              model: QuestionType,
               as: 'questionType',
               attributes: ['id', 'code', 'question_type_name', 'scoring_method', 'skill_type_id']
             },
+            {
+              model: Question,
+              as: 'childQuestions',
+              // separate: true, // separate query is often better for hasMany
+              attributes: ['id', 'content', 'question_type_id', 'media_url', 'additional_media', 'parent_question_id'],
+              include: [{
+                model: QuestionType,
+                as: 'questionType',
+                attributes: ['id', 'code', 'question_type_name']
+              }]
+            },
+            {
+              model: Question,
+              as: 'parentQuestion',
+              attributes: ['id', 'content', 'media_url', 'additional_media']
+            }
           ],
         },
       ],
@@ -650,15 +682,15 @@ exports.getAttemptQuestions = async (req, res, next) => {
     // Format answers with answer_data for frontend consumption
     const formattedAnswers = answers.map(answer => {
       const answerJson = answer.toJSON();
-      
-      // Log media_url for debugging
-      if (answerJson.question?.media_url) {
-        console.log('[getAttemptQuestions] Q' + answerJson.question.id + ' has media_url:', answerJson.question.media_url);
+
+      // Log detailed media info for debugging
+      if (answerJson.question) {
+        console.log(`[getAttemptQuestions] Q${answerJson.question.id} Type:${answerJson.question.question_type_id} MediaURL: ${answerJson.question.media_url || 'NULL/EMPTY'} AddMedia: ${answerJson.question.additional_media ? 'YES' : 'NO'}`);
       }
-      
+
       // Create answer_data structure based on answer_type
       let answer_data = null;
-      
+
       if (answer.answer_type === 'option' && answer.selected_option_id) {
         answer_data = { selected_option_id: answer.selected_option_id };
       } else if (answer.answer_type === 'json' && answer.answer_json) {
@@ -671,13 +703,13 @@ exports.getAttemptQuestions = async (req, res, next) => {
         answer_data = { text_answer: answer.text_answer };
       } else if (answer.answer_type === 'audio' && answer.audio_url) {
         // For audio answers, just mark as completed - don't need to load audio file
-        answer_data = { 
+        answer_data = {
           audio_url: answer.audio_url,
           completed: true,
           transcribed_text: answer.transcribed_text || null
         };
       }
-      
+
       return {
         ...answerJson,
         answer_data

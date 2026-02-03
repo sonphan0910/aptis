@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Box,
   TextField,
@@ -22,64 +22,103 @@ import { questionApi } from '../../../../services/questionService';
  * Listening MCQ Single Question Form - Part 1 của Listening skill
  * Chỉ 1 câu hỏi với nhiều lựa chọn
  */
-export default function ListeningMCQSingleForm({ content, onChange, isEdit = false }) {
+export default function ListeningMCQSingleForm({ content, onChange, onAudioFilesChange, isEdit = false }) {
   const [title, setTitle] = useState('');
   const [audioFile, setAudioFile] = useState(null);
   const [audioUrl, setAudioUrl] = useState('');
+  const [audioPreviewUrl, setAudioPreviewUrl] = useState(''); // For local file preview
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState(['', '', '']);
   const [correctAnswer, setCorrectAnswer] = useState(0);
   const [instructions, setInstructions] = useState('Listen carefully and choose the correct answer.');
-  
+
   // Error handling states
   const [errors, setErrors] = useState({});
   const [isValidated, setIsValidated] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
+  // Cleanup preview URL when component unmounts or file changes
+  useEffect(() => {
+    return () => {
+      if (audioPreviewUrl) {
+        URL.revokeObjectURL(audioPreviewUrl);
+      }
+    };
+  }, [audioPreviewUrl]);
+
   // Audio file selection function
   const handleAudioFileSelect = (file) => {
     if (!file) return;
-    
+
     setAudioFile(file);
+
+    // Create preview URL for local playback
+    if (audioPreviewUrl) {
+      URL.revokeObjectURL(audioPreviewUrl); // Clean up old URL
+    }
+    const previewUrl = URL.createObjectURL(file);
+    setAudioPreviewUrl(previewUrl);
+
+    // Pass file to parent QuestionForm via callback
+    if (onAudioFilesChange) {
+      console.log('📤 [ListeningMCQSingleForm] Calling onAudioFilesChange with file:', file.name);
+      onAudioFilesChange({
+        mainAudio: file,
+        speakerAudios: []
+      });
+    } else {
+      console.warn('⚠️ [ListeningMCQSingleForm] onAudioFilesChange callback is NOT provided!');
+    }
+
     console.log('✅ Audio file selected:', file.name);
   };
 
   const validateData = useCallback(() => {
     const newErrors = {};
-    
+
     // Check title
     if (!title.trim()) {
       newErrors.title = 'Tiêu đề không được để trống';
     }
-    
+
     // Check audio file - allow either audioUrl OR audioFile (File object or string)
     const hasAudioUrl = audioUrl && typeof audioUrl === 'string' && audioUrl.trim();
     const hasAudioFile = audioFile && (audioFile instanceof File || typeof audioFile === 'object');
-    
+
     if (!hasAudioUrl && !hasAudioFile) {
       newErrors.audio = 'Vui lòng chọn file audio';
     }
-    
+
     // Check question
     if (!question.trim()) {
       newErrors.question = 'Câu hỏi không được để trống';
     }
-    
+
+    // Auto-generate title if empty (fallback)
+    if (!title.trim() && question.trim()) {
+      // In validateData, we can't update state freely. 
+      // Instead, we should handle this in the input change handler.
+      // But here we enforce title presence.
+      newErrors.title = 'Tiêu đề không được để trống (có thể copy từ câu hỏi)';
+    } else if (!title.trim()) {
+      newErrors.title = 'Tiêu đề không được để trống';
+    }
+
     // Check options
     const validOptions = options.filter(opt => opt.trim());
     if (validOptions.length < 2) {
       newErrors.options = 'Phải có ít nhất 2 lựa chọn';
     }
-    
+
     // Check correct answer
     if (correctAnswer >= options.length || !options[correctAnswer].trim()) {
       newErrors.correctAnswer = 'Đáp án đúng không hợp lệ';
     }
-    
+
     setErrors(newErrors);
     const isValid = Object.keys(newErrors).length === 0;
     setIsValidated(isValid);
-    
+
     // Send data to parent when valid
     if (isValid && onChange) {
       // Prepare data for backend helper function
@@ -95,11 +134,11 @@ export default function ListeningMCQSingleForm({ content, onChange, isEdit = fal
         instructions: instructions.trim(),
         title: title.trim()
       };
-      
+
       // Send content as JSON string for backend auto-generation
       onChange(JSON.stringify(structuredData));
     }
-    
+
     return isValid;
   }, [title, audioUrl, audioFile, question, options, correctAnswer, instructions, onChange]);
 
@@ -118,10 +157,10 @@ export default function ListeningMCQSingleForm({ content, onChange, isEdit = fal
   // Handle removing option
   const handleRemoveOption = (index) => {
     if (options.length <= 2) return; // Minimum 2 options required
-    
+
     const newOptions = options.filter((_, i) => i !== index);
     setOptions(newOptions);
-    
+
     // Adjust correct answer if necessary
     if (correctAnswer === index) {
       setCorrectAnswer(0); // Reset to first option
@@ -135,7 +174,7 @@ export default function ListeningMCQSingleForm({ content, onChange, isEdit = fal
       <Typography variant="h6" gutterBottom>
         Listening MCQ - Single Question
       </Typography>
-      
+
       <Typography variant="body2" color="text.secondary" mb={3}>
         Tạo câu hỏi Listening với 1 câu hỏi và nhiều lựa chọn
       </Typography>
@@ -156,7 +195,7 @@ export default function ListeningMCQSingleForm({ content, onChange, isEdit = fal
         <Typography variant="subtitle1" gutterBottom>
           File Audio
         </Typography>
-        
+
         <Box display="flex" alignItems="center" gap={2}>
           <Button
             variant="outlined"
@@ -178,21 +217,40 @@ export default function ListeningMCQSingleForm({ content, onChange, isEdit = fal
               }}
             />
           </Button>
-          
+
           {audioFile && (
             <Typography variant="body2" color="text.secondary">
               {audioFile.name}
             </Typography>
           )}
-          
-          {audioUrl && (
-            <audio controls style={{ maxWidth: 300 }}>
+        </Box>
+
+        {/* Audio Preview - for newly selected file */}
+        {audioPreviewUrl && (
+          <Box mt={2}>
+            <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+              🎧 Nghe thử audio đã chọn:
+            </Typography>
+            <audio controls style={{ width: '100%', maxWidth: 400 }}>
+              <source src={audioPreviewUrl} />
+              Your browser does not support the audio element.
+            </audio>
+          </Box>
+        )}
+
+        {/* Existing audio URL (for edit mode) */}
+        {audioUrl && !audioPreviewUrl && (
+          <Box mt={2}>
+            <Typography variant="caption" color="text.secondary" display="block" mb={1}>
+              Audio hiện tại:
+            </Typography>
+            <audio controls style={{ width: '100%', maxWidth: 400 }}>
               <source src={audioUrl} type="audio/mpeg" />
               Your browser does not support the audio element.
             </audio>
-          )}
-        </Box>
-        
+          </Box>
+        )}
+
         {errors.audio && (
           <Typography variant="caption" color="error" display="block" mt={1}>
             {errors.audio}
@@ -204,7 +262,14 @@ export default function ListeningMCQSingleForm({ content, onChange, isEdit = fal
       <TextField
         label="Câu hỏi"
         value={question}
-        onChange={(e) => setQuestion(e.target.value)}
+        onChange={(e) => {
+          const newVal = e.target.value;
+          setQuestion(newVal);
+          // Auto-sync title if it's empty or matches the previous question content
+          if (!title || title === question) {
+            setTitle(newVal);
+          }
+        }}
         fullWidth
         multiline
         rows={2}

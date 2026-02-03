@@ -30,17 +30,17 @@ class AiScoringService {
   async getImageAsBase64(filePath) {
     try {
       let resolvedPath = filePath;
-      
+
       // If relative path, resolve from project root
       if (!path.isAbsolute(filePath) && !filePath.startsWith('/')) {
         resolvedPath = path.join(__dirname, '../../..', filePath);
       }
-      
+
       if (!fs.existsSync(resolvedPath)) {
         console.warn(`[getImageAsBase64] ⚠️ File not found: ${resolvedPath}`);
         return null;
       }
-      
+
       const fileBuffer = fs.readFileSync(resolvedPath);
       const base64 = fileBuffer.toString('base64');
       console.log(`[getImageAsBase64] ✅ Converted: ${path.basename(resolvedPath)}`);
@@ -50,7 +50,7 @@ class AiScoringService {
       return null;
     }
   }
-  
+
   /**
    * Get MIME type from file extension
    */
@@ -59,7 +59,7 @@ class AiScoringService {
     const mimes = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.gif': 'image/gif', '.webp': 'image/webp' };
     return mimes[ext] || 'image/jpeg';
   }
-  
+
   /**
    * Extract images from question and prepare for vision API
    * Converts local files to base64, keeps external URLs as-is
@@ -68,22 +68,22 @@ class AiScoringService {
    */
   async prepareImagesForVision(question) {
     const images = [];
-    
+
     if (!question.additional_media) return images;
-    
+
     try {
-      const media = typeof question.additional_media === 'string' 
-        ? JSON.parse(question.additional_media) 
+      const media = typeof question.additional_media === 'string'
+        ? JSON.parse(question.additional_media)
         : question.additional_media;
-      
+
       if (!Array.isArray(media)) return images;
-      
+
       const imageMedia = media.filter(m => m.type === 'image');
       console.log(`[prepareImagesForVision] Found ${imageMedia.length} image(s) in question`);
-      
+
       for (let i = 0; i < imageMedia.length; i++) {
         const img = imageMedia[i];
-        
+
         if (img.url) {
           if (img.url.startsWith('http')) {
             // External URL - use directly
@@ -113,17 +113,17 @@ class AiScoringService {
           }
         }
       }
-      
+
       if (images.length > 0) {
         console.log(`[prepareImagesForVision] ✅ Prepared ${images.length} image(s) for vision API`);
       }
     } catch (error) {
       console.warn(`[prepareImagesForVision] ⚠️ Error: ${error.message}`);
     }
-    
+
     return images;
   }
-  
+
   /**
    * Validate CEFR level - enforce consistency between score and CEFR level
    * If AI provides inconsistent CEFR level, correct it based on score percentage
@@ -134,7 +134,7 @@ class AiScoringService {
    */
   validateCefrLevel(score, maxScore, aiCefrLevel) {
     const percentage = maxScore > 0 ? (score / maxScore) * 100 : 0;
-    
+
     // Define CEFR level thresholds based on score percentage
     let expectedCefrLevel;
     if (percentage < 30) {
@@ -152,19 +152,19 @@ class AiScoringService {
     } else {
       expectedCefrLevel = 'C1-C2';
     }
-    
+
     // Check if AI's CEFR level is consistent with score
     const aiCefrClean = (aiCefrLevel || 'N/A').toUpperCase().replace(/[.\s]/g, '');
     const expectedCefrClean = expectedCefrLevel.toUpperCase().replace(/[.\s]/g, '');
-    
+
     // Allow some flexibility: if AI says B2.1 and expected is B2, that's OK
-    const isConsistent = 
+    const isConsistent =
       aiCefrClean === expectedCefrClean ||
       aiCefrClean.startsWith(expectedCefrClean) ||
       expectedCefrClean.includes(aiCefrClean.substring(0, 2)) ||
       (percentage >= 50 && percentage < 80 && aiCefrClean.startsWith('B')) || // B1/B2 range
       (percentage >= 30 && percentage < 60 && aiCefrClean.startsWith('A')); // A1/A2 range
-    
+
     if (!isConsistent) {
       console.warn(`[validateCefrLevel] ⚠️ CEFR inconsistency detected!`);
       console.warn(`[validateCefrLevel]   AI suggested: ${aiCefrLevel}`);
@@ -173,7 +173,7 @@ class AiScoringService {
       console.warn(`[validateCefrLevel]   ✓ Correcting to: ${expectedCefrLevel}`);
       return expectedCefrLevel;
     }
-    
+
     console.log(`[validateCefrLevel] ✓ CEFR Level: ${aiCefrLevel} | Score: ${score}/${maxScore} (${percentage.toFixed(1)}%)`);
     return aiCefrLevel;
   }
@@ -192,7 +192,7 @@ class AiScoringService {
       'WRITING_SHORT': { // Task 1: 0-3 scale
         'A0': 0,
         'A1.1': 1,
-        'A1.2': 2, 
+        'A1.2': 2,
         'above A1': 3
       },
       'WRITING_FORM': { // Task 2: 0-5 scale
@@ -206,7 +206,7 @@ class AiScoringService {
       'WRITING_LONG': { // Task 3: 0-5 scale
         'A0': 0,
         'A2.1': 1,
-        'A2.2': 2, 
+        'A2.2': 2,
         'B1.1': 3,
         'B1.2': 4,
         'B2+': 5
@@ -229,7 +229,7 @@ class AiScoringService {
       const percentageMapping = {
         'A0': 0,
         'A1': 0.2,
-        'A2': 0.4, 
+        'A2': 0.4,
         'B1': 0.6,
         'B2': 0.8,
         'C1': 0.9,
@@ -263,15 +263,15 @@ class AiScoringService {
       }
 
       const finalScore = Math.min(result.score, answer.max_score || 10);
-      
+
       // Validate CEFR level consistency 
       const validatedCefrLevel = this.validateCefrLevel(finalScore, answer.max_score || 10, result.cefrLevel);
       result.cefrLevel = validatedCefrLevel;
-      
+
       if (finalScore !== result.score) {
         console.warn(`[scoreWriting] ⚠️  AI score capped: ${result.score} -> ${finalScore} (max: ${answer.max_score})`);
       }
-      
+
       await answer.update({
         score: finalScore,
         ai_feedback: result.overallFeedback || result.comment,
@@ -280,7 +280,7 @@ class AiScoringService {
 
       console.log(`[scoreWriting] ✅ Writing answer ${answerId} scored comprehensively: ${finalScore}/${answer.max_score}`);
       return result;
-      
+
     } catch (error) {
       console.error(`[scoreWriting] ❌ Failed to score writing answer ${answerId}:`, error.message);
       throw error;
@@ -301,15 +301,15 @@ class AiScoringService {
       }
 
       const finalScore = Math.min(result.score, answer.max_score || 10);
-      
+
       // Validate CEFR level consistency
       const validatedCefrLevel = this.validateCefrLevel(finalScore, answer.max_score || 10, result.cefrLevel);
       result.cefrLevel = validatedCefrLevel;
-      
+
       if (finalScore !== result.score) {
         console.warn(`[scoreSpeakingWithAudioAnalysis] ⚠️  AI score capped: ${result.score} -> ${finalScore} (max: ${answer.max_score})`);
       }
-      
+
       await answer.update({
         score: finalScore,
         ai_feedback: result.overallFeedback || result.comment,
@@ -318,7 +318,7 @@ class AiScoringService {
 
       console.log(`[scoreSpeakingWithAudioAnalysis] ✅ Speaking answer ${answerId} scored comprehensively: ${finalScore}/${answer.max_score}`);
       return result;
-      
+
     } catch (error) {
       console.error(`[scoreSpeakingWithAudioAnalysis] ❌ Failed to score speaking answer ${answerId}:`, error.message);
       throw error;
@@ -342,11 +342,11 @@ class AiScoringService {
           }
         ]
       });
-      
+
       if (!answer) {
         throw new BadRequestError('Answer not found');
       }
-      
+
       // If transcribed_text is not available, wait for transcription queue to process
       let maxRetries = 10;
       let retryCount = 0;
@@ -367,7 +367,7 @@ class AiScoringService {
           ]
         });
       }
-      
+
       // If still no transcription, log warning but proceed anyway
       // AI will score based on audio_url or minimal context
       if (!answer.transcribed_text) {
@@ -375,7 +375,7 @@ class AiScoringService {
       } else {
         console.log(`[scoreSpeaking] ✅ Transcription available: ${answer.transcribed_text.substring(0, 100)}...`);
       }
-      
+
       // Use comprehensive scoring with audio analysis - speaking has audio
       const result = await this.scoreAnswerComprehensively(answerId, true);
 
@@ -386,15 +386,15 @@ class AiScoringService {
       }
 
       const finalScore = Math.min(result.score, answer.max_score || 10);
-      
+
       // Validate CEFR level consistency
       const validatedCefrLevel = this.validateCefrLevel(finalScore, answer.max_score || 10, result.cefrLevel);
       result.cefrLevel = validatedCefrLevel;
-      
+
       if (finalScore !== result.score) {
         console.warn(`[scoreSpeaking] ⚠️  AI score capped: ${result.score} -> ${finalScore} (max: ${answer.max_score})`);
       }
-      
+
       await answer.update({
         score: finalScore,
         ai_feedback: result.overallFeedback || result.comment,
@@ -403,7 +403,7 @@ class AiScoringService {
 
       console.log(`[scoreSpeaking] ✅ Speaking answer ${answerId} scored comprehensively: ${finalScore}/${answer.max_score}`);
       return result;
-      
+
     } catch (error) {
       console.error(`[scoreSpeaking] ❌ Failed to score speaking answer ${answerId}:`, error.message);
       console.error(`[scoreSpeaking] Error stack:`, error.stack);
@@ -616,9 +616,9 @@ class AiScoringService {
           comment: cs.comment,
           suggestions: cs.suggestions,
         };
-        
+
         console.log(`[createAnswerAiFeedbacks] Creating feedback for ${cs.criteriaName}:`, feedbackData);
-        
+
         const feedback = await AnswerAiFeedback.create(feedbackData);
         console.log(`[createAnswerAiFeedbacks] ✅ Created feedback ${feedback.id} for criterion ${cs.criteriaName}: ${cs.score}/${cs.maxScore}`);
       } catch (error) {
@@ -629,7 +629,7 @@ class AiScoringService {
         console.error(`[createAnswerAiFeedbacks] Error details:`, error);
       }
     }
-    
+
     console.log(`[createAnswerAiFeedbacks] Completed feedback creation for answer ${answerId}`);
   }
 
@@ -663,44 +663,88 @@ class AiScoringService {
     console.log(`[scoreEntireAnswer] Scoring entire answer with ${criteria.length} criteria as context`);
 
     try {
+      // ═══════════════════════════════════════════════════════════════════════
+      // 📸 DEBUG LOG: KIỂM TRA LUỒNG XỬ LÝ ẢNH CHO SPEAKING
+      // ═══════════════════════════════════════════════════════════════════════
+      const questionTypeCode = question.questionType?.code || taskType;
+      const isSpeaking = questionTypeCode.toLowerCase().includes('speaking');
+
+      console.log(`\n${'═'.repeat(70)}`);
+      console.log(`📸 [IMAGE DEBUG] Question ID: ${question.id}`);
+      console.log(`📸 [IMAGE DEBUG] Question Type: ${questionTypeCode}`);
+      console.log(`📸 [IMAGE DEBUG] Is Speaking: ${isSpeaking ? '✅ YES' : '❌ NO'}`);
+      console.log(`📸 [IMAGE DEBUG] Has parent_question_id: ${question.parent_question_id || 'null'}`);
+      console.log(`📸 [IMAGE DEBUG] Has additional_media (before merge): ${question.additional_media ? '✅ YES' : '❌ NO'}`);
+
+      if (question.additional_media) {
+        const mediaItems = typeof question.additional_media === 'string'
+          ? JSON.parse(question.additional_media)
+          : question.additional_media;
+        console.log(`📸 [IMAGE DEBUG] Media items (before merge): ${JSON.stringify(mediaItems.map(m => ({ type: m.type, desc: m.description?.substring(0, 30) })))}`);
+      }
+      console.log(`${'═'.repeat(70)}\n`);
+      // ═══════════════════════════════════════════════════════════════════════
+
       // Load parent question if this is a child question (to get images/context)
       let parentQuestion = null;
       if (question.parent_question_id) {
-        console.log(`[scoreEntireAnswer] Loading parent question ID: ${question.parent_question_id}`);
+        console.log(`📸 [IMAGE DEBUG] 🔍 Loading parent question ID: ${question.parent_question_id}`);
         parentQuestion = await Question.findByPk(question.parent_question_id);
-        
+
         if (parentQuestion && parentQuestion.additional_media) {
-          console.log(`[scoreEntireAnswer] ✓ Parent question has media (images/audio) for context`);
+          console.log(`📸 [IMAGE DEBUG] ✅ Parent question HAS media - will merge`);
           // Merge parent's media into current question for AI context
-          const parentMedia = typeof parentQuestion.additional_media === 'string' 
-            ? JSON.parse(parentQuestion.additional_media) 
+          const parentMedia = typeof parentQuestion.additional_media === 'string'
+            ? JSON.parse(parentQuestion.additional_media)
             : parentQuestion.additional_media;
-          
-          const currentMedia = question.additional_media 
+
+          console.log(`📸 [IMAGE DEBUG] Parent media: ${JSON.stringify(parentMedia.map(m => ({ type: m.type, desc: m.description?.substring(0, 30) })))}`);
+
+          const currentMedia = question.additional_media
             ? (typeof question.additional_media === 'string' ? JSON.parse(question.additional_media) : question.additional_media)
             : [];
-          
+
           // Add parent media with context note
           question.additional_media = [...currentMedia, ...parentMedia.map(m => ({
             ...m,
             source: 'parent_question',
             description: `${m.description} (from main question)`
           }))];
-          
-          console.log(`[scoreEntireAnswer] ✓ Added ${parentMedia.length} media item(s) from parent question`);
+
+          console.log(`📸 [IMAGE DEBUG] ✅ Merged ${parentMedia.length} media item(s) from parent`);
+          console.log(`📸 [IMAGE DEBUG] Total media after merge: ${question.additional_media.length}`);
+        } else {
+          console.log(`📸 [IMAGE DEBUG] ⚠️ Parent question found but NO media`);
         }
       }
 
       console.log(`[scoreEntireAnswer] Building prompt for ${criteria.length} criteria with vision support`);
-      
+
       // Build comprehensive prompt with vision API support
       let prompt;
-      const questionTypeCode = question.questionType?.code || taskType;
-      
+
+      // ═══════════════════════════════════════════════════════════════════════
+      // 📸 DEBUG LOG: QUYẾT ĐỊNH VISION API HAY TEXT-ONLY
+      // ═══════════════════════════════════════════════════════════════════════
+      const hasImages = !!question.additional_media;
+      const isWriting = questionTypeCode.toLowerCase().includes('writing');
+      const willUseVision = !isWriting && hasImages;
+
+      console.log(`\n${'─'.repeat(70)}`);
+      console.log(`📸 [IMAGE DEBUG] DECISION POINT:`);
+      console.log(`📸 [IMAGE DEBUG]   - Is Writing: ${isWriting ? '✅ YES' : '❌ NO'}`);
+      console.log(`📸 [IMAGE DEBUG]   - Has Images (after merge): ${hasImages ? '✅ YES' : '❌ NO'}`);
+      console.log(`📸 [IMAGE DEBUG]   - Will Use Vision API: ${willUseVision ? '✅ YES - Images WILL be sent to AI' : '❌ NO - Text only'}`);
+      console.log(`${'─'.repeat(70)}\n`);
+      // ═══════════════════════════════════════════════════════════════════════
+
       // For non-writing questions with images, use vision API
-      if (!questionTypeCode.toLowerCase().includes('writing') && question.additional_media) {
+      if (willUseVision) {
+        console.log(`📸 [IMAGE DEBUG] 🚀 Calling buildGenericScoringPromptWithVision...`);
         prompt = await this.buildGenericScoringPromptWithVision(answerText, question, criteria, taskType, this.getMaxScoreFromCriteria(criteria, question));
+        console.log(`📸 [IMAGE DEBUG] ✅ Vision prompt created with ${prompt.images?.length || 0} image(s)`);
       } else {
+        console.log(`📸 [IMAGE DEBUG] 📝 Calling buildComprehensiveScoringPrompt (text-only)...`);
         prompt = this.buildComprehensiveScoringPrompt(answerText, question, criteria, taskType);
       }
 
@@ -708,17 +752,17 @@ class AiScoringService {
       console.log(`[scoreEntireAnswer] Calling AI service...`);
       const aiResponse = await AiServiceClient.callAiWithRetry(prompt);
       console.log(`[scoreEntireAnswer] Raw AI response: ${aiResponse.substring(0, 200)}...`);
-      
+
       // Get max score from question
       const maxScore = this.getMaxScoreFromCriteria(criteria, question);
-      
+
       // Parse AI response - AI calculates score directly based on CEFR and maxScore in prompt
       const parsedResult = AiServiceClient.parseAiResponse(aiResponse, maxScore);
-      
+
       // Use AI's calculated score (already converted from CEFR in prompt)
       const finalScore = parsedResult.score || 0;
       console.log(`[scoreEntireAnswer] ✅ AI scored: ${finalScore}/${maxScore} (CEFR: ${parsedResult.cefrLevel})`);
-      
+
       // Validate CEFR level against final score
       const validatedCefrLevel = this.validateCefrLevel(finalScore, maxScore, parsedResult.cefrLevel);
 
@@ -756,17 +800,17 @@ class AiScoringService {
       console.log(`[scoreEntireAnswerWithAudio] Building enhanced prompt for ${criteria.length} criteria`);
       // Build enhanced prompt with audio analysis
       const prompt = this.buildEnhancedComprehensiveScoringPrompt(
-        answerText, 
-        question, 
-        criteria, 
-        taskType, 
+        answerText,
+        question,
+        criteria,
+        taskType,
         audioAnalysis
       );
 
       // Call AI service
       const aiResponse = await AiServiceClient.callAiWithRetry(prompt);
       console.log(`[scoreEntireAnswerWithAudio] Raw AI response: ${aiResponse.substring(0, 200)}...`);
-      
+
       const maxScore = question.max_score || 10;
       const parsedResult = AiServiceClient.parseAiResponse(aiResponse, maxScore);
 
@@ -783,7 +827,7 @@ class AiScoringService {
         );
         finalScore = Math.max(0, Math.min(maxScore, finalScore));
       }
-      
+
       // Validate CEFR level against final score
       const validatedCefrLevel = this.validateCefrLevel(finalScore, maxScore, parsedResult.cefrLevel);
 
@@ -811,16 +855,16 @@ class AiScoringService {
   buildComprehensiveScoringPrompt(answerText, question, criteria, taskType) {
     const criterion = criteria[0]; // Use first criterion as main assessment guideline
     const maxScore = this.getMaxScoreFromCriteria(criteria, question);
-    
+
     // Detect question type
     const questionTypeCode = question.questionType?.code || taskType;
-    
+
     // Use specialized Speaking prompt builder for speaking questions
     if (questionTypeCode.toLowerCase().includes('speaking')) {
       console.log(`[buildComprehensiveScoringPrompt] Using SpeakingScoringPromptBuilder for ${questionTypeCode}`);
       return SpeakingScoringPromptBuilder.buildSpeakingPrompt(answerText, question, criteria, maxScore);
     }
-    
+
     // Use specialized Writing prompt builder for writing questions
     if (questionTypeCode === 'WRITING_SHORT') {
       return this.buildWritingTask1Prompt(answerText, question, criterion, maxScore);
@@ -831,7 +875,7 @@ class AiScoringService {
     } else if (questionTypeCode === 'WRITING_EMAIL') {
       return this.buildWritingTask4Prompt(answerText, question, criterion, maxScore);
     }
-    
+
     // Fallback for other question types
     return this.buildGenericScoringPrompt(answerText, question, criteria, taskType, maxScore);
   }
@@ -896,7 +940,7 @@ Return assessment in this JSON format:
    */
   buildWritingTask2Prompt(answerText, question, criterion, maxScore) {
     const wordCount = answerText.trim().split(/\s+/).length;
-    
+
     return `You are an official APTIS assessor scoring Writing Task 2 - Short text writing.
 
 OFFICIAL APTIS RUBRIC:
@@ -944,7 +988,7 @@ Return assessment in this JSON format:
   buildWritingTask3Prompt(answerText, question, criterion, maxScore) {
     const responses = answerText.split('\n').filter(r => r.trim());
     const responseCount = responses.length;
-    
+
     return `You are an official APTIS assessor scoring Writing Task 3 - Three written responses.
 
 OFFICIAL APTIS RUBRIC (0-5 scale):
@@ -1044,21 +1088,21 @@ Return assessment in this JSON format:
    */
   async buildGenericScoringPromptWithVision(answerText, question, criteria, taskType, maxScore) {
     const criteriaList = criteria.map(c => `- ${c.criteria_name}: ${c.description || c.rubric_prompt}`).join('\n');
-    
-    const isWritingTask = taskType.toLowerCase().includes('writing') || 
-                          question.questionType?.code?.includes('WRITING');
-    
-    const specialInstructions = isWritingTask ? 
+
+    const isWritingTask = taskType.toLowerCase().includes('writing') ||
+      question.questionType?.code?.includes('WRITING');
+
+    const specialInstructions = isWritingTask ?
       `\nSPECIAL INSTRUCTIONS FOR WRITING ASSESSMENT:
 - In "suggestions", provide SPECIFIC text corrections using exact quotes
 - Format: 'Change "student's text" to "corrected text"'
 - Focus on grammar, vocabulary, spelling, and structure errors
 - Give concrete fixes, not general advice
 - Example: 'Change "I go to school yesterday" to "I went to school yesterday"'` : '';
-    
+
     // Prepare images for vision API (convert local files to base64)
     const images = await this.prepareImagesForVision(question);
-    
+
     // Build text prompt
     let visualContext = '';
     if (images.length > 0) {
@@ -1068,7 +1112,7 @@ Return assessment in this JSON format:
 - Did they use relevant vocabulary related to the visual content?
 - For comparison tasks: Did they identify similarities and differences between images?`;
     }
-    
+
     const promptText = `You are an expert language assessor. Score this ${taskType} response holistically using ALL the following criteria:
 
 ${criteriaList}
@@ -1101,26 +1145,26 @@ Return your response in this exact JSON format:
 
   buildGenericScoringPrompt(answerText, question, criteria, taskType, maxScore) {
     const criteriaList = criteria.map(c => `- ${c.criteria_name}: ${c.description || c.rubric_prompt}`).join('\n');
-    
-    const isWritingTask = taskType.toLowerCase().includes('writing') || 
-                          question.questionType?.code?.includes('WRITING');
-    
-    const specialInstructions = isWritingTask ? 
+
+    const isWritingTask = taskType.toLowerCase().includes('writing') ||
+      question.questionType?.code?.includes('WRITING');
+
+    const specialInstructions = isWritingTask ?
       `\nSPECIAL INSTRUCTIONS FOR WRITING ASSESSMENT:
 - In "suggestions", provide SPECIFIC text corrections using exact quotes
 - Format: 'Change "student's text" to "corrected text"'
 - Focus on grammar, vocabulary, spelling, and structure errors
 - Give concrete fixes, not general advice
 - Example: 'Change "I go to school yesterday" to "I went to school yesterday"'` : '';
-    
+
     // Add visual context if question has images
     let visualContext = '';
     if (question.additional_media) {
       try {
-        const media = typeof question.additional_media === 'string' 
-          ? JSON.parse(question.additional_media) 
+        const media = typeof question.additional_media === 'string'
+          ? JSON.parse(question.additional_media)
           : question.additional_media;
-        
+
         const images = media.filter(m => m.type === 'image');
         if (images.length > 0) {
           visualContext = `\n\nVISUAL CONTEXT (Images provided to student):`;
@@ -1138,7 +1182,7 @@ Return your response in this exact JSON format:
         console.error('[buildGenericScoringPrompt] Error parsing additional_media:', e);
       }
     }
-    
+
     return `You are an expert language assessor. Score this ${taskType} response holistically using ALL the following criteria:
 
 ${criteriaList}
@@ -1173,7 +1217,7 @@ Return your response in this exact JSON format:
    */
   buildEnhancedComprehensiveScoringPrompt(answerText, question, criteria, taskType, audioAnalysis) {
     const basePrompt = this.buildComprehensiveScoringPrompt(answerText, question, criteria, taskType);
-    
+
     if (!audioAnalysis) {
       return basePrompt;
     }
@@ -1206,7 +1250,7 @@ Consider this objective audio data when assessing speaking fluency and delivery.
         },
         order: [['criteria_name', 'ASC']]
       });
-      
+
       console.log(`[getCriteriaByQuestionType] Found ${criteria.length} criteria for question type ${questionTypeId}`);
       return criteria;
     } catch (error) {
@@ -1252,24 +1296,24 @@ Consider this objective audio data when assessing speaking fluency and delivery.
 
       const question = answer.question;
       const questionTypeId = question.question_type_id;
-      
+
       // Get aptisTypeId from Question first, then fallback to Exam
       let aptisTypeId = question.aptis_type_id;
-      
+
       // Fallback to exam aptis_type_id if not in question
       if (!aptisTypeId && answer.attempt?.exam?.aptis_type_id) {
         aptisTypeId = answer.attempt.exam.aptis_type_id;
       }
-      
+
       if (!aptisTypeId) {
         throw new BadRequestError(`Cannot determine APTIS type for question ${question.id}`);
       }
-      
+
       console.log(`[scoreAnswerComprehensively] Using aptisTypeId: ${aptisTypeId}, questionTypeId: ${questionTypeId}`);
-      
+
       // Get all criteria for this question type
       const criteria = await this.getCriteriaByQuestionType(questionTypeId, aptisTypeId);
-      
+
       if (!criteria || criteria.length === 0) {
         throw new BadRequestError(`No scoring criteria found for question type ${questionTypeId}`);
       }
@@ -1279,42 +1323,42 @@ Consider this objective audio data when assessing speaking fluency and delivery.
       // Determine scoring method based on question type and audio availability
       let result;
       const hasAudio = includeAudio && answer.audio_url;
-      
+
       // CRITICAL: For speaking questions, MUST have transcribed_text before scoring
       const isSpeaking = question.questionType.code.toLowerCase().includes('speaking');
       if (isSpeaking && hasAudio && !answer.transcribed_text) {
         console.error(`[scoreAnswerComprehensively] ❌ Cannot score speaking answer ${answerId} - transcription not completed yet`);
         throw new BadRequestError('Cannot score speaking answer: transcription not completed. Please wait for speech-to-text processing to finish.');
       }
-      
+
       // For speaking, prefer transcribed_text over text_answer
       const answerText = answer.transcribed_text || answer.text_answer || '';
-      
+
       console.log(`[scoreAnswerComprehensively] hasAudio=${hasAudio}, includeAudio=${includeAudio}, isSpeaking=${isSpeaking}, answerText length=${answerText.length}`);
-      
+
       if (hasAudio) {
         console.log(`[scoreAnswerComprehensively] Using scoreEntireAnswerWithAudio`);
         // Get audio analysis if available
         const audioAnalysis = answer.audio_analysis ? JSON.parse(answer.audio_analysis) : null;
         result = await this.scoreEntireAnswerWithAudio(
-          answerText, 
-          question, 
-          criteria, 
+          answerText,
+          question,
+          criteria,
           question.questionType.type_name || 'general',
           audioAnalysis
         );
       } else {
         console.log(`[scoreAnswerComprehensively] Using scoreEntireAnswer`);
         result = await this.scoreEntireAnswer(
-          answerText, 
-          question, 
-          criteria, 
+          answerText,
+          question,
+          criteria,
           question.questionType.type_name || 'general'
         );
       }
 
       console.log(`[scoreAnswerComprehensively] Got result with score: ${result.score}`);
-      
+
       // Validate and adjust score if needed
       const maxScore = answer.max_score || question.max_score || 10;
       let aiScore = (typeof result.score === 'number' && !isNaN(result.score) && result.score > 0) ? result.score : 0;
@@ -1332,7 +1376,7 @@ Consider this objective audio data when assessing speaking fluency and delivery.
       result.score = finalScore;
       result.overallFeedback = aiFeedback;
       // Log
-      console.log(`[scoreAnswerComprehensively] Score validation: ${result.score}/${maxScore} (${((finalScore/maxScore)*100).toFixed(1)}%) -> CEFR: ${validatedCefrLevel}`);
+      console.log(`[scoreAnswerComprehensively] Score validation: ${result.score}/${maxScore} (${((finalScore / maxScore) * 100).toFixed(1)}%) -> CEFR: ${validatedCefrLevel}`);
       // Update the answer with the score and AI feedback
       await answer.update({
         score: finalScore,
@@ -1345,7 +1389,7 @@ Consider this objective audio data when assessing speaking fluency and delivery.
       await this.createComprehensiveFeedback(answerId, result);
       console.log(`[scoreAnswerComprehensively] ✅ Comprehensive scoring completed for answer ${answerId}`);
       return result;
-      
+
     } catch (error) {
       console.error(`[scoreAnswerComprehensively] ❌ Error scoring answer ${answerId}:`, error.message);
       console.error(`[scoreAnswerComprehensively] Stack:`, error.stack);
@@ -1359,16 +1403,16 @@ Consider this objective audio data when assessing speaking fluency and delivery.
   async createComprehensiveFeedback(answerId, result) {
     try {
       console.log(`[createComprehensiveFeedback] Creating comprehensive feedback for answer ${answerId}`);
-      
+
       // Validate result object
       if (!result) {
         throw new Error('Result object is null or undefined');
       }
-      
+
       console.log(`[createComprehensiveFeedback] Result object keys:`, Object.keys(result));
       console.log(`[createComprehensiveFeedback] Result score: ${result.score}, type: ${typeof result.score}`);
       console.log(`[createComprehensiveFeedback] Result cefrLevel: ${result.cefrLevel}`);
-      
+
       // Get answer to determine max_score for validation
       const answer = await AttemptAnswer.findByPk(answerId, {
         include: [{
@@ -1376,16 +1420,16 @@ Consider this objective audio data when assessing speaking fluency and delivery.
           as: 'question'
         }]
       });
-      
+
       if (!answer) {
         throw new Error(`Answer ${answerId} not found for feedback creation`);
       }
-      
+
       const maxScore = answer.max_score || answer.question?.max_score || 10;
-      
+
       // Validate CEFR level based on actual score
       const validatedCefrLevel = this.validateCefrLevel(result.score, maxScore, result.cefrLevel);
-      
+
       // Handle suggestions - keep as array for JSON storage
       let suggestions = result.suggestions;
       if (!Array.isArray(suggestions)) {
@@ -1400,7 +1444,7 @@ Consider this objective audio data when assessing speaking fluency and delivery.
           suggestions = [];
         }
       }
-      
+
       // Force score=0 and feedback if invalid
       let safeScore = (typeof result.score === 'number' && !isNaN(result.score) && result.score > 0) ? result.score : 0;
       let safeComment = result.comment || result.overallFeedback || 'Không có câu trả lời để chấm điểm.';
@@ -1416,9 +1460,9 @@ Consider this objective audio data when assessing speaking fluency and delivery.
         suggestions: suggestions, // Store as array - JSON column will handle serialization
         cefr_level: safeCefr // Use validated level
       };
-      
+
       console.log(`[createComprehensiveFeedback] Feedback data to create:`, JSON.stringify(feedbackData, null, 2));
-      
+
       // Validate required fields before creating
       if (feedbackData.score === null || feedbackData.score === undefined) {
         throw new Error(`Invalid score: ${feedbackData.score}`);
@@ -1426,10 +1470,10 @@ Consider this objective audio data when assessing speaking fluency and delivery.
       if (feedbackData.answer_id === null || feedbackData.answer_id === undefined) {
         throw new Error(`Invalid answer_id: ${feedbackData.answer_id}`);
       }
-      
+
       const feedback = await AnswerAiFeedback.create(feedbackData);
       console.log(`[createComprehensiveFeedback] ✅ Created comprehensive feedback ${feedback.id} with score ${feedback.score} and validated CEFR: ${feedback.cefr_level}`);
-      
+
       return feedback;
     } catch (error) {
       console.error(`[createComprehensiveFeedback] ❌ Failed to create comprehensive feedback:`, error.message);
@@ -1483,9 +1527,9 @@ Consider this objective audio data when assessing speaking fluency and delivery.
         suggestions: result.suggestions,
         cefr_level: result.cefrLevel,
       };
-      
+
       console.log(`[createSingleAnswerFeedback] Creating single feedback for answer ${answerId}:`, feedbackData);
-      
+
       const feedback = await AnswerAiFeedback.create(feedbackData);
       console.log(`[createSingleAnswerFeedback] ✅ Created feedback ${feedback.id} with score: ${result.score}`);
       return feedback;
@@ -1502,7 +1546,7 @@ Consider this objective audio data when assessing speaking fluency and delivery.
   async scoreWithCriteria(answerText, question, criteria, taskType = 'general') {
     console.log(`[scoreWithCriteria] LEGACY: Redirecting to scoreEntireAnswer`);
     const result = await this.scoreEntireAnswer(answerText, question, criteria, taskType);
-    
+
     // Convert to legacy format for backward compatibility
     return {
       totalScore: result.score,
@@ -1518,7 +1562,7 @@ Consider this objective audio data when assessing speaking fluency and delivery.
   async scoreWithAudioAnalysis(answerText, question, criteria, taskType = 'general', audioAnalysis = null) {
     console.log(`[scoreWithAudioAnalysis] LEGACY: Redirecting to scoreEntireAnswerWithAudio`);
     const result = await this.scoreEntireAnswerWithAudio(answerText, question, criteria, taskType, audioAnalysis);
-    
+
     // Convert to legacy format for backward compatibility
     return {
       totalScore: result.score,

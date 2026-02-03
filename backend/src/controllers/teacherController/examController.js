@@ -5,6 +5,7 @@ const {
   AptisType,
   SkillType,
   Question,
+  QuestionType,
   User,
   ExamAttempt,
 } = require('../../models');
@@ -32,19 +33,19 @@ exports.createExam = async (req, res, next) => {
       { skill: 'Reading', part: 2, name: 'Ordering', duration: 10, instructions: 'Part 2: Ordering: Read carefully and answer all questions.' },
       { skill: 'Reading', part: 3, name: 'Matching', duration: 10, instructions: 'Part 3: Matching: Read carefully and answer all questions.' },
       { skill: 'Reading', part: 4, name: 'Matching Headings', duration: 10, instructions: 'Part 4: Matching Headings: Read carefully and answer all questions.' },
-      
+
       // Listening sections (4 parts, 10+10+10+10 = 40 phút)
       { skill: 'Listening', part: 1, name: 'Multiple Choice', duration: 10, instructions: 'Part 1: Multiple Choice: Listen carefully and answer all questions.' },
       { skill: 'Listening', part: 2, name: 'Speaker Matching', duration: 10, instructions: 'Part 2: Speaker Matching: Listen carefully and answer all questions.' },
       { skill: 'Listening', part: 3, name: 'Statement Matching', duration: 10, instructions: 'Part 3: Statement Matching: Listen carefully and answer all questions.' },
       { skill: 'Listening', part: 4, name: 'Extended MCQ', duration: 10, instructions: 'Part 4: Extended MCQ: Listen carefully and answer all questions.' },
-      
+
       // Writing sections (4 tasks, 10+10+10+20 = 50 phút)
       { skill: 'Writing', part: 1, name: 'Form Filling (A1)', duration: 10, instructions: 'Part 1: Form Filling (A1): Follow the instructions carefully and complete within the time limit.' },
       { skill: 'Writing', part: 2, name: 'Short Response (A2)', duration: 10, instructions: 'Part 2: Short Response (A2): Follow the instructions carefully and complete within the time limit.' },
       { skill: 'Writing', part: 3, name: 'Chat Responses (B1)', duration: 10, instructions: 'Part 3: Chat Responses (B1): Follow the instructions carefully and complete within the time limit.' },
       { skill: 'Writing', part: 4, name: 'Email Writing (B2)', duration: 20, instructions: 'Part 4: Email Writing (B2): Follow the instructions carefully and complete within the time limit.' },
-      
+
       // Speaking sections (4 tasks, 2+2+2+6 = 12 phút)
       { skill: 'Speaking', part: 1, name: 'Personal Introduction', duration: 2, instructions: 'Part 1: Personal Introduction: Record your response clearly within the time limit.' },
       { skill: 'Speaking', part: 2, name: 'Picture Description', duration: 2, instructions: 'Part 2: Picture Description: Record your response clearly within the time limit.' },
@@ -69,7 +70,7 @@ exports.createExam = async (req, res, next) => {
     for (let i = 0; i < defaultSections.length; i++) {
       const section = defaultSections[i];
       const skillTypeId = skillMap[section.skill];
-      
+
       if (skillTypeId) {
         await ExamSection.create({
           exam_id: exam.id,
@@ -152,6 +153,7 @@ exports.updateExam = async (req, res, next) => {
                   model: Question,
                   as: 'question',
                   attributes: ['id', 'content', 'question_type_id', 'difficulty'],
+                  include: [{ model: QuestionType, as: 'questionType', attributes: ['id', 'code', 'question_type_name'] }]
                 },
               ],
             },
@@ -317,11 +319,16 @@ exports.addQuestionToSection = async (req, res, next) => {
       throw new NotFoundError('Section not found');
     }
 
-    const question = await Question.findByPk(question_id);
+    // Fetch question with childQuestions to auto-add them
+    const question = await Question.findByPk(question_id, {
+      include: [{ model: Question, as: 'childQuestions' }]
+    });
+
     if (!question) {
       throw new NotFoundError('Question not found');
     }
 
+    // 1. Add Main Question
     const esq = await ExamSectionQuestion.create({
       exam_section_id: sectionId,
       question_id,
@@ -329,6 +336,33 @@ exports.addQuestionToSection = async (req, res, next) => {
       max_score,
     });
 
+    // 2. Auto-add Child Questions (if any)
+    if (question.childQuestions && question.childQuestions.length > 0) {
+      console.log(`[addQuestionToSection] Found ${question.childQuestions.length} child questions. Auto-adding...`);
+
+      // Sort children by ID or some criteria if needed, assuming default order is fine
+      // We process them to add to the section
+      let nextOrder = parseInt(question_order) + 1;
+
+      for (const child of question.childQuestions) {
+        // Check if already in section to avoid duplicates (though minimal risk if just created)
+        const exists = await ExamSectionQuestion.findOne({
+          where: { exam_section_id: sectionId, question_id: child.id }
+        });
+
+        if (!exists) {
+          await ExamSectionQuestion.create({
+            exam_section_id: sectionId,
+            question_id: child.id,
+            question_order: nextOrder,
+            max_score: 5.0, // Default scoring for child questions (required for AI scoring)
+          });
+          nextOrder++;
+        }
+      }
+    }
+
+    // Recalculate total score
     const exam = await Exam.findByPk(examId, {
       include: [
         {
@@ -345,7 +379,7 @@ exports.addQuestionToSection = async (req, res, next) => {
     });
 
     const totalScore = exam.sections.reduce(
-      (sum, sec) => sum + sec.questions.reduce((s, q) => s + parseFloat(q.max_score), 0),
+      (sum, sec) => sum + sec.questions.reduce((s, q) => s + parseFloat(q.max_score || 0), 0),
       0,
     );
 
@@ -354,6 +388,7 @@ exports.addQuestionToSection = async (req, res, next) => {
     res.status(201).json({
       success: true,
       data: esq,
+      message: 'Question and sub-questions (if any) added successfully'
     });
   } catch (error) {
     next(error);
@@ -380,27 +415,62 @@ exports.removeQuestionFromSection = async (req, res, next) => {
     });
 
     if (!section) {
-      console.log('[removeQuestionFromSection] Section not found for exam:', { sectionId, examId });
       throw new NotFoundError('Section not found in this exam');
     }
 
-    const esq = await ExamSectionQuestion.findOne({
+    // Try to find by question_id (foreign key) first
+    let esq = await ExamSectionQuestion.findOne({
       where: {
         exam_section_id: sectionId,
         question_id: questionId,
       },
+      include: [{
+        model: Question,
+        as: 'question',
+        include: [{ model: Question, as: 'childQuestions' }]
+      }]
     });
 
+    // If not found, try to find by primary key (id)
     if (!esq) {
-      console.log('[removeQuestionFromSection] Question not found in section:', { sectionId, questionId });
+      esq = await ExamSectionQuestion.findOne({
+        where: {
+          id: questionId,
+          exam_section_id: sectionId,
+        },
+        include: [{
+          model: Question,
+          as: 'question',
+          include: [{ model: Question, as: 'childQuestions' }]
+        }]
+      });
+    }
+
+    if (!esq) {
       throw new NotFoundError('Question not found in section');
     }
 
+    // Identify child questions to remove
+    const childQuestions = esq.question?.childQuestions || [];
+
+    // Remove main ESQ
     await esq.destroy();
+
+    // Remove child ESQs
+    if (childQuestions.length > 0) {
+      console.log(`[removeQuestionFromSection] Auto-removing ${childQuestions.length} child questions...`);
+      const childIds = childQuestions.map(c => c.id);
+      await ExamSectionQuestion.destroy({
+        where: {
+          exam_section_id: sectionId,
+          question_id: { [Op.in]: childIds }
+        }
+      });
+    }
 
     res.json({
       success: true,
-      message: 'Question removed from section',
+      message: 'Question and sub-questions (if any) removed from section',
     });
   } catch (error) {
     next(error);
@@ -481,7 +551,8 @@ exports.publishExam = async (req, res, next) => {
 
     for (const section of exam.sections) {
       if (!section.questions || section.questions.length === 0) {
-        throw new BadRequestError('All sections must have at least one question');
+        // Try to get skill name if possible, or just ID
+        throw new BadRequestError(`Section with ID ${section.id} (Order ${section.section_order}) is empty. All sections must have at least one question.`);
       }
     }
 
@@ -514,13 +585,13 @@ exports.publishExam = async (req, res, next) => {
 
 exports.getMyExams = async (req, res, next) => {
   try {
-    const { 
-      page = 1, 
-      limit = 20, 
+    const {
+      page = 1,
+      limit = 20,
       status,
       aptis_type,
       skill,
-      search 
+      search
     } = req.query;
     const { offset, limit: validLimit } = paginate(page, limit);
     const teacherId = req.user.userId;
@@ -713,6 +784,7 @@ exports.getExamById = async (req, res, next) => {
                   model: Question,
                   as: 'question',
                   attributes: ['id', 'content', 'question_type_id', 'difficulty'],
+                  include: [{ model: QuestionType, as: 'questionType', attributes: ['id', 'code', 'question_type_name'] }],
                 },
               ],
             },

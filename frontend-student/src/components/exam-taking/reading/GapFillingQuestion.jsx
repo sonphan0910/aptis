@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -12,41 +12,85 @@ import {
 export default function ReadingGapFillingQuestion({ question, onAnswerChange }) {
   const [gaps, setGaps] = useState({});
 
+  // Parse content and handle JSON data if necessary
+  const { displayContent, displayItems, displayOptions } = useMemo(() => {
+    let content = question.content || '';
+    let items = question.items || [];
+    let options = question.options || [];
+
+    // Try to parse content if it's JSON
+    try {
+      if (content && (content.trim().startsWith('{') || content.trim().startsWith('['))) {
+        const parsed = JSON.parse(content);
+        if (parsed.passage) {
+          content = parsed.passage;
+
+          // If items are missing from the question object but present in JSON (via correctAnswers)
+          if (items.length === 0 && (parsed.correctAnswers || parsed.options)) {
+            const count = parsed.correctAnswers ? parsed.correctAnswers.length :
+              (content.match(/\[GAP\d+\]/g) || []).length;
+
+            items = Array.from({ length: count }, (_, i) => ({
+              id: `gap-${i + 1}`,
+              item_number: i + 1,
+              item_order: i + 1
+            }));
+          }
+
+          // If options are missing from the question object but present in JSON
+          if (options.length === 0 && parsed.options) {
+            options = parsed.options.map((opt, idx) => ({
+              id: `opt-${idx}`,
+              option_text: opt
+            }));
+          }
+        }
+      }
+    } catch (e) {
+      console.log('[ReadingGapFillingQuestion] Content is not JSON or missing passage field');
+    }
+
+    return { displayContent: content, displayItems: items, displayOptions: options };
+  }, [question.content, question.items, question.options]);
+
   // Initialize from existing answer or create empty gaps
   useEffect(() => {
+    const initialGaps = {};
+
+    // Initialize empty gaps for all items
+    if (displayItems && displayItems.length > 0) {
+      displayItems.forEach(item => {
+        initialGaps[item.id] = '';
+      });
+    }
+
+    // Overlay existing answer if available
     if (question.answer_data?.answer_json) {
       try {
         const parsedData = JSON.parse(question.answer_data.answer_json);
         if (parsedData.gaps) {
-          setGaps(parsedData.gaps);
+          setGaps({ ...initialGaps, ...parsedData.gaps });
           return;
         }
       } catch (error) {
         console.error('[ReadingGapFillingQuestion] Error parsing answer_json:', error);
       }
     }
-    
-    // Initialize empty gaps
-    if (question.items) {
-      const initialGaps = {};
-      question.items.forEach(item => {
-        initialGaps[item.id] = '';
-      });
-      setGaps(initialGaps);
-    }
-  }, [question.id, question.answer_data?.answer_json, question.items]);
+
+    setGaps(initialGaps);
+  }, [question.id, question.answer_data?.answer_json, displayItems]);
 
   const handleGapChange = (itemId, optionId) => {
     const newGaps = { ...gaps, [itemId]: optionId };
     setGaps(newGaps);
-    
+
     onAnswerChange({
       answer_type: 'json',
       answer_json: JSON.stringify({ gaps: newGaps })
     });
   };
 
-  if (!question.content || !question.items || !question.options) {
+  if (!displayContent) {
     return (
       <Typography color="error">
         Dữ liệu câu hỏi không đầy đủ.
@@ -56,43 +100,30 @@ export default function ReadingGapFillingQuestion({ question, onAnswerChange }) 
 
   // Parse content and replace [GAP1], [GAP2], etc. with dropdowns
   const renderContent = () => {
-    let content = question.content;
+    let content = displayContent;
     const parts = [];
     let lastIndex = 0;
 
-    // Debug logging
-    console.log('[ReadingGapFillingQuestion] Debug data:', {
-      items: question.items,
-      options: question.options,
-      content: content
-    });
-
-    if (!question.items || question.items.length === 0) {
-      console.error('[ReadingGapFillingQuestion] No items found');
+    if (!displayItems || displayItems.length === 0) {
+      console.warn('[ReadingGapFillingQuestion] No items found');
       return content;
     }
 
     // Sort items by item_number if available, otherwise by item_order
-    const sortedItems = [...question.items].sort((a, b) => {
+    const sortedItems = [...displayItems].sort((a, b) => {
       const aNum = a.item_number || a.item_order || 0;
       const bNum = b.item_number || b.item_order || 0;
       return aNum - bNum;
     });
 
-    console.log('[ReadingGapFillingQuestion] Sorted items:', sortedItems);
-
     sortedItems.forEach((item, index) => {
       // Try both item_number and index-based gap patterns
       const gapNumber = item.item_number || (index + 1);
       const gapPattern = `[GAP${gapNumber}]`;
-      
-      console.log(`[ReadingGapFillingQuestion] Looking for pattern: ${gapPattern}`);
-      
+
       const gapIndex = content.indexOf(gapPattern, lastIndex);
-      
+
       if (gapIndex !== -1) {
-        console.log(`[ReadingGapFillingQuestion] Found gap at index ${gapIndex}`);
-        
         // Add text before gap
         if (gapIndex > lastIndex) {
           parts.push(
@@ -104,10 +135,10 @@ export default function ReadingGapFillingQuestion({ question, onAnswerChange }) 
 
         // Add dropdown for gap
         parts.push(
-          <FormControl 
-            key={`gap-${item.id}-${index}`} 
-            size="small" 
-            sx={{ 
+          <FormControl
+            key={`gap-${item.id}-${index}`}
+            size="small"
+            sx={{
               mx: 0.5,
               minWidth: 120,
               display: 'inline-flex',
@@ -133,8 +164,8 @@ export default function ReadingGapFillingQuestion({ question, onAnswerChange }) 
               <MenuItem value="">
                 <em>-- Chọn từ --</em>
               </MenuItem>
-              {question.options && question.options.length > 0 ? (
-                question.options.map((option) => (
+              {displayOptions && displayOptions.length > 0 ? (
+                displayOptions.map((option) => (
                   <MenuItem key={`opt-${option.id}`} value={option.option_text}>
                     {option.option_text}
                   </MenuItem>
@@ -149,8 +180,6 @@ export default function ReadingGapFillingQuestion({ question, onAnswerChange }) 
         );
 
         lastIndex = gapIndex + gapPattern.length;
-      } else {
-        console.warn(`[ReadingGapFillingQuestion] Gap pattern ${gapPattern} not found in content from index ${lastIndex}`);
       }
     });
 
@@ -163,11 +192,8 @@ export default function ReadingGapFillingQuestion({ question, onAnswerChange }) 
       );
     }
 
-    console.log('[ReadingGapFillingQuestion] Generated parts:', parts.length);
-    
     // If no parts were generated, return the original content
     if (parts.length === 0) {
-      console.warn('[ReadingGapFillingQuestion] No parts generated, returning original content');
       return content;
     }
 
@@ -175,18 +201,22 @@ export default function ReadingGapFillingQuestion({ question, onAnswerChange }) 
   };
 
   return (
-    <Box>
-      <Typography 
-        variant="body1" 
-        component="div"
-        sx={{ 
-          lineHeight: 2,
-          fontSize: '1rem',
-          whiteSpace: 'pre-wrap'
-        }}
-      >
-        {renderContent()}
-      </Typography>
+    <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%', py: 2 }}>
+      <Box sx={{ maxWidth: '850px', width: '100%' }}>
+        <Typography
+          variant="body1"
+          component="div"
+          sx={{
+            lineHeight: 2.2,
+            fontSize: '1.05rem',
+            whiteSpace: 'pre-wrap',
+            textAlign: 'justify'
+          }}
+        >
+          {renderContent()}
+        </Typography>
+      </Box>
     </Box>
   );
 }
+

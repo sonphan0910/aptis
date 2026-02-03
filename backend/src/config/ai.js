@@ -9,8 +9,8 @@ const OPENAI_CONFIG = {
   // gpt-4 does NOT support vision - will fail with images
   model: process.env.OPENAI_MODEL || 'gpt-4-turbo',
   baseURL: 'https://api.openai.com/v1',
-  temperature: 1, 
-  maxTokens: 2048, 
+  temperature: 1,
+  maxTokens: 2048,
 };
 
 
@@ -33,11 +33,6 @@ const checkAIProviders = async () => {
 
 checkAIProviders();
 
-
-const callGemini = async (prompt) => {
-  throw new Error('Gemini API is no longer supported. Using OpenAI ChatGPT exclusively.');
-};
-
 /**
  * Gọi OpenAI ChatGPT API (Cloud-based, most capable)
  * @param {string} prompt - Prompt để gửi
@@ -51,20 +46,20 @@ const callOpenAI = async (prompt, options = {}) => {
 
   try {
     console.log(`[OpenAI] Calling model: ${OPENAI_CONFIG.model}`);
-    
+
     // Prepare content - support both text and vision (images)
     let messageContent = prompt;
-    
+
     // If images provided, build vision content
     if (options.images && Array.isArray(options.images) && options.images.length > 0) {
       console.log(`[OpenAI] 🖼️  Vision mode: Including ${options.images.length} image(s)`);
-      
+
       // Log image details for debugging
       options.images.forEach((img, idx) => {
         const imageSize = img.base64 ? `${(img.base64.length / 1024 / 1024).toFixed(2)}MB` : 'URL';
         console.log(`[OpenAI]   Image ${idx + 1}: ${img.description || 'No description'} (${imageSize})`);
       });
-      
+
       messageContent = [
         {
           type: 'text',
@@ -84,7 +79,7 @@ const callOpenAI = async (prompt, options = {}) => {
       ];
       console.log(`[OpenAI] ✅ Vision content prepared with ${options.images.length} image(s)`);
     }
-    
+
     // Prepare request body
     const requestBody = {
       model: OPENAI_CONFIG.model,
@@ -97,7 +92,7 @@ const callOpenAI = async (prompt, options = {}) => {
       max_completion_tokens: options.max_completion_tokens || OPENAI_CONFIG.maxTokens,
       temperature: options.temperature !== undefined ? options.temperature : OPENAI_CONFIG.temperature,
     };
-    
+
     // Log request details for debugging
     if (Array.isArray(messageContent)) {
       const imageCount = messageContent.filter(item => item.type === 'image_url').length;
@@ -105,7 +100,7 @@ const callOpenAI = async (prompt, options = {}) => {
     } else {
       console.log(`[OpenAI] 🚀 Sending text-only request to ${OPENAI_CONFIG.model}...`);
     }
-    
+
     const response = await fetch(`${OPENAI_CONFIG.baseURL}/chat/completions`, {
       method: 'POST',
       headers: {
@@ -124,12 +119,12 @@ const callOpenAI = async (prompt, options = {}) => {
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content || '';
-    
+
     // Debug logging
     if (!content || content.trim().length === 0) {
       console.log('[OpenAI] ⚠️  Empty content received. Full response:', JSON.stringify(data, null, 2));
     }
-    
+
     console.log('[OpenAI] ✅ Response received');
     return content;
   } catch (error) {
@@ -154,11 +149,11 @@ module.exports = {
   // OpenAI ChatGPT (ONLY PROVIDER - Best for English assessment)
   callOpenAI,
   OPENAI_CONFIG,
-  
+
   // AI service (calls OpenAI directly)
   callAI,
   checkAIProviders,
-  
+
   // Status
   isUsingOpenAI: () => useOpenAI,
 };

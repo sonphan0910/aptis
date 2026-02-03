@@ -14,11 +14,11 @@ import WritingQuestion from './WritingQuestion';
 import WritingQuestionDisplay from './writing/WritingQuestionDisplay';
 import SpeakingQuestion from './speaking/SpeakingQuestion';
 
-export default function QuestionDisplay({ 
-  question, 
-  answer, 
-  onAnswerChange, 
-  questionNumber, 
+export default function QuestionDisplay({
+  question,
+  answer,
+  onAnswerChange,
+  questionNumber,
   totalQuestions,
   attemptId,
   onMoveToNextQuestion,
@@ -30,17 +30,17 @@ export default function QuestionDisplay({
   // Protect against overwriting audio answers
   const handleAnswerChange = (answerData) => {
     // If this is an audio question and we already have audio_url, don't allow overwrite
-    if (question.questionType?.code?.includes('SPEAKING') && 
-        answer?.audio_url && 
-        answerData?.answer_type !== 'audio') {
+    if (question.questionType?.code?.includes('SPEAKING') &&
+      answer?.audio_url &&
+      answerData?.answer_type !== 'audio') {
       console.warn('[QuestionDisplay] Preventing overwrite of speaking answer:', answerData);
       return;
     }
-    
+
     console.log('[QuestionDisplay] Forwarding answer change:', answerData);
     onAnswerChange(answerData);
   };
-  
+
   if (!question) {
     return (
       <Box sx={{ p: 3, textAlign: 'center' }}>
@@ -62,6 +62,7 @@ export default function QuestionDisplay({
       'READING_MATCHING_HEADINGS': 'Matching Headings',
 
       'LISTENING_MCQ': 'Multiple Choice',
+      'LISTENING_MCQ_MULTI': 'Multiple Choice Questions',
       'LISTENING_MATCHING': 'Speaker Matching',
       'LISTENING_STATEMENT_MATCHING': 'Statement Matching',
       'WRITING_SHORT': 'Short Answers',
@@ -93,7 +94,7 @@ export default function QuestionDisplay({
       ...question,
       answer_data: answerData
     };
-    
+
     console.log('[QuestionDisplay] Rendering question:', questionData.id, 'with answer_data:', questionData.answer_data, 'media_url:', questionData.media_url);
 
     const questionTypeCode = question.questionType?.code || 'MCQ';
@@ -105,7 +106,7 @@ export default function QuestionDisplay({
         'GV_MCQ': 'mcq',
         'GV_GAP_FILL': 'gap_filling',
         'GV_MATCHING': 'matching',
-        
+
         // Reading
         'READING_MCQ': 'mcq',
         'READING_TRUE_FALSE': 'mcq', // use MCQ component for true/false
@@ -114,25 +115,26 @@ export default function QuestionDisplay({
         'READING_MATCHING': 'matching',
         'READING_MATCHING_HEADINGS': 'matching_headings',
 
-        
+
         // Listening - now mapped to listening component
         'LISTENING_MCQ': 'listening_mcq',
+        'LISTENING_MCQ_MULTI': 'listening_mcq',
         'LISTENING_MATCHING': 'listening_matching',
         'LISTENING_STATEMENT_MATCHING': 'listening_statement_matching',
-        
+
         // Writing - mapped to writing components
         'WRITING_SHORT': 'writing_short_answer',
-        'WRITING_EMAIL': 'writing_email', 
+        'WRITING_EMAIL': 'writing_email',
         'WRITING_LONG': 'writing_chat',
         'WRITING_ESSAY': 'writing_essay',
         'WRITING_FORM': 'writing_form',
-        
+
         // Speaking
         'SPEAKING_INTRO': 'speaking',
         'SPEAKING_DESCRIPTION': 'speaking',
         'SPEAKING_COMPARISON': 'speaking',
         'SPEAKING_DISCUSSION': 'speaking',
-        
+
         // Legacy/fallback mappings
         'MCQ': 'mcq',
         'MATCHING': 'matching',
@@ -268,9 +270,9 @@ export default function QuestionDisplay({
           Câu {questionNumber}
         </Typography>
         <Box display="flex" gap={1}>
-          <Chip 
-            label={getQuestionTypeLabel(question.questionType?.code || 'UNKNOWN')} 
-            size="small" 
+          <Chip
+            label={getQuestionTypeLabel(question.questionType?.code || 'UNKNOWN')}
+            size="small"
             variant="outlined"
             color="primary"
           />
@@ -279,8 +281,8 @@ export default function QuestionDisplay({
       </Box>
 
       {/* Question Content */}
-      <Box sx={{ 
-        flex: 1, 
+      <Box sx={{
+        flex: 1,
         overflow: 'auto',
         maxHeight: '70vh',
         paddingRight: 1,

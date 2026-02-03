@@ -37,7 +37,11 @@ export const questionApi = {
       status: questionData.status || 'draft'
     };
 
+    console.log('[questionService.createQuestion] 🚀 Sending to backend:', backendData);
+    console.log('[questionService.createQuestion] ⚠️ parent_question_id:', backendData.parent_question_id, typeof backendData.parent_question_id);
+
     const response = await apiClient.post(API_ENDPOINTS.TEACHER.QUESTIONS.CREATE, backendData);
+    console.log('[questionService.createQuestion] 📥 Response from backend:', response.data);
     return response.data;
   },
 
@@ -119,7 +123,7 @@ export const questionApi = {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('format', format);
-    
+
     const response = await apiClient.post(API_ENDPOINTS.TEACHER.QUESTIONS.IMPORT, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
@@ -200,16 +204,31 @@ export const questionApi = {
   // Upload audio files for a question (similar to uploadQuestionImages)
   uploadQuestionAudios: async (questionId, audioFiles) => {
     const formData = new FormData();
-    
+
     if (audioFiles.mainAudio) {
       formData.append('mainAudio', audioFiles.mainAudio);
     }
-    
+
     if (audioFiles.speakerAudios && audioFiles.speakerAudios.length > 0) {
-      audioFiles.speakerAudios.forEach(file => {
-        formData.append('speakerAudios', file);
+      audioFiles.speakerAudios.forEach((item, index) => {
+        // Handle both {file, order} object and direct File object
+        if (item.file) {
+          formData.append('speakerAudios', item.file);
+          formData.append('speakerOrder', item.order !== undefined ? item.order : index);
+        } else if (item instanceof File) { // Fallback if item is just a File
+          formData.append('speakerAudios', item);
+          formData.append('speakerOrder', index);
+        } else if (item && item.originFileObj) { // Ant Design format sometimes
+          formData.append('speakerAudios', item.originFileObj);
+          formData.append('speakerOrder', index);
+        }
       });
     }
+
+    // Log the formData entries for debugging (browser console)
+    // for (let pair of formData.entries()) {
+    //   console.log('[uploadQuestionAudios] FormData:', pair[0], pair[1]); 
+    // }
 
     const response = await apiClient.post(
       `/teacher/questions/${questionId}/upload-audios`,
@@ -302,7 +321,7 @@ export const questionApi = {
         }
         if (Object.keys(audioUrls).length > 0) {
           contentData.audioUrls = audioUrls;
-          
+
           // Update speakers with their audio URLs
           if (contentData.speakers) {
             contentData.speakers = contentData.speakers.map((speaker, index) => ({

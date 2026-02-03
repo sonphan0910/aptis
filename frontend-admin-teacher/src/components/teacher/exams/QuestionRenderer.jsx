@@ -9,7 +9,7 @@ export default function QuestionRenderer({ question, compact = false }) {
   }
 
   const questionType = question.questionType?.code || question.question_type;
-  
+
   // Parse content if it's JSON string
   const parseContent = (content) => {
     if (!content) return null;
@@ -37,7 +37,7 @@ export default function QuestionRenderer({ question, compact = false }) {
 
   const renderReadingGapFill = () => {
     let passage, options, prompt;
-    
+
     // Parse content - could be JSON or string
     if (typeof content === 'string') {
       // Check if it's structured with prompt + passage
@@ -95,7 +95,7 @@ export default function QuestionRenderer({ question, compact = false }) {
   const renderReadingOrdering = () => {
     const sentences = content?.sentences || [];
     const title = content?.title || 'Ordering Exercise';
-    
+
     return (
       <Box>
         <Typography variant="body2" fontWeight={500} color="primary" mb={1}>
@@ -111,7 +111,7 @@ export default function QuestionRenderer({ question, compact = false }) {
           <List dense disablePadding>
             {sentences.map((sentence, index) => (
               <ListItem key={index} dense sx={{ py: 0.5 }}>
-                <ListItemText 
+                <ListItemText
                   primary={`${index + 1}. ${sentence}`}
                   sx={{ '& .MuiListItemText-primary': { fontSize: '0.875rem' } }}
                 />
@@ -125,7 +125,7 @@ export default function QuestionRenderer({ question, compact = false }) {
 
   const renderReadingMatching = () => {
     const passage = typeof content === 'string' ? content : content?.passage || question.content;
-    
+
     return (
       <Box>
         <Typography variant="body2" fontWeight={500} color="primary" mb={1}>
@@ -133,7 +133,7 @@ export default function QuestionRenderer({ question, compact = false }) {
         </Typography>
         <Paper variant="outlined" sx={sectionStyle}>
           <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-            {compact && passage.length > 300 
+            {compact && passage.length > 300
               ? passage.substring(0, 300) + '...'
               : passage
             }
@@ -147,7 +147,7 @@ export default function QuestionRenderer({ question, compact = false }) {
             <List dense disablePadding>
               {items.slice(0, compact ? 3 : items.length).map((item, index) => (
                 <ListItem key={index} dense sx={{ py: 0.25 }}>
-                  <ListItemText 
+                  <ListItemText
                     primary={`${index + 1}. ${item.content || item.text || 'N/A'}`}
                     sx={{ '& .MuiListItemText-primary': { fontSize: '0.8rem' } }}
                   />
@@ -167,7 +167,7 @@ export default function QuestionRenderer({ question, compact = false }) {
 
   const renderReadingMatchingHeadings = () => {
     const passage = typeof content === 'string' ? content : content?.passage || question.content;
-    
+
     return (
       <Box>
         <Typography variant="body2" fontWeight={500} color="primary" mb={1}>
@@ -175,7 +175,7 @@ export default function QuestionRenderer({ question, compact = false }) {
         </Typography>
         <Paper variant="outlined" sx={sectionStyle}>
           <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-            {compact && passage.length > 200 
+            {compact && passage.length > 200
               ? passage.substring(0, 200) + '...'
               : passage
             }
@@ -194,7 +194,7 @@ export default function QuestionRenderer({ question, compact = false }) {
 
   const renderListeningMCQ = () => {
     let script, prompt;
-    
+
     if (typeof content === 'string') {
       script = content;
     } else {
@@ -203,7 +203,7 @@ export default function QuestionRenderer({ question, compact = false }) {
 
     // Get options from items if available
     const mcqOptions = items.length > 0 ? items : question.options || [];
-    
+
     return (
       <Box>
         <Typography variant="body2" fontWeight={500} color="primary" mb={1}>
@@ -231,7 +231,7 @@ export default function QuestionRenderer({ question, compact = false }) {
             <List dense disablePadding>
               {mcqOptions.map((item, index) => (
                 <ListItem key={index} dense sx={{ py: 0.25 }}>
-                  <ListItemText 
+                  <ListItemText
                     primary={`${String.fromCharCode(65 + index)}. ${item.content || item.option_text || item.text || 'N/A'}`}
                     sx={{ '& .MuiListItemText-primary': { fontSize: '0.8rem' } }}
                   />
@@ -246,7 +246,7 @@ export default function QuestionRenderer({ question, compact = false }) {
 
   const renderListeningMatching = () => {
     const instruction = typeof content === 'string' ? content : question.content;
-    
+
     return (
       <Box>
         <Typography variant="body2" fontWeight={500} color="primary" mb={1}>
@@ -276,7 +276,7 @@ export default function QuestionRenderer({ question, compact = false }) {
 
   const renderWritingShort = () => {
     const prompt = typeof content === 'string' ? content : content?.prompt || question.content;
-    
+
     return (
       <Box>
         <Typography variant="body2" fontWeight={500} color="primary" mb={1}>
@@ -300,10 +300,10 @@ export default function QuestionRenderer({ question, compact = false }) {
 
   const renderSpeakingQuestion = (type) => {
     const prompt = typeof content === 'string' ? content : content?.prompt || question.content;
-    
+
     const speakingTypes = {
       'SPEAKING_PERSONAL': '🗣️ Speaking - Personal Introduction',
-      'SPEAKING_DESCRIPTION': '📸 Speaking - Description',  
+      'SPEAKING_DESCRIPTION': '📸 Speaking - Description',
       'SPEAKING_COMPARISON': '⚖️ Speaking - Comparison',
       'SPEAKING_DISCUSSION': '💭 Speaking - Discussion'
     };
@@ -329,21 +329,21 @@ export default function QuestionRenderer({ question, compact = false }) {
 
   const renderDefault = () => {
     const displayContent = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
-    
+
     return (
       <Box>
         <Typography variant="body2" fontWeight={500} color="primary" mb={1}>
           ❓ {questionType || 'Unknown Type'}
         </Typography>
         <Paper variant="outlined" sx={sectionStyle}>
-          <Typography variant="body2" component="pre" sx={{ 
+          <Typography variant="body2" component="pre" sx={{
             whiteSpace: 'pre-wrap',
             fontFamily: 'inherit',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             maxHeight: compact ? '100px' : 'none'
           }}>
-            {compact && displayContent.length > 200 
+            {compact && displayContent.length > 200
               ? displayContent.substring(0, 200) + '...'
               : displayContent
             }
@@ -353,6 +353,51 @@ export default function QuestionRenderer({ question, compact = false }) {
           <Typography variant="caption" color="text.secondary" mt={1} display="block">
             {items.length} items/options
           </Typography>
+        )}
+      </Box>
+    );
+  };
+
+  const renderListeningMCQMulti = () => {
+    // Content should be parsed JSON
+    const questions = content?.questions || [];
+    const title = content?.title || 'Multiple Choice Questions';
+
+    return (
+      <Box>
+        <Typography variant="body2" fontWeight={500} color="primary" mb={1}>
+          🎧 Listening - Multiple Choice (Multi)
+        </Typography>
+        <Box display="flex" alignItems="center" gap={1} mb={1}>
+          <AudioFile fontSize="small" color="action" />
+          <Typography variant="caption" color="text.secondary">
+            {title} ({questions.length} câu hỏi)
+          </Typography>
+          {question.media_url && (
+            <Chip label="Audio Available" size="small" color="info" variant="outlined" />
+          )}
+        </Box>
+
+        {questions.length > 0 ? (
+          questions.map((q, qIndex) => (
+            <Paper key={qIndex} variant="outlined" sx={{ ...sectionStyle, mb: 1, bgcolor: 'background.paper' }}>
+              <Typography variant="subtitle2" gutterBottom>
+                {qIndex + 1}. {q.question}
+              </Typography>
+              <List dense disablePadding>
+                {q.options?.map((opt, optIndex) => (
+                  <ListItem key={optIndex} dense sx={{ py: 0 }}>
+                    <ListItemText
+                      primary={`${String.fromCharCode(65 + optIndex)}. ${typeof opt === 'string' ? opt : opt.text}`}
+                      sx={{ '& .MuiListItemText-primary': { fontSize: '0.8rem', color: 'text.secondary' } }}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            </Paper>
+          ))
+        ) : (
+          <Typography variant="body2" color="text.secondary">Không có câu hỏi nào</Typography>
         )}
       </Box>
     );
@@ -370,17 +415,21 @@ export default function QuestionRenderer({ question, compact = false }) {
       return renderReadingMatchingHeadings();
     case 'LISTENING_MCQ':
       return renderListeningMCQ();
+    case 'LISTENING_MCQ_MULTI':
+      return renderListeningMCQMulti();
     case 'LISTENING_MATCHING':
     case 'LISTENING_STATEMENT_MATCHING':
       return renderListeningMatching();
     case 'WRITING_SHORT':
     case 'WRITING_LONG':
     case 'WRITING_FORM':
+    case 'WRITING_EMAIL':
       return renderWritingShort();
     case 'SPEAKING_PERSONAL':
     case 'SPEAKING_DESCRIPTION':
     case 'SPEAKING_COMPARISON':
     case 'SPEAKING_DISCUSSION':
+    case 'SPEAKING_INTRO': // Add missing speaking type codes
       return renderSpeakingQuestion(questionType);
     default:
       return renderDefault();
