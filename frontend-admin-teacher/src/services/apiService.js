@@ -2,13 +2,13 @@ import { authService } from './authService';
 
 class ApiService {
   constructor() {
-    this.baseURL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000/api';
+    this.baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
   }
 
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
     const token = authService.getToken();
-    
+
     const config = {
       headers: {
         'Content-Type': 'application/json',
